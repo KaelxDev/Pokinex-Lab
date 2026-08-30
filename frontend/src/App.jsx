@@ -36,6 +36,7 @@ function App() {
   const [username, setUsername] = useState(loadUsername);
   const [connected, setConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState("disconnected");
+  const [reconnectAttempt, setReconnectAttempt] = useState(0);
   const [messages, setMessages] = useState(loadMessages);
   const [users, setUsers] = useState([]);
   const [messageInput, setMessageInput] = useState("");
@@ -66,12 +67,15 @@ function App() {
     const name = username.trim();
     if (!name) return;
 
+    socketRef.current?.close();
     setConnectionStatus("connecting");
+    setReconnectAttempt(0);
 
     const socket = createWebSocket(name, {
       onOpen() {
         setConnected(true);
         setConnectionStatus("connected");
+        setReconnectAttempt(0);
       },
       onMessage(data) {
         setMessages((current) => [
@@ -83,7 +87,11 @@ function App() {
       },
       onClose() {
         setConnected(false);
-        setConnectionStatus("disconnected");
+      },
+      onReconnecting(_delay, attempt) {
+        setConnected(false);
+        setConnectionStatus("reconnecting");
+        setReconnectAttempt(attempt);
       },
       onError(error) {
         console.error("WebSocket error:", error);
@@ -114,6 +122,7 @@ function App() {
     socketRef.current = null;
     setConnected(false);
     setConnectionStatus("disconnected");
+    setReconnectAttempt(0);
     setUsers([]);
     setMessageInput("");
   }
@@ -140,11 +149,19 @@ function App() {
   }, []);
 
   if (!connected) {
+    const isReconnecting = connectionStatus === "reconnecting";
+
     return (
       <main className="app">
         <section className="login">
           <h1>💬 Poknex</h1>
           <p>Entre no chat para conversar em tempo real.</p>
+
+          {isReconnecting && (
+            <div className="status connecting">
+              🟡 Reconectando... tentativa #{reconnectAttempt}
+            </div>
+          )}
 
           {connectionStatus === "connecting" && (
             <div className="status connecting">🟡 Conectando...</div>
