@@ -15,7 +15,7 @@ export function createWebSocket(
 ) {
   let socket = null;
   let reconnectTimer = null;
-  let reconnectDelay = INITIAL_RECONNECT_DELAY;
+  let reconnectAttempt = 0;
   let manuallyClosed = false;
 
   function connect() {
@@ -27,7 +27,7 @@ export function createWebSocket(
 
     socket.onopen = () => {
       console.log("WebSocket conectado.");
-      reconnectDelay = INITIAL_RECONNECT_DELAY;
+      reconnectAttempt = 0;
       onOpen?.();
     };
 
@@ -47,30 +47,33 @@ export function createWebSocket(
 
     socket.onclose = () => {
       console.log("WebSocket desconectado.");
-      onClose?.();
 
-      if (!manuallyClosed) {
-        scheduleReconnect();
+      if (manuallyClosed) {
+        onClose?.();
+        return;
       }
+
+      scheduleReconnect();
     };
   }
 
   function scheduleReconnect() {
     if (manuallyClosed || reconnectTimer) return;
 
-    console.log(
-      `Tentando reconectar em ${reconnectDelay / 1000}s...`
+    const delay = Math.min(
+      INITIAL_RECONNECT_DELAY * 2 ** reconnectAttempt,
+      MAX_RECONNECT_DELAY
     );
-    onReconnecting?.(reconnectDelay);
+
+    reconnectAttempt += 1;
+
+    console.log(`Tentativa de reconexão #${reconnectAttempt} em ${delay / 1000}s...`);
+    onReconnecting?.(delay, reconnectAttempt);
 
     reconnectTimer = setTimeout(() => {
       reconnectTimer = null;
       connect();
-      reconnectDelay = Math.min(
-        reconnectDelay * 2,
-        MAX_RECONNECT_DELAY
-      );
-    }, reconnectDelay);
+    }, delay);
   }
 
   connect();
