@@ -44,7 +44,6 @@ function App() {
 
   const socketRef = useRef(null);
   const messagesEndRef = useRef(null);
-  const messageInputRef = useRef(null);
 
   useEffect(() => {
     try {
@@ -56,9 +55,7 @@ function App() {
 
   useEffect(() => {
     try {
-      if (username.trim()) {
-        localStorage.setItem(USERNAME_KEY, username.trim());
-      }
+      if (username.trim()) localStorage.setItem(USERNAME_KEY, username.trim());
     } catch (error) {
       console.error("Erro ao salvar username local:", error);
     }
@@ -95,17 +92,16 @@ function App() {
           ...current,
           { ...data, timestamp: Date.now() }
         ]);
-
         if (data.users) setUsers(data.users);
       },
       onClose() {
         setConnected(false);
       },
-      onReconnecting(delay, attempt) {
+      onReconnecting(_delay, attempt) {
         setConnected(false);
         setConnectionStatus("reconnecting");
         setReconnectAttempt(attempt);
-        setReconnectSeconds(Math.ceil(delay / 1000));
+        setReconnectSeconds(10);
       },
       onError(error) {
         console.error("WebSocket error:", error);
@@ -155,13 +151,7 @@ function App() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  useEffect(() => {
-    if (connected) messageInputRef.current?.focus();
-  }, [connected]);
-
-  useEffect(() => {
-    return () => socketRef.current?.close();
-  }, []);
+  useEffect(() => () => socketRef.current?.close(), []);
 
   if (!connected) {
     const isReconnecting = connectionStatus === "reconnecting";
@@ -262,18 +252,11 @@ function App() {
               const isMine = message.username === username;
 
               return (
-                <div
-                  className={`message ${isMine ? "mine" : "other"}`}
-                  key={index}
-                >
-                  {!isMine && (
-                    <span className="message-user">{message.username}</span>
-                  )}
+                <div className={`message ${isMine ? "mine" : "other"}`} key={index}>
+                  {!isMine && <span className="message-user">{message.username}</span>}
                   <div className="message-row">
                     <div className="message-bubble">{message.message}</div>
-                    <span className="message-time">
-                      {formatTime(message.timestamp)}
-                    </span>
+                    <span className="message-time">{formatTime(message.timestamp)}</span>
                   </div>
                 </div>
               );
@@ -283,7 +266,6 @@ function App() {
 
           <form className="message-form" onSubmit={sendMessage}>
             <textarea
-              ref={messageInputRef}
               placeholder="Digite uma mensagem..."
               value={messageInput}
               onChange={(event) => setMessageInput(event.target.value)}
