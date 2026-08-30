@@ -26,7 +26,6 @@ function App() {
   const [messageInput, setMessageInput] = useState("");
   const socketRef = useRef(null);
   const hasConnectedRef = useRef(loadSession());
-  const autoConnectRef = useRef(false);
 
   useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(messages)); } catch {} }, [messages]);
   useEffect(() => { try { if (username.trim()) localStorage.setItem(USERNAME_KEY, username.trim()); } catch {} }, [username]);
@@ -40,12 +39,13 @@ function App() {
   function connect() {
     const name = username.trim();
     if (!name) return;
+
     socketRef.current?.close();
+    hasConnectedRef.current = true;
+    setHasConnected(true);
     setConnectionStatus("connecting");
     setReconnectAttempt(0);
     setReconnectSeconds(0);
-    hasConnectedRef.current = true;
-    setHasConnected(true);
     try { localStorage.setItem(SESSION_KEY, "true"); } catch {}
 
     const socket = createWebSocket(name, {
@@ -64,19 +64,27 @@ function App() {
       },
       onReconnecting(_delay, attempt) {
         setConnected(false);
-        if (hasConnectedRef.current) { setHasConnected(true); setConnectionStatus("reconnecting"); setReconnectAttempt(attempt); setReconnectSeconds(10); }
+        if (hasConnectedRef.current) {
+          setHasConnected(true); setConnectionStatus("reconnecting");
+          setReconnectAttempt(attempt); setReconnectSeconds(10);
+        }
       },
-      onError: (error) => console.error("WebSocket error:", error),
+      onError: (error) => console.error("Erro no WebSocket:", error),
     });
     socketRef.current = socket;
   }
 
-  // Se havia uma sessão salva, reconecta automaticamente após F5.
+  // Restaura a sessão depois de F5. Sem ref de bloqueio para não quebrar no React StrictMode.
   useEffect(() => {
-    if (!hasConnected || !username.trim() || autoConnectRef.current) return;
-    autoConnectRef.current = true;
+    const session = loadSession();
+    const name = loadUsername();
+    if (!session || !name) return;
+
+    setHasConnected(true);
+    hasConnectedRef.current = true;
+    setConnectionStatus("connecting");
     connect();
-  }, [hasConnected, username]);
+  }, []);
 
   function sendMessage(event) {
     event.preventDefault();
@@ -88,7 +96,8 @@ function App() {
     if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); sendMessage(event); }
   }
   function disconnect() {
-    socketRef.current?.close(); socketRef.current = null; hasConnectedRef.current = false;
+    hasConnectedRef.current = false;
+    socketRef.current?.close(); socketRef.current = null;
     setConnected(false); setHasConnected(false); setConnectionStatus("disconnected");
     setReconnectAttempt(0); setReconnectSeconds(0); setUsers([]); setMessageInput("");
     try { localStorage.removeItem(SESSION_KEY); } catch {}
