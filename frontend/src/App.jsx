@@ -10,18 +10,9 @@ function formatTime(timestamp) {
   if (!timestamp) return "";
   return new Date(timestamp).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
-
-function loadMessages() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { return []; }
-}
-
-function loadUsername() {
-  try { return localStorage.getItem(USERNAME_KEY) || ""; } catch { return ""; }
-}
-
-function loadSession() {
-  try { return localStorage.getItem(SESSION_KEY) === "true"; } catch { return false; }
-}
+function loadMessages() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { return []; } }
+function loadUsername() { try { return localStorage.getItem(USERNAME_KEY) || ""; } catch { return ""; } }
+function loadSession() { try { return localStorage.getItem(SESSION_KEY) === "true"; } catch { return false; } }
 
 function App() {
   const [username, setUsername] = useState(loadUsername);
@@ -35,30 +26,20 @@ function App() {
   const [messageInput, setMessageInput] = useState("");
   const socketRef = useRef(null);
   const hasConnectedRef = useRef(loadSession());
+  const autoConnectRef = useRef(false);
 
-  useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(messages)); }
-    catch (error) { console.error("Erro ao salvar mensagens localmente:", error); }
-  }, [messages]);
-
-  useEffect(() => {
-    try {
-      if (username.trim()) localStorage.setItem(USERNAME_KEY, username.trim());
-    } catch (error) { console.error("Erro ao salvar username local:", error); }
-  }, [username]);
+  useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(messages)); } catch {} }, [messages]);
+  useEffect(() => { try { if (username.trim()) localStorage.setItem(USERNAME_KEY, username.trim()); } catch {} }, [username]);
 
   useEffect(() => {
     if (connectionStatus !== "reconnecting") return;
-    const timer = setInterval(() => {
-      setReconnectSeconds((current) => current > 1 ? current - 1 : 10);
-    }, 1000);
+    const timer = setInterval(() => setReconnectSeconds((current) => current > 1 ? current - 1 : 10), 1000);
     return () => clearInterval(timer);
   }, [connectionStatus, reconnectAttempt]);
 
   function connect() {
     const name = username.trim();
     if (!name) return;
-
     socketRef.current?.close();
     setConnectionStatus("connecting");
     setReconnectAttempt(0);
@@ -67,14 +48,10 @@ function App() {
     setHasConnected(true);
     try { localStorage.setItem(SESSION_KEY, "true"); } catch {}
 
-    socketRef.current = createWebSocket(name, {
+    const socket = createWebSocket(name, {
       onOpen() {
-        setConnected(true);
-        setHasConnected(true);
-        hasConnectedRef.current = true;
-        setConnectionStatus("connected");
-        setReconnectAttempt(0);
-        setReconnectSeconds(0);
+        setConnected(true); setHasConnected(true); hasConnectedRef.current = true;
+        setConnectionStatus("connected"); setReconnectAttempt(0); setReconnectSeconds(0);
       },
       onMessage(data) {
         setMessages((current) => [...current, { ...data, timestamp: Date.now() }]);
@@ -82,25 +59,24 @@ function App() {
       },
       onClose() {
         setConnected(false);
-        if (hasConnectedRef.current) {
-          setConnectionStatus("reconnecting");
-          setReconnectSeconds(10);
-        } else {
-          setConnectionStatus("disconnected");
-        }
+        if (hasConnectedRef.current) { setConnectionStatus("reconnecting"); setReconnectSeconds(10); }
+        else setConnectionStatus("disconnected");
       },
       onReconnecting(_delay, attempt) {
         setConnected(false);
-        if (hasConnectedRef.current) {
-          setHasConnected(true);
-          setConnectionStatus("reconnecting");
-          setReconnectAttempt(attempt);
-          setReconnectSeconds(10);
-        }
+        if (hasConnectedRef.current) { setHasConnected(true); setConnectionStatus("reconnecting"); setReconnectAttempt(attempt); setReconnectSeconds(10); }
       },
       onError: (error) => console.error("WebSocket error:", error),
     });
+    socketRef.current = socket;
   }
+
+  // Se havia uma sessão salva, reconecta automaticamente após F5.
+  useEffect(() => {
+    if (!hasConnected || !username.trim() || autoConnectRef.current) return;
+    autoConnectRef.current = true;
+    connect();
+  }, [hasConnected, username]);
 
   function sendMessage(event) {
     event.preventDefault();
@@ -108,51 +84,33 @@ function App() {
     if (!message || !connected) return;
     if (socketRef.current?.sendMessage(message)) setMessageInput("");
   }
-
   function handleMessageKeyDown(event) {
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      sendMessage(event);
-    }
+    if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); sendMessage(event); }
   }
-
   function disconnect() {
-    socketRef.current?.close();
-    socketRef.current = null;
-    hasConnectedRef.current = false;
-    setConnected(false);
-    setHasConnected(false);
-    setConnectionStatus("disconnected");
-    setReconnectAttempt(0);
-    setReconnectSeconds(0);
-    setUsers([]);
-    setMessageInput("");
+    socketRef.current?.close(); socketRef.current = null; hasConnectedRef.current = false;
+    setConnected(false); setHasConnected(false); setConnectionStatus("disconnected");
+    setReconnectAttempt(0); setReconnectSeconds(0); setUsers([]); setMessageInput("");
     try { localStorage.removeItem(SESSION_KEY); } catch {}
   }
-
   function clearLocalHistory() {
-    setMessages([]);
-    try { localStorage.removeItem(STORAGE_KEY); }
-    catch (error) { console.error("Erro ao limpar histórico local:", error); }
+    setMessages([]); try { localStorage.removeItem(STORAGE_KEY); } catch {}
   }
 
   useEffect(() => () => socketRef.current?.close(), []);
-
   const showChat = hasConnected || connected;
 
-  if (!showChat) {
-    return (
-      <main className="app"><section className="login">
-        <h1>💬 Poknex</h1><p>Entre no chat para conversar em tempo real.</p>
-        {connectionStatus === "connecting" && <div className="status connecting">🟡 Conectando...</div>}
-        {connectionStatus === "disconnected" && <div className="status disconnected">🔴 Desconectado</div>}
-        <form className="login-form" onSubmit={(event) => { event.preventDefault(); connect(); }}>
-          <input type="text" placeholder="Seu username" value={username} onChange={(event) => setUsername(event.target.value)} maxLength={20} autoFocus />
-          <button type="submit" disabled={connectionStatus === "connecting"}>{connectionStatus === "connecting" ? "Conectando..." : "Entrar"}</button>
-        </form>
-      </section></main>
-    );
-  }
+  if (!showChat) return (
+    <main className="app"><section className="login">
+      <h1>💬 Poknex</h1><p>Entre no chat para conversar em tempo real.</p>
+      {connectionStatus === "connecting" && <div className="status connecting">🟡 Conectando...</div>}
+      {connectionStatus === "disconnected" && <div className="status disconnected">🔴 Desconectado</div>}
+      <form className="login-form" onSubmit={(event) => { event.preventDefault(); connect(); }}>
+        <input type="text" placeholder="Seu username" value={username} onChange={(event) => setUsername(event.target.value)} maxLength={20} autoFocus />
+        <button type="submit" disabled={connectionStatus === "connecting"}>{connectionStatus === "connecting" ? "Conectando..." : "Entrar"}</button>
+      </form>
+    </section></main>
+  );
 
   return (
     <main className="app"><section className="chat">
@@ -163,12 +121,9 @@ function App() {
         <button className="logout" onClick={clearLocalHistory}>Limpar histórico local</button>
       </aside>
       <div className="chat-content">
-        <header className="chat-header">
-          <div><h1># geral</h1>
-            {connectionStatus === "reconnecting" ? <div className="connection connecting">🟡 Reconectando... tentativa #{reconnectAttempt} • próxima tentativa em {reconnectSeconds}s</div> : connectionStatus === "connecting" ? <div className="connection connecting">🟡 Conectando...</div> : <div className="connection"><span className="online-dot" />Online</div>}
-          </div>
-          <button className="logout" onClick={disconnect}>Sair</button>
-        </header>
+        <header className="chat-header"><div><h1># geral</h1>
+          {connectionStatus === "reconnecting" ? <div className="connection connecting">🟡 Reconectando... tentativa #{reconnectAttempt} • próxima tentativa em {reconnectSeconds}s</div> : connectionStatus === "connecting" ? <div className="connection connecting">🟡 Conectando...</div> : <div className="connection"><span className="online-dot" />Online</div>}
+        </div><button className="logout" onClick={disconnect}>Sair</button></header>
         <div className="messages">{messages.map((message, index) => {
           if (message.type === "system") return <div className="system-message" key={index}>{message.message}<span> • {formatTime(message.timestamp)}</span></div>;
           const isMine = message.username === username;
@@ -180,5 +135,4 @@ function App() {
     </section></main>
   );
 }
-
 export default App;
