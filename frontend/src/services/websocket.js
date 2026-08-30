@@ -67,7 +67,10 @@ export function createWebSocket(
 
     reconnectAttempt += 1;
 
-    console.log(`Tentativa de reconexão #${reconnectAttempt} em ${delay / 1000}s...`);
+    console.log(
+      `Tentativa de reconexão #${reconnectAttempt} em ${delay / 1000}s...`
+    );
+
     onReconnecting?.(delay, reconnectAttempt);
 
     reconnectTimer = setTimeout(() => {
