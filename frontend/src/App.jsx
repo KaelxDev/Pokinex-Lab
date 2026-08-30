@@ -62,14 +62,15 @@ function App() {
   }, [username]);
 
   useEffect(() => {
-    if (connectionStatus !== "reconnecting" || reconnectSeconds <= 0) return;
+    if (connectionStatus !== "reconnecting") return;
 
+    setReconnectSeconds(10);
     const timer = setInterval(() => {
-      setReconnectSeconds((current) => Math.max(current - 1, 0));
+      setReconnectSeconds((current) => (current > 1 ? current - 1 : 10));
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [connectionStatus, reconnectSeconds]);
+  }, [connectionStatus, reconnectAttempt]);
 
   function connect() {
     const name = username.trim();
@@ -153,16 +154,14 @@ function App() {
 
   useEffect(() => () => socketRef.current?.close(), []);
 
-  if (!connected) {
-    const isReconnecting = connectionStatus === "reconnecting";
-
-    return (
-      <main className="app">
+  return (
+    <main className="app">
+      {!connected ? (
         <section className="login">
           <h1>💬 Poknex</h1>
           <p>Entre no chat para conversar em tempo real.</p>
 
-          {isReconnecting && (
+          {connectionStatus === "reconnecting" && (
             <div className="status connecting">
               🟡 Reconectando... tentativa #{reconnectAttempt}
               <br />
@@ -178,13 +177,10 @@ function App() {
             <div className="status disconnected">🔴 Desconectado</div>
           )}
 
-          <form
-            className="login-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              connect();
-            }}
-          >
+          <form className="login-form" onSubmit={(event) => {
+            event.preventDefault();
+            connect();
+          }}>
             <input
               type="text"
               placeholder="Seu username"
@@ -198,87 +194,67 @@ function App() {
             </button>
           </form>
         </section>
-      </main>
-    );
-  }
-
-  return (
-    <main className="app">
-      <section className="chat">
-        <aside className="sidebar">
-          <div className="sidebar-header">
-            <h2>💬 Poknex</h2>
-            <p>Conectado como <strong>{username}</strong></p>
-          </div>
-
-          <div className="users-title">Usuários online — {users.length}</div>
-          <ul className="users">
-            {users.map((user, index) => (
-              <li className="user" key={`${user}-${index}`}>
-                <span className="online-dot" />
-                {user}
-              </li>
-            ))}
-          </ul>
-
-          <button className="logout" onClick={clearLocalHistory}>
-            Limpar histórico local
-          </button>
-        </aside>
-
-        <div className="chat-content">
-          <header className="chat-header">
-            <div>
-              <h1># geral</h1>
-              <div className="connection">
-                <span className="online-dot" />
-                Online
-              </div>
+      ) : (
+        <section className="chat">
+          <aside className="sidebar">
+            <div className="sidebar-header">
+              <h2>💬 Poknex</h2>
+              <p>Conectado como <strong>{username}</strong></p>
             </div>
-            <button className="logout" onClick={disconnect}>Sair</button>
-          </header>
+            <div className="users-title">Usuários online — {users.length}</div>
+            <ul className="users">
+              {users.map((user, index) => (
+                <li className="user" key={`${user}-${index}`}>
+                  <span className="online-dot" />{user}
+                </li>
+              ))}
+            </ul>
+            <button className="logout" onClick={clearLocalHistory}>Limpar histórico local</button>
+          </aside>
 
-          <div className="messages">
-            {messages.map((message, index) => {
-              if (message.type === "system") {
+          <div className="chat-content">
+            <header className="chat-header">
+              <div>
+                <h1># geral</h1>
+                <div className="connection"><span className="online-dot" />Online</div>
+              </div>
+              <button className="logout" onClick={disconnect}>Sair</button>
+            </header>
+
+            <div className="messages">
+              {messages.map((message, index) => {
+                if (message.type === "system") {
+                  return <div className="system-message" key={index}>{message.message}<span> • {formatTime(message.timestamp)}</span></div>;
+                }
+                const isMine = message.username === username;
                 return (
-                  <div className="system-message" key={index}>
-                    {message.message}
-                    <span> • {formatTime(message.timestamp)}</span>
+                  <div className={`message ${isMine ? "mine" : "other"}`} key={index}>
+                    {!isMine && <span className="message-user">{message.username}</span>}
+                    <div className="message-row">
+                      <div className="message-bubble">{message.message}</div>
+                      <span className="message-time">{formatTime(message.timestamp)}</span>
+                    </div>
                   </div>
                 );
-              }
+              })}
+              <div ref={messagesEndRef} />
+            </div>
 
-              const isMine = message.username === username;
-
-              return (
-                <div className={`message ${isMine ? "mine" : "other"}`} key={index}>
-                  {!isMine && <span className="message-user">{message.username}</span>}
-                  <div className="message-row">
-                    <div className="message-bubble">{message.message}</div>
-                    <span className="message-time">{formatTime(message.timestamp)}</span>
-                  </div>
-                </div>
-              );
-            })}
-            <div ref={messagesEndRef} />
+            <form className="message-form" onSubmit={sendMessage}>
+              <textarea
+                placeholder="Digite uma mensagem..."
+                value={messageInput}
+                onChange={(event) => setMessageInput(event.target.value)}
+                onKeyDown={handleMessageKeyDown}
+                rows={1}
+                maxLength={1000}
+              />
+              <button type="submit" disabled={!messageInput.trim()}>Enviar</button>
+            </form>
+            <div className="input-hint">Enter para enviar • Histórico salvo neste navegador</div>
           </div>
-
-          <form className="message-form" onSubmit={sendMessage}>
-            <textarea
-              placeholder="Digite uma mensagem..."
-              value={messageInput}
-              onChange={(event) => setMessageInput(event.target.value)}
-              onKeyDown={handleMessageKeyDown}
-              rows={1}
-              maxLength={1000}
-            />
-            <button type="submit" disabled={!messageInput.trim()}>Enviar</button>
-          </form>
-
-          <div className="input-hint">Enter para enviar • Histórico salvo neste navegador</div>
-        </div>
-      </section>
+        </section>
+      )}
     </main>
   );
 }
