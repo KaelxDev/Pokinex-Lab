@@ -37,6 +37,7 @@ function App() {
   const [connected, setConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState("disconnected");
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
+  const [reconnectSeconds, setReconnectSeconds] = useState(0);
   const [messages, setMessages] = useState(loadMessages);
   const [users, setUsers] = useState([]);
   const [messageInput, setMessageInput] = useState("");
@@ -63,6 +64,16 @@ function App() {
     }
   }, [username]);
 
+  useEffect(() => {
+    if (connectionStatus !== "reconnecting" || reconnectSeconds <= 0) return;
+
+    const timer = setInterval(() => {
+      setReconnectSeconds((current) => Math.max(current - 1, 0));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [connectionStatus, reconnectSeconds]);
+
   function connect() {
     const name = username.trim();
     if (!name) return;
@@ -70,12 +81,14 @@ function App() {
     socketRef.current?.close();
     setConnectionStatus("connecting");
     setReconnectAttempt(0);
+    setReconnectSeconds(0);
 
     const socket = createWebSocket(name, {
       onOpen() {
         setConnected(true);
         setConnectionStatus("connected");
         setReconnectAttempt(0);
+        setReconnectSeconds(0);
       },
       onMessage(data) {
         setMessages((current) => [
@@ -88,10 +101,11 @@ function App() {
       onClose() {
         setConnected(false);
       },
-      onReconnecting(_delay, attempt) {
+      onReconnecting(delay, attempt) {
         setConnected(false);
         setConnectionStatus("reconnecting");
         setReconnectAttempt(attempt);
+        setReconnectSeconds(Math.ceil(delay / 1000));
       },
       onError(error) {
         console.error("WebSocket error:", error);
@@ -123,6 +137,7 @@ function App() {
     setConnected(false);
     setConnectionStatus("disconnected");
     setReconnectAttempt(0);
+    setReconnectSeconds(0);
     setUsers([]);
     setMessageInput("");
   }
@@ -160,6 +175,8 @@ function App() {
           {isReconnecting && (
             <div className="status connecting">
               🟡 Reconectando... tentativa #{reconnectAttempt}
+              <br />
+              ⏱️ Próxima tentativa em {reconnectSeconds}s
             </div>
           )}
 
