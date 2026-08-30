@@ -6,24 +6,29 @@ const STORAGE_KEY = "poknex_messages";
 const USERNAME_KEY = "poknex_username";
 const SESSION_KEY = "poknex_session";
 
-function formatTime(timestamp) { if (!timestamp) return ""; return new Date(timestamp).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }); }
+function formatTime(timestamp) {
+  if (!timestamp) return "";
+  return new Date(timestamp).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}
 function loadMessages() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { return []; } }
 function loadUsername() { try { return localStorage.getItem(USERNAME_KEY) || ""; } catch { return ""; } }
 function loadSession() { try { return localStorage.getItem(SESSION_KEY) === "true"; } catch { return false; } }
 
 function App() {
-  const [username, setUsername] = useState(loadUsername);
+  const initialUsername = loadUsername();
+  const initialSession = loadSession() && !!initialUsername;
+  const [username, setUsername] = useState(initialUsername);
   const [connected, setConnected] = useState(false);
-  const [hasConnected, setHasConnected] = useState(loadSession);
-  const [connectionStatus, setConnectionStatus] = useState(loadSession ? "reconnecting" : "disconnected");
+  const [hasSession, setHasSession] = useState(initialSession);
+  const [connectionStatus, setConnectionStatus] = useState(initialSession ? "connecting" : "disconnected");
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
-  const [reconnectSeconds, setReconnectSeconds] = useState(loadSession ? 10 : 0);
+  const [reconnectSeconds, setReconnectSeconds] = useState(0);
   const [messages, setMessages] = useState(loadMessages);
   const [users, setUsers] = useState([]);
   const [messageInput, setMessageInput] = useState("");
   const socketRef = useRef(null);
-  const sessionRef = useRef(loadSession());
-  const initializingRef = useRef(false);
+  const sessionRef = useRef(initialSession);
+  const connectGenerationRef = useRef(0);
 
   useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(messages)); } catch {} }, [messages]);
   useEffect(() => { try { if (username.trim()) localStorage.setItem(USERNAME_KEY, username.trim()); } catch {} }, [username]);
@@ -36,32 +41,58 @@ function App() {
 
   function connect(nameOverride = username) {
     const name = nameOverride.trim();
-    if (!name || initializingRef.current) return;
-    initializingRef.current = true;
+    if (!name) return;
 
+    const generation = ++connectGenerationRef.current;
     socketRef.current?.close();
     sessionRef.current = true;
-    setHasConnected(true); setConnected(false); setConnectionStatus("connecting"); setReconnectAttempt(0); setReconnectSeconds(0);
-    try { localStorage.setItem(USERNAME_KEY, name); localStorage.setItem(SESSION_KEY, "true"); } catch {}
+    setHasSession(true);
+    setConnected(false);
+    setConnectionStatus("connecting");
+    setReconnectAttempt(0);
+    setReconnectSeconds(0);
+
+    try {
+      localStorage.setItem(USERNAME_KEY, name);
+      localStorage.setItem(SESSION_KEY, "true");
+    } catch {}
 
     const socket = createWebSocket(name, {
       onOpen() {
-        initializingRef.current = false;
-        setConnected(true); setHasConnected(true); setConnectionStatus("connected"); setReconnectAttempt(0); setReconnectSeconds(0);
+        if (generation !== connectGenerationRef.current) return;
+        setConnected(true);
+        setHasSession(true);
+        setConnectionStatus("connected");
+        setReconnectAttempt(0);
+        setReconnectSeconds(0);
       },
       onMessage(data) {
-        if (data?.type === "users") { setUsers(Array.isArray(data.users) ? data.users : []); return; }
-        if (data?.type === "message" || data?.type === "system") setMessages((current) => [...current, { ...data, timestamp: data.timestamp || Date.now() }]);
+        if (generation !== connectGenerationRef.current) return;
+        if (data?.type === "users") {
+          setUsers(Array.isArray(data.users) ? data.users : []);
+          return;
+        }
+        if (data?.type === "message" || data?.type === "system") {
+          setMessages((current) => [...current, { ...data, timestamp: data.timestamp || Date.now() }]);
+        }
       },
       onClose() {
-        initializingRef.current = false;
+        if (generation !== connectGenerationRef.current) return;
         setConnected(false);
-        if (sessionRef.current) { setConnectionStatus("reconnecting"); setReconnectSeconds(10); } else setConnectionStatus("disconnected");
+        if (sessionRef.current) {
+          setConnectionStatus("reconnecting");
+          setReconnectSeconds(10);
+        } else {
+          setConnectionStatus("disconnected");
+        }
       },
       onReconnecting(_delay, attempt) {
-        if (!sessionRef.current) return;
-        initializingRef.current = false;
-        setConnected(false); setHasConnected(true); setConnectionStatus("reconnecting"); setReconnectAttempt(attempt); setReconnectSeconds(10);
+        if (generation !== connectGenerationRef.current || !sessionRef.current) return;
+        setConnected(false);
+        setHasSession(true);
+        setConnectionStatus("reconnecting");
+        setReconnectAttempt(attempt);
+        setReconnectSeconds(10);
       },
       onError: (error) => console.error("Erro no WebSocket:", error),
     });
@@ -69,22 +100,37 @@ function App() {
   }
 
   useEffect(() => {
-    const savedUsername = loadUsername();
-    if (!loadSession() || !savedUsername) return;
-    sessionRef.current = true;
-    setHasConnected(true);
-    setConnectionStatus("connecting");
-    connect(savedUsername);
-    return () => { socketRef.current?.close(); socketRef.current = null; };
+    if (!initialSession) return;
+    // React StrictMode executa o efeito duas vezes em desenvolvimento.
+    // O pequeno atraso permite cancelar o cleanup da primeira execução
+    // antes que ele feche a conexão válida da segunda execução.
+    const timer = setTimeout(() => connect(initialUsername), 0);
+    return () => clearTimeout(timer);
   }, []);
 
-  function sendMessage(event) { event.preventDefault(); const message = messageInput.trim(); if (!message || !connected) return; if (socketRef.current?.sendMessage(message)) setMessageInput(""); }
-  function handleMessageKeyDown(event) { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); sendMessage(event); } }
-  function disconnect() { sessionRef.current = false; initializingRef.current = false; socketRef.current?.close(); socketRef.current = null; setConnected(false); setHasConnected(false); setConnectionStatus("disconnected"); setReconnectAttempt(0); setReconnectSeconds(0); setUsers([]); setMessageInput(""); try { localStorage.removeItem(SESSION_KEY); } catch {} }
-  function clearLocalHistory() { setMessages([]); try { localStorage.removeItem(STORAGE_KEY); } catch {} }
+  function sendMessage(event) {
+    event.preventDefault();
+    const message = messageInput.trim();
+    if (!message || !connected) return;
+    if (socketRef.current?.sendMessage(message)) setMessageInput("");
+  }
+  function handleMessageKeyDown(event) {
+    if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); sendMessage(event); }
+  }
+  function disconnect() {
+    sessionRef.current = false;
+    ++connectGenerationRef.current;
+    socketRef.current?.close();
+    socketRef.current = null;
+    setConnected(false); setHasSession(false); setConnectionStatus("disconnected");
+    setReconnectAttempt(0); setReconnectSeconds(0); setUsers([]); setMessageInput("");
+    try { localStorage.removeItem(SESSION_KEY); } catch {}
+  }
+  function clearLocalHistory() {
+    setMessages([]); try { localStorage.removeItem(STORAGE_KEY); } catch {}
+  }
 
-  const showChat = hasConnected || connected;
-  if (!showChat) return (
+  if (!hasSession) return (
     <main className="app"><section className="login"><h1>💬 Poknex</h1><p>Entre no chat para conversar em tempo real.</p>{connectionStatus === "connecting" && <div className="status connecting">🟡 Conectando...</div>}{connectionStatus === "disconnected" && <div className="status disconnected">🔴 Desconectado</div>}<form className="login-form" onSubmit={(event) => { event.preventDefault(); connect(); }}><input type="text" placeholder="Seu username" value={username} onChange={(event) => setUsername(event.target.value)} maxLength={20} autoFocus /><button type="submit" disabled={connectionStatus === "connecting"}>{connectionStatus === "connecting" ? "Conectando..." : "Entrar"}</button></form></section></main>
   );
 
