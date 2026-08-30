@@ -1,5 +1,8 @@
 const WS_URL = "ws://127.0.0.1:8000/ws";
 
+const INITIAL_RECONNECT_DELAY = 1000;
+const MAX_RECONNECT_DELAY = 10000;
+
 export function createWebSocket(
   username,
   {
@@ -7,41 +10,78 @@ export function createWebSocket(
     onOpen,
     onClose,
     onError,
+    onReconnecting,
   } = {}
 ) {
-  const socket = new WebSocket(
-    `${WS_URL}?username=${encodeURIComponent(username)}`
-  );
+  let socket = null;
+  let reconnectTimer = null;
+  let reconnectDelay = INITIAL_RECONNECT_DELAY;
+  let manuallyClosed = false;
 
-  socket.onopen = () => {
-    console.log("WebSocket conectado.");
-    onOpen?.();
-  };
+  function connect() {
+    if (manuallyClosed) return;
 
-  socket.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data);
-      onMessage?.(data);
-    } catch (error) {
-      console.error("Erro ao interpretar mensagem:", error);
-    }
-  };
+    socket = new WebSocket(
+      `${WS_URL}?username=${encodeURIComponent(username)}`
+    );
 
-  socket.onerror = (error) => {
-    console.error("Erro no WebSocket:", error);
-    onError?.(error);
-  };
+    socket.onopen = () => {
+      console.log("WebSocket conectado.");
+      reconnectDelay = INITIAL_RECONNECT_DELAY;
+      onOpen?.();
+    };
 
-  socket.onclose = () => {
-    console.log("WebSocket desconectado.");
-    onClose?.();
-  };
+    socket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        onMessage?.(data);
+      } catch (error) {
+        console.error("Erro ao interpretar mensagem:", error);
+      }
+    };
+
+    socket.onerror = (error) => {
+      console.error("Erro no WebSocket:", error);
+      onError?.(error);
+    };
+
+    socket.onclose = () => {
+      console.log("WebSocket desconectado.");
+      onClose?.();
+
+      if (!manuallyClosed) {
+        scheduleReconnect();
+      }
+    };
+  }
+
+  function scheduleReconnect() {
+    if (manuallyClosed || reconnectTimer) return;
+
+    console.log(
+      `Tentando reconectar em ${reconnectDelay / 1000}s...`
+    );
+    onReconnecting?.(reconnectDelay);
+
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      connect();
+      reconnectDelay = Math.min(
+        reconnectDelay * 2,
+        MAX_RECONNECT_DELAY
+      );
+    }, reconnectDelay);
+  }
+
+  connect();
 
   return {
-    socket,
+    get socket() {
+      return socket;
+    },
 
     sendMessage(message) {
-      if (socket.readyState !== WebSocket.OPEN) {
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
         console.warn("WebSocket ainda não está conectado.");
         return false;
       }
@@ -57,7 +97,14 @@ export function createWebSocket(
     },
 
     close() {
-      socket.close();
+      manuallyClosed = true;
+
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+
+      socket?.close();
     },
   };
 }
