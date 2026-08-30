@@ -2,435 +2,269 @@ import { useEffect, useRef, useState } from "react";
 import { createWebSocket } from "./services/websocket";
 import "./App.css";
 
+const STORAGE_KEY = "poknex_messages";
+const USERNAME_KEY = "poknex_username";
 
 function formatTime(timestamp) {
-  if (!timestamp) {
-    return "";
-  }
-
-  return new Date(timestamp).toLocaleTimeString(
-    "pt-BR",
-    {
-      hour: "2-digit",
-      minute: "2-digit"
-    }
-  );
+  if (!timestamp) return "";
+  return new Date(timestamp).toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit"
+  });
 }
 
+function loadMessages() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved) : [];
+  } catch (error) {
+    console.error("Erro ao carregar mensagens locais:", error);
+    return [];
+  }
+}
+
+function loadUsername() {
+  try {
+    return localStorage.getItem(USERNAME_KEY) || "";
+  } catch (error) {
+    console.error("Erro ao carregar username local:", error);
+    return "";
+  }
+}
 
 function App() {
-  const [username, setUsername] = useState("");
-
+  const [username, setUsername] = useState(loadUsername);
   const [connected, setConnected] = useState(false);
-  const [connectionStatus, setConnectionStatus] =
-    useState("disconnected");
-
-  const [messages, setMessages] = useState([]);
+  const [connectionStatus, setConnectionStatus] = useState("disconnected");
+  const [messages, setMessages] = useState(loadMessages);
   const [users, setUsers] = useState([]);
-
   const [messageInput, setMessageInput] = useState("");
 
   const socketRef = useRef(null);
   const messagesEndRef = useRef(null);
   const messageInputRef = useRef(null);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+    } catch (error) {
+      console.error("Erro ao salvar mensagens localmente:", error);
+    }
+  }, [messages]);
+
+  useEffect(() => {
+    try {
+      if (username.trim()) {
+        localStorage.setItem(USERNAME_KEY, username.trim());
+      }
+    } catch (error) {
+      console.error("Erro ao salvar username local:", error);
+    }
+  }, [username]);
 
   function connect() {
     const name = username.trim();
-
-    if (!name) {
-      return;
-    }
+    if (!name) return;
 
     setConnectionStatus("connecting");
 
     const socket = createWebSocket(name, {
-
       onOpen() {
         setConnected(true);
         setConnectionStatus("connected");
       },
-
-
       onMessage(data) {
         setMessages((current) => [
           ...current,
-          {
-            ...data,
-            timestamp: Date.now()
-          }
+          { ...data, timestamp: Date.now() }
         ]);
 
-        if (data.users) {
-          setUsers(data.users);
-        }
+        if (data.users) setUsers(data.users);
       },
-
-
       onClose() {
         setConnected(false);
         setConnectionStatus("disconnected");
       },
-
-
       onError(error) {
-        console.error(
-          "WebSocket error:",
-          error
-        );
+        console.error("WebSocket error:", error);
       }
-
     });
 
     socketRef.current = socket;
   }
 
-
   function sendMessage(event) {
     event.preventDefault();
-
     const message = messageInput.trim();
+    if (!message) return;
 
-    if (!message) {
-      return;
-    }
-
-    const sent =
-      socketRef.current?.sendMessage(message);
-
-    if (sent) {
-      setMessageInput("");
-    }
+    const sent = socketRef.current?.sendMessage(message);
+    if (sent) setMessageInput("");
   }
-
 
   function handleMessageKeyDown(event) {
-
-    if (
-      event.key === "Enter" &&
-      !event.shiftKey
-    ) {
+    if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
-
       sendMessage(event);
     }
-
   }
-
 
   function disconnect() {
     socketRef.current?.close();
-
     socketRef.current = null;
-
     setConnected(false);
     setConnectionStatus("disconnected");
-
-    setMessages([]);
     setUsers([]);
     setMessageInput("");
   }
 
+  function clearLocalHistory() {
+    setMessages([]);
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (error) {
+      console.error("Erro ao limpar histórico local:", error);
+    }
+  }
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({
-      behavior: "smooth"
-    });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-
   useEffect(() => {
-    if (connected) {
-      messageInputRef.current?.focus();
-    }
+    if (connected) messageInputRef.current?.focus();
   }, [connected]);
 
-
   useEffect(() => {
-    return () => {
-      socketRef.current?.close();
-    };
+    return () => socketRef.current?.close();
   }, []);
-
-
-  /*
-   * LOGIN
-   */
 
   if (!connected) {
     return (
       <main className="app">
-
         <section className="login">
-
-          <h1>💬 Pokinex</h1>
-
-          <p>
-            Entre no chat para conversar
-            em tempo real.
-          </p>
-
+          <h1>💬 Poknex</h1>
+          <p>Entre no chat para conversar em tempo real.</p>
 
           {connectionStatus === "connecting" && (
-            <div className="status connecting">
-              🟡 Conectando...
-            </div>
+            <div className="status connecting">🟡 Conectando...</div>
           )}
-
 
           {connectionStatus === "disconnected" && (
-            <div className="status disconnected">
-              🔴 Desconectado
-            </div>
+            <div className="status disconnected">🔴 Desconectado</div>
           )}
-
 
           <form
             className="login-form"
             onSubmit={(event) => {
               event.preventDefault();
-
               connect();
             }}
           >
-
             <input
               type="text"
               placeholder="Seu username"
               value={username}
-              onChange={(event) =>
-                setUsername(event.target.value)
-              }
+              onChange={(event) => setUsername(event.target.value)}
               maxLength={20}
               autoFocus
             />
-
-            <button
-              type="submit"
-              disabled={
-                connectionStatus === "connecting"
-              }
-            >
-              {connectionStatus === "connecting"
-                ? "Conectando..."
-                : "Entrar"}
+            <button type="submit" disabled={connectionStatus === "connecting"}>
+              {connectionStatus === "connecting" ? "Conectando..." : "Entrar"}
             </button>
-
           </form>
-
         </section>
-
       </main>
     );
   }
 
-
-  /*
-   * CHAT
-   */
-
   return (
     <main className="app">
-
       <section className="chat">
-
-        {/* SIDEBAR */}
-
         <aside className="sidebar">
-
           <div className="sidebar-header">
-
-            <h2>
-              💬 Pokinex
-            </h2>
-
-            <p>
-              Conectado como{" "}
-              <strong>{username}</strong>
-            </p>
-
+            <h2>💬 Poknex</h2>
+            <p>Conectado como <strong>{username}</strong></p>
           </div>
 
-
-          <div className="users-title">
-            Usuários online — {users.length}
-          </div>
-
-
+          <div className="users-title">Usuários online — {users.length}</div>
           <ul className="users">
-
             {users.map((user, index) => (
-
-              <li
-                className="user"
-                key={`${user}-${index}`}
-              >
-
+              <li className="user" key={`${user}-${index}`}>
                 <span className="online-dot" />
-
                 {user}
-
               </li>
-
             ))}
-
           </ul>
 
+          <button className="logout" onClick={clearLocalHistory}>
+            Limpar histórico local
+          </button>
         </aside>
 
-
-        {/* CHAT */}
-
         <div className="chat-content">
-
           <header className="chat-header">
-
             <div>
-
               <h1># geral</h1>
-
               <div className="connection">
-
                 <span className="online-dot" />
-
                 Online
-
               </div>
-
             </div>
-
-
-            <button
-              className="logout"
-              onClick={disconnect}
-            >
-              Sair
-            </button>
-
+            <button className="logout" onClick={disconnect}>Sair</button>
           </header>
 
-
-          {/* MESSAGES */}
-
           <div className="messages">
-
             {messages.map((message, index) => {
-
-              /*
-               * SYSTEM MESSAGE
-               */
-
               if (message.type === "system") {
-
                 return (
-                  <div
-                    className="system-message"
-                    key={index}
-                  >
+                  <div className="system-message" key={index}>
                     {message.message}
-                    <span>
-                      {" "}
-                      • {formatTime(message.timestamp)}
-                    </span>
+                    <span> • {formatTime(message.timestamp)}</span>
                   </div>
                 );
-
               }
 
-
-              /*
-               * NORMAL MESSAGE
-               */
-
-              const isMine =
-                message.username === username;
-
+              const isMine = message.username === username;
 
               return (
                 <div
-                  className={`message ${
-                    isMine
-                      ? "mine"
-                      : "other"
-                  }`}
+                  className={`message ${isMine ? "mine" : "other"}`}
                   key={index}
                 >
-
                   {!isMine && (
-                    <span className="message-user">
-                      {message.username}
-                    </span>
+                    <span className="message-user">{message.username}</span>
                   )}
-
-
                   <div className="message-row">
-
-                    <div className="message-bubble">
-                      {message.message}
-                    </div>
-
+                    <div className="message-bubble">{message.message}</div>
                     <span className="message-time">
-                      {formatTime(
-                        message.timestamp
-                      )}
+                      {formatTime(message.timestamp)}
                     </span>
-
                   </div>
-
                 </div>
               );
-
             })}
-
-
             <div ref={messagesEndRef} />
-
           </div>
 
-
-          {/* MESSAGE INPUT */}
-
-          <form
-            className="message-form"
-            onSubmit={sendMessage}
-          >
-
+          <form className="message-form" onSubmit={sendMessage}>
             <textarea
               ref={messageInputRef}
               placeholder="Digite uma mensagem..."
               value={messageInput}
-              onChange={(event) =>
-                setMessageInput(
-                  event.target.value
-                )
-              }
+              onChange={(event) => setMessageInput(event.target.value)}
               onKeyDown={handleMessageKeyDown}
               rows={1}
               maxLength={1000}
             />
-
-
-            <button
-              type="submit"
-              disabled={!messageInput.trim()}
-            >
-              Enviar
-            </button>
-
+            <button type="submit" disabled={!messageInput.trim()}>Enviar</button>
           </form>
 
-
-          <div className="input-hint">
-            Enter para enviar
-          </div>
-
+          <div className="input-hint">Enter para enviar • Histórico salvo neste navegador</div>
         </div>
-
       </section>
-
     </main>
   );
 }
-
 
 export default App;
