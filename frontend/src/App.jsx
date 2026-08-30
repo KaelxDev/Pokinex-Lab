@@ -18,14 +18,15 @@ function App() {
   const [username, setUsername] = useState(loadUsername);
   const [connected, setConnected] = useState(false);
   const [hasConnected, setHasConnected] = useState(loadSession);
-  const [connectionStatus, setConnectionStatus] = useState(loadSession ? "connecting" : "disconnected");
+  const [connectionStatus, setConnectionStatus] = useState(loadSession ? "reconnecting" : "disconnected");
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
-  const [reconnectSeconds, setReconnectSeconds] = useState(0);
+  const [reconnectSeconds, setReconnectSeconds] = useState(loadSession ? 10 : 0);
   const [messages, setMessages] = useState(loadMessages);
   const [users, setUsers] = useState([]);
   const [messageInput, setMessageInput] = useState("");
   const socketRef = useRef(null);
   const hasConnectedRef = useRef(loadSession());
+  const startedRef = useRef(false);
 
   useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(messages)); } catch {} }, [messages]);
   useEffect(() => { try { if (username.trim()) localStorage.setItem(USERNAME_KEY, username.trim()); } catch {} }, [username]);
@@ -36,22 +37,31 @@ function App() {
     return () => clearInterval(timer);
   }, [connectionStatus, reconnectAttempt]);
 
-  function connect() {
-    const name = username.trim();
+  function connect(nameOverride = username) {
+    const name = nameOverride.trim();
     if (!name) return;
 
     socketRef.current?.close();
     hasConnectedRef.current = true;
     setHasConnected(true);
+    setConnected(false);
     setConnectionStatus("connecting");
     setReconnectAttempt(0);
     setReconnectSeconds(0);
-    try { localStorage.setItem(SESSION_KEY, "true"); } catch {}
+
+    try {
+      localStorage.setItem(USERNAME_KEY, name);
+      localStorage.setItem(SESSION_KEY, "true");
+    } catch {}
 
     const socket = createWebSocket(name, {
       onOpen() {
-        setConnected(true); setHasConnected(true); hasConnectedRef.current = true;
-        setConnectionStatus("connected"); setReconnectAttempt(0); setReconnectSeconds(0);
+        setConnected(true);
+        setHasConnected(true);
+        hasConnectedRef.current = true;
+        setConnectionStatus("connected");
+        setReconnectAttempt(0);
+        setReconnectSeconds(0);
       },
       onMessage(data) {
         setMessages((current) => [...current, { ...data, timestamp: Date.now() }]);
@@ -59,31 +69,42 @@ function App() {
       },
       onClose() {
         setConnected(false);
-        if (hasConnectedRef.current) { setConnectionStatus("reconnecting"); setReconnectSeconds(10); }
-        else setConnectionStatus("disconnected");
+        if (hasConnectedRef.current) {
+          setConnectionStatus("reconnecting");
+          setReconnectSeconds(10);
+        } else {
+          setConnectionStatus("disconnected");
+        }
       },
       onReconnecting(_delay, attempt) {
         setConnected(false);
         if (hasConnectedRef.current) {
-          setHasConnected(true); setConnectionStatus("reconnecting");
-          setReconnectAttempt(attempt); setReconnectSeconds(10);
+          setHasConnected(true);
+          setConnectionStatus("reconnecting");
+          setReconnectAttempt(attempt);
+          setReconnectSeconds(10);
         }
       },
       onError: (error) => console.error("Erro no WebSocket:", error),
     });
+
     socketRef.current = socket;
   }
 
-  // Restaura a sessão depois de F5. Sem ref de bloqueio para não quebrar no React StrictMode.
+  // Restaura a sessão uma única vez após o carregamento da aplicação.
   useEffect(() => {
-    const session = loadSession();
-    const name = loadUsername();
-    if (!session || !name) return;
+    if (startedRef.current) return;
+    startedRef.current = true;
 
-    setHasConnected(true);
-    hasConnectedRef.current = true;
-    setConnectionStatus("connecting");
-    connect();
+    const session = loadSession();
+    const savedUsername = loadUsername();
+
+    if (session && savedUsername) {
+      hasConnectedRef.current = true;
+      setHasConnected(true);
+      setConnectionStatus("connecting");
+      connect(savedUsername);
+    }
   }, []);
 
   function sendMessage(event) {
@@ -97,7 +118,8 @@ function App() {
   }
   function disconnect() {
     hasConnectedRef.current = false;
-    socketRef.current?.close(); socketRef.current = null;
+    socketRef.current?.close();
+    socketRef.current = null;
     setConnected(false); setHasConnected(false); setConnectionStatus("disconnected");
     setReconnectAttempt(0); setReconnectSeconds(0); setUsers([]); setMessageInput("");
     try { localStorage.removeItem(SESSION_KEY); } catch {}
