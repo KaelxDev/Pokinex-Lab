@@ -4,6 +4,7 @@ import "./App.css";
 
 const STORAGE_KEY = "poknex_messages";
 const USERNAME_KEY = "poknex_username";
+const SESSION_KEY = "poknex_session";
 
 function formatTime(timestamp) {
   if (!timestamp) return "";
@@ -18,18 +19,22 @@ function loadUsername() {
   try { return localStorage.getItem(USERNAME_KEY) || ""; } catch { return ""; }
 }
 
+function loadSession() {
+  try { return localStorage.getItem(SESSION_KEY) === "true"; } catch { return false; }
+}
+
 function App() {
   const [username, setUsername] = useState(loadUsername);
   const [connected, setConnected] = useState(false);
-  const [hasConnected, setHasConnected] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState("disconnected");
+  const [hasConnected, setHasConnected] = useState(loadSession);
+  const [connectionStatus, setConnectionStatus] = useState(loadSession ? "connecting" : "disconnected");
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
   const [reconnectSeconds, setReconnectSeconds] = useState(0);
   const [messages, setMessages] = useState(loadMessages);
   const [users, setUsers] = useState([]);
   const [messageInput, setMessageInput] = useState("");
   const socketRef = useRef(null);
-  const hasConnectedRef = useRef(false);
+  const hasConnectedRef = useRef(loadSession());
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(messages)); }
@@ -37,8 +42,9 @@ function App() {
   }, [messages]);
 
   useEffect(() => {
-    try { if (username.trim()) localStorage.setItem(USERNAME_KEY, username.trim()); }
-    catch (error) { console.error("Erro ao salvar username local:", error); }
+    try {
+      if (username.trim()) localStorage.setItem(USERNAME_KEY, username.trim());
+    } catch (error) { console.error("Erro ao salvar username local:", error); }
   }, [username]);
 
   useEffect(() => {
@@ -57,8 +63,11 @@ function App() {
     setConnectionStatus("connecting");
     setReconnectAttempt(0);
     setReconnectSeconds(0);
+    hasConnectedRef.current = true;
+    setHasConnected(true);
+    try { localStorage.setItem(SESSION_KEY, "true"); } catch {}
 
-    const socket = createWebSocket(name, {
+    socketRef.current = createWebSocket(name, {
       onOpen() {
         setConnected(true);
         setHasConnected(true);
@@ -82,17 +91,15 @@ function App() {
       },
       onReconnecting(_delay, attempt) {
         setConnected(false);
-        setHasConnected(hasConnectedRef.current);
-        setConnectionStatus(hasConnectedRef.current ? "reconnecting" : "disconnected");
         if (hasConnectedRef.current) {
+          setHasConnected(true);
+          setConnectionStatus("reconnecting");
           setReconnectAttempt(attempt);
           setReconnectSeconds(10);
         }
       },
       onError: (error) => console.error("WebSocket error:", error),
     });
-
-    socketRef.current = socket;
   }
 
   function sendMessage(event) {
@@ -120,6 +127,7 @@ function App() {
     setReconnectSeconds(0);
     setUsers([]);
     setMessageInput("");
+    try { localStorage.removeItem(SESSION_KEY); } catch {}
   }
 
   function clearLocalHistory() {
