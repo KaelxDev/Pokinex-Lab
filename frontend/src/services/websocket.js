@@ -1,7 +1,6 @@
 const WS_URL = "ws://127.0.0.1:8000/ws";
 
-const INITIAL_RECONNECT_DELAY = 1000;
-const MAX_RECONNECT_DELAY = 10000;
+const RECONNECT_INTERVAL = 10000;
 
 export function createWebSocket(
   username,
@@ -60,23 +59,18 @@ export function createWebSocket(
   function scheduleReconnect() {
     if (manuallyClosed || reconnectTimer) return;
 
-    const delay = Math.min(
-      INITIAL_RECONNECT_DELAY * 2 ** reconnectAttempt,
-      MAX_RECONNECT_DELAY
-    );
-
     reconnectAttempt += 1;
 
     console.log(
-      `Tentativa de reconexão #${reconnectAttempt} em ${delay / 1000}s...`
+      `Tentativa de reconexão #${reconnectAttempt} em 10s...`
     );
 
-    onReconnecting?.(delay, reconnectAttempt);
+    onReconnecting?.(RECONNECT_INTERVAL, reconnectAttempt);
 
     reconnectTimer = setTimeout(() => {
       reconnectTimer = null;
       connect();
-    }, delay);
+    }, RECONNECT_INTERVAL);
   }
 
   connect();
