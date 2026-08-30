@@ -29,6 +29,7 @@ function App() {
   const [users, setUsers] = useState([]);
   const [messageInput, setMessageInput] = useState("");
   const socketRef = useRef(null);
+  const hasConnectedRef = useRef(false);
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(messages)); }
@@ -51,15 +52,17 @@ function App() {
   function connect() {
     const name = username.trim();
     if (!name) return;
+
     socketRef.current?.close();
     setConnectionStatus("connecting");
     setReconnectAttempt(0);
     setReconnectSeconds(0);
 
-    socketRef.current = createWebSocket(name, {
+    const socket = createWebSocket(name, {
       onOpen() {
         setConnected(true);
         setHasConnected(true);
+        hasConnectedRef.current = true;
         setConnectionStatus("connected");
         setReconnectAttempt(0);
         setReconnectSeconds(0);
@@ -70,16 +73,26 @@ function App() {
       },
       onClose() {
         setConnected(false);
-        if (hasConnected) setConnectionStatus("reconnecting");
+        if (hasConnectedRef.current) {
+          setConnectionStatus("reconnecting");
+          setReconnectSeconds(10);
+        } else {
+          setConnectionStatus("disconnected");
+        }
       },
       onReconnecting(_delay, attempt) {
         setConnected(false);
-        setConnectionStatus("reconnecting");
-        setReconnectAttempt(attempt);
-        setReconnectSeconds(10);
+        setHasConnected(hasConnectedRef.current);
+        setConnectionStatus(hasConnectedRef.current ? "reconnecting" : "disconnected");
+        if (hasConnectedRef.current) {
+          setReconnectAttempt(attempt);
+          setReconnectSeconds(10);
+        }
       },
       onError: (error) => console.error("WebSocket error:", error),
     });
+
+    socketRef.current = socket;
   }
 
   function sendMessage(event) {
@@ -99,6 +112,7 @@ function App() {
   function disconnect() {
     socketRef.current?.close();
     socketRef.current = null;
+    hasConnectedRef.current = false;
     setConnected(false);
     setHasConnected(false);
     setConnectionStatus("disconnected");
@@ -151,7 +165,7 @@ function App() {
           if (message.type === "system") return <div className="system-message" key={index}>{message.message}<span> • {formatTime(message.timestamp)}</span></div>;
           const isMine = message.username === username;
           return <div className={`message ${isMine ? "mine" : "other"}`} key={index}>{!isMine && <span className="message-user">{message.username}</span>}<div className="message-row"><div className="message-bubble">{message.message}</div><span className="message-time">{formatTime(message.timestamp)}</span></div></div>;
-        })}<div ref={useRef(null)} /></div>
+        })}</div>
         <form className="message-form" onSubmit={sendMessage}><textarea placeholder={connected ? "Digite uma mensagem..." : "Aguardando conexão..."} value={messageInput} onChange={(event) => setMessageInput(event.target.value)} onKeyDown={handleMessageKeyDown} rows={1} maxLength={1000} disabled={!connected} /><button type="submit" disabled={!connected || !messageInput.trim()}>Enviar</button></form>
         <div className="input-hint">Enter para enviar • Histórico salvo neste navegador</div>
       </div>
