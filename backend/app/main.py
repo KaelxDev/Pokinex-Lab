@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from app.auth import get_user_from_token
 from app.database import initialize_database
 from app.routes.auth import router as auth_router
-from app.websocket.message_order import manager
+from app.websocket.chat import manager
 
 
 initialize_database()
@@ -28,7 +28,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Public local media. The avatar upload endpoint writes into this exact directory.
 app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
 app.include_router(auth_router)
 
@@ -51,6 +50,24 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             data = await websocket.receive_json()
+            event_type = data.get("type", "message")
+
+            if event_type == "edit_message":
+                message_id = data.get("messageId")
+                message = data.get("message", "")
+                if not isinstance(message_id, str) or not message_id:
+                    continue
+                if not isinstance(message, str):
+                    continue
+                message = message.strip()
+                if not message:
+                    await websocket.send_json({"type": "error", "action": "edit_message", "messageId": message_id, "message": "A mensagem não pode ficar vazia."})
+                    continue
+                if len(message) > 1000:
+                    message = message[:1000]
+                await manager.edit_message(user, message_id, message, websocket)
+                continue
+
             message = data.get("message", "")
             message_id = data.get("messageId")
 
