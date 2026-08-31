@@ -7,20 +7,11 @@ import './Profile.css'
 import './MessageContextMenu.css'
 import './MessageLayout.css'
 import './MessageTimePatch.css'
-import App from './AppFixed.jsx'
-import MessageContextMenu from './MessageContextMenu.jsx'
-
-function Root() {
-  return (
-    <>
-      <App />
-      <MessageContextMenu />
-    </>
-  )
-}
+import './AppEdit.css'
+import AppEdit from './AppEdit.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <Root />
+    <AppEdit />
   </StrictMode>,
 )
