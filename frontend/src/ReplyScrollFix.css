@@ -1,0 +1,41 @@
+/* =========================================================
+   REPLY SCROLL — FINAL LAYOUT FIX
+   The messages region is the only flexible/scrollable area.
+   Applies whenever the reply composer is visible.
+========================================================= */
+
+.chat-content {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+
+.chat-content .messages {
+  flex: 1 1 0 !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior-y: contain !important;
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: pan-y !important;
+  pointer-events: auto !important;
+}
+
+.chat-content .reply-composer,
+.chat-content .message-form,
+.chat-content .input-hint {
+  flex: 0 0 auto !important;
+}
+
+@media (max-width: 520px) {
+  .chat-content .messages {
+    height: 0 !important;
+    flex-basis: 0 !important;
+    touch-action: pan-y !important;
+  }
+}
