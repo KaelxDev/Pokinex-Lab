@@ -6,6 +6,7 @@ import './App.css'
 import './Profile.css'
 import './MessageContextMenu.css'
 import './MessageLayout.css'
+import './MessageTimePatch.css'
 import App from './AppFixed.jsx'
 import MessageContextMenu from './MessageContextMenu.jsx'
 
