@@ -12,6 +12,7 @@ class Credentials(BaseModel):
 
 
 class ProfileUpdate(BaseModel):
+    username: str = Field(min_length=3, max_length=20)
     displayName: str = Field(min_length=1, max_length=30)
     avatar: str = ""
     status: str = Field(default="", max_length=60)
@@ -53,7 +54,10 @@ def me(authorization: str | None = Header(default=None)):
 @router.patch("/profile")
 def profile(data: ProfileUpdate, authorization: str | None = Header(default=None)):
     _, user = require_user(authorization)
-    updated = update_profile(user["id"], data.displayName, data.avatar, data.status)
+    try:
+        updated = update_profile(user["id"], data.username, data.displayName, data.avatar, data.status)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     if not updated:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Perfil inválido.")
     return {"user": updated}
