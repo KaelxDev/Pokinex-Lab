@@ -12,33 +12,14 @@
   transition: background 160ms ease;
 }
 
-.profile-summary:hover {
-  background: var(--surface-2);
-}
-
-.profile-summary > div:last-child {
-  min-width: 0;
-}
-
-.profile-summary h2 {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
+.profile-summary:hover { background: var(--surface-2); }
+.profile-summary > div:last-child { min-width: 0; }
+.profile-summary h2,
 .profile-summary p,
-.profile-summary small {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.profile-summary small {
-  margin-top: 4px;
-  color: var(--text-subtle);
-  font-size: 11px;
-}
+.profile-summary small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.profile-summary p,
+.profile-summary small { display: block; }
+.profile-summary small { margin-top: 4px; color: var(--text-subtle); font-size: 11px; }
 
 .avatar,
 .message-avatar {
@@ -75,45 +56,62 @@
   object-fit: cover;
 }
 
+/* =========================================================
+   MESSAGE AVATAR LAYOUT
+========================================================= */
+
+.message {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  gap: 9px;
+  width: fit-content;
+  max-width: min(70%, 680px);
+}
+
+.message.other { align-self: flex-start; }
+.message.mine { align-self: flex-end; flex-direction: row-reverse; }
+
 .message-avatar {
   width: 34px;
   height: 34px;
-  margin-top: 20px;
+  margin: 0;
   border-radius: 9px;
   font-size: 13px;
 }
 
-.message {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  column-gap: 9px;
-  align-items: start;
-}
-
-.message.mine {
-  align-self: flex-end;
-}
-
 .message-main {
   min-width: 0;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
-.message.mine .message-main {
-  order: 1;
+.message-user {
+  margin-bottom: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
 }
 
-.message.mine .message-avatar {
-  order: 2;
-  margin-top: 20px;
+.message-row {
+  min-width: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 7px;
 }
 
-.message.other .message-avatar {
-  order: 1;
+.message-bubble {
+  min-width: 0;
+  max-width: 100%;
 }
 
-.message.other .message-main {
-  order: 2;
-}
+/* Keep own messages visually aligned with the bubble + time + avatar. */
+.message.mine .message-main { align-items: flex-end; }
+.message.mine .message-row { justify-content: flex-end; }
+.message.mine .message-bubble { max-width: min(100%, 560px); }
+.message.other .message-row { justify-content: flex-start; }
+.message.other .message-bubble { max-width: min(100%, 560px); }
 
 .profile-overlay {
   position: fixed;
@@ -138,9 +136,7 @@
   box-shadow: var(--shadow-lg);
 }
 
-.profile-modal h2 {
-  margin: 0 0 20px;
-}
+.profile-modal h2 { margin: 0 0 20px; }
 
 .profile-preview {
   display: flex;
@@ -181,14 +177,8 @@
   cursor: pointer;
 }
 
-.avatar-button:hover {
-  background: var(--primary-hover);
-}
-
-.avatar-picker span {
-  color: var(--text-subtle);
-  font-size: 11px;
-}
+.avatar-button:hover { background: var(--primary-hover); }
+.avatar-picker span { color: var(--text-subtle); font-size: 11px; }
 
 .profile-modal > label {
   display: block;
@@ -231,41 +221,18 @@
   font-weight: 600;
 }
 
-.profile-actions button:last-child {
-  border-color: transparent;
-  background: var(--primary);
-  color: #fff;
-}
+.profile-actions button:last-child { border-color: transparent; background: var(--primary); color: #fff; }
+.profile-actions button:hover { filter: brightness(1.08); }
 
-.profile-actions button:hover {
-  filter: brightness(1.08);
+@media (max-width: 700px) {
+  .message { max-width: 85%; }
 }
 
 @media (max-width: 520px) {
-  .profile-overlay {
-    align-items: flex-end;
-    padding: 0;
-  }
-
-  .profile-modal {
-    width: 100%;
-    max-height: 90dvh;
-    border-radius: 18px 18px 0 0;
-  }
-
-  .profile-preview-avatar {
-    width: 76px;
-    height: 76px;
-  }
-
-  .message-avatar {
-    width: 30px;
-    height: 30px;
-    margin-top: 19px;
-  }
-
-  .message {
-    grid-template-columns: 30px minmax(0, 1fr);
-    column-gap: 7px;
-  }
+  .profile-overlay { align-items: flex-end; padding: 0; }
+  .profile-modal { width: 100%; max-height: 90dvh; border-radius: 18px 18px 0 0; }
+  .profile-preview-avatar { width: 76px; height: 76px; }
+  .message-avatar { width: 30px; height: 30px; }
+  .message { max-width: 88%; gap: 7px; }
+  .message-bubble { max-width: 100%; }
 }
