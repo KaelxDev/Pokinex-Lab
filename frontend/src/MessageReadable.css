@@ -6,14 +6,18 @@
 
 .message-bubble {
   box-sizing: border-box;
-  min-width: 58px;
-  padding: 14px 19px !important;
-  line-height: 1.58 !important;
+  min-width: 72px;
+  max-width: 680px;
+  padding: 16px 22px !important;
+  line-height: 1.62 !important;
   letter-spacing: 0.003em;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   word-break: normal;
   text-align: center !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .message-main {
@@ -37,7 +41,7 @@
 
 .reply-preview {
   margin: 0 0 8px !important;
-  padding: 8px 11px !important;
+  padding: 9px 12px !important;
   line-height: 1.45 !important;
 }
 
@@ -51,13 +55,16 @@
 }
 
 .message-deleted .message-bubble {
-  padding-top: 13px !important;
-  padding-bottom: 13px !important;
+  padding-top: 14px !important;
+  padding-bottom: 14px !important;
 }
 
 @media (max-width: 700px) {
   .message-bubble {
-    padding: 13px 16px !important;
+    min-width: 64px;
+    max-width: 100%;
+    padding: 14px 18px !important;
+    line-height: 1.58 !important;
   }
 
   .message {
@@ -67,8 +74,9 @@
 
 @media (max-width: 520px) {
   .message-bubble {
-    padding: 12px 15px !important;
-    line-height: 1.55 !important;
+    min-width: 60px;
+    padding: 13px 17px !important;
+    line-height: 1.58 !important;
   }
 
   .message {
