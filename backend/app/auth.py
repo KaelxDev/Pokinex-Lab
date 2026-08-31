@@ -15,12 +15,7 @@ def now_utc() -> datetime:
 
 
 def _derive_password(password: str, salt: bytes) -> bytes:
-    return hashlib.pbkdf2_hmac(
-        "sha256",
-        password.encode("utf-8"),
-        salt,
-        PASSWORD_ITERATIONS,
-    )
+    return hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, PASSWORD_ITERATIONS)
 
 
 def hash_password(password: str) -> tuple[str, str]:
@@ -35,8 +30,7 @@ def verify_password(password: str, password_hash: str, password_salt: str) -> bo
         salt = bytes.fromhex(password_salt)
     except ValueError:
         return False
-    actual = _derive_password(password, salt)
-    return hmac.compare_digest(actual, expected)
+    return hmac.compare_digest(_derive_password(password, salt), expected)
 
 
 def validate_credentials(username: str, password: str) -> tuple[str | None, str | None]:
@@ -50,13 +44,21 @@ def validate_credentials(username: str, password: str) -> tuple[str | None, str 
     return username, None
 
 
+def validate_username(username: str) -> tuple[str | None, str | None]:
+    username = username.strip()
+    if len(username) < 3 or len(username) > 20:
+        return None, "Username deve ter entre 3 e 20 caracteres."
+    if not all(char.isalnum() or char in "_-" for char in username):
+        return None, "Username deve usar apenas letras, números, _ ou -."
+    return username, None
+
+
 def create_user(username: str, password: str) -> dict:
     username, error = validate_credentials(username, password)
     if error:
         raise ValueError(error)
 
     password_hash, password_salt = hash_password(password)
-    display_name = username
     created_at = now_utc().isoformat()
 
     connection = get_connection()
@@ -66,21 +68,37 @@ def create_user(username: str, password: str) -> dict:
             INSERT INTO users (username, password_hash, password_salt, display_name, created_at)
             VALUES (?, ?, ?, ?, ?)
             """,
-            (username, password_hash, password_salt, display_name, created_at),
+            (username, password_hash, password_salt, username, created_at),
         )
         connection.commit()
         user_id = cursor.lastrowid
-        return {
-            "id": user_id,
-            "username": username,
-            "displayName": display_name,
-            "avatar": "",
-            "status": "",
-        }
+        return get_user_by_id(user_id, connection=connection)
     except sqlite3.IntegrityError as exc:
         raise ValueError("Username já está em uso.") from exc
     finally:
         connection.close()
+
+
+def get_user_by_id(user_id: int, connection=None) -> dict | None:
+    owns_connection = connection is None
+    connection = connection or get_connection()
+    try:
+        user = connection.execute(
+            "SELECT id, username, display_name, avatar, status FROM users WHERE id = ?",
+            (user_id,),
+        ).fetchone()
+        if not user:
+            return None
+        return {
+            "id": user["id"],
+            "username": user["username"],
+            "displayName": user["display_name"],
+            "avatar": user["avatar"],
+            "status": user["status"],
+        }
+    finally:
+        if owns_connection:
+            connection.close()
 
 
 def authenticate(username: str, password: str) -> dict | None:
@@ -142,17 +160,14 @@ def get_user_from_token(token: str | None) -> dict | None:
         ).fetchone()
         if not row:
             return None
-
         try:
             expires_at = datetime.fromisoformat(row["expires_at"])
         except ValueError:
             return None
-
         if expires_at <= now_utc():
             connection.execute("DELETE FROM sessions WHERE token_hash = ?", (token_hash,))
             connection.commit()
             return None
-
         return {
             "id": row["id"],
             "username": row["username"],
@@ -176,7 +191,11 @@ def delete_session(token: str | None) -> None:
         connection.close()
 
 
-def update_profile(user_id: int, display_name: str, avatar: str, status: str) -> dict | None:
+def update_profile(user_id: int, username: str, display_name: str, avatar: str, status: str) -> dict | None:
+    username, error = validate_username(username)
+    if error:
+        raise ValueError(error)
+
     display_name = display_name.strip()[:30]
     status = status.strip()[:60]
     avatar = avatar.strip()
@@ -186,22 +205,12 @@ def update_profile(user_id: int, display_name: str, avatar: str, status: str) ->
     connection = get_connection()
     try:
         connection.execute(
-            "UPDATE users SET display_name = ?, avatar = ?, status = ? WHERE id = ?",
-            (display_name, avatar, status, user_id),
+            "UPDATE users SET username = ?, display_name = ?, avatar = ?, status = ? WHERE id = ?",
+            (username, display_name, avatar, status, user_id),
         )
         connection.commit()
-        row = connection.execute(
-            "SELECT id, username, display_name, avatar, status FROM users WHERE id = ?",
-            (user_id,),
-        ).fetchone()
-        if not row:
-            return None
-        return {
-            "id": row["id"],
-            "username": row["username"],
-            "displayName": row["display_name"],
-            "avatar": row["avatar"],
-            "status": row["status"],
-        }
+        return get_user_by_id(user_id, connection=connection)
+    except sqlite3.IntegrityError as exc:
+        raise ValueError("Username já está em uso.") from exc
     finally:
         connection.close()
