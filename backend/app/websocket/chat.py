@@ -88,7 +88,24 @@ class ConnectionManager:
         if not persisted:
             save_message(message_id, user["id"], message, edited_at)
 
-        await self.broadcast({"type": "message_edited", "messageId": message_id, "userId": user["id"], "username": user["username"], "displayName": user["displayName"], "avatar": user["avatar"], "status": user["status"], "message": message, "editedAt": edited_at, "edited": True})
+        self.sequence += 1
+        event = {
+            "type": "message_edited",
+            "messageId": message_id,
+            "userId": user["id"],
+            "username": user["username"],
+            "displayName": user["displayName"],
+            "avatar": user["avatar"],
+            "status": user["status"],
+            "message": message,
+            "editedAt": edited_at,
+            "edited": True,
+            "sequence": self.sequence,
+        }
+        await self.broadcast(event)
+        # Also send a normal message-shaped update so every client replaces
+        # the existing message even if it does not handle message_edited yet.
+        await self.broadcast({**event, "type": "message"})
         await sender.send_json({"type": "edit_ack", "messageId": message_id})
 
     @staticmethod
