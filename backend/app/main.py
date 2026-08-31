@@ -49,11 +49,13 @@ async def websocket_endpoint(websocket: WebSocket):
                 continue
             message = data.get("message", "")
             message_id = data.get("messageId")
+            reply_to_message_id = data.get("replyTo")
             if not isinstance(message, str): continue
             message = message.strip()
             if not message: continue
             if message_id is not None and not isinstance(message_id, str): message_id = None
-            await manager.send_message(user, message[:1000], message_id, websocket)
+            if reply_to_message_id is not None and not isinstance(reply_to_message_id, str): reply_to_message_id = None
+            await manager.send_message(user, message[:1000], message_id, websocket, reply_to_message_id)
     except WebSocketDisconnect:
         disconnected_user = manager.disconnect(websocket)
         if disconnected_user:
