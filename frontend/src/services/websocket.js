@@ -1,4 +1,5 @@
-const WS_URL = "ws://127.0.0.1:8000/ws";
+const WS_HOST = window.location.hostname || "localhost";
+const WS_URL = `ws://${WS_HOST}:8000/ws`;
 const RECONNECT_INTERVAL = 10000;
 
 export function createWebSocket(token, { onMessage, onOpen, onClose, onError, onReconnecting } = {}) {
