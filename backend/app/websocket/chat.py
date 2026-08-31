@@ -53,7 +53,15 @@ class ConnectionManager:
         if reply_to_message_id:
             original = get_message(reply_to_message_id)
             if original:
-                reply_to = {"messageId": original["message_id"], "userId": original["user_id"], "message": original["message"], "deleted": bool(original["deleted_at"])}
+                reply_to = {
+                    "messageId": original["message_id"],
+                    "userId": original["user_id"],
+                    "username": original["username"],
+                    "displayName": original["display_name"],
+                    "avatar": original["avatar"],
+                    "message": "Esta mensagem foi excluída" if original["deleted_at"] else original["message"],
+                    "deleted": bool(original["deleted_at"]),
+                }
         timestamp = self.get_timestamp()
         if message_id:
             self.processed_message_ids.add(message_id); self.message_owners[message_id] = user["id"]
