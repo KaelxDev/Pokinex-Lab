@@ -47,7 +47,14 @@ def get_message_owner(message_id: str) -> int | None:
 def get_message(message_id: str):
     connection = get_connection()
     try:
-        row = connection.execute("SELECT message_id, user_id, message, created_at, edited_at, deleted_at, reply_to_message_id FROM messages WHERE message_id = ?", (message_id,)).fetchone()
+        row = connection.execute("""
+            SELECT m.message_id, m.user_id, m.message, m.created_at, m.edited_at,
+                   m.deleted_at, m.reply_to_message_id,
+                   u.username, u.display_name, u.avatar
+            FROM messages m
+            JOIN users u ON u.id = m.user_id
+            WHERE m.message_id = ?
+        """, (message_id,)).fetchone()
         return dict(row) if row else None
     finally: connection.close()
 
