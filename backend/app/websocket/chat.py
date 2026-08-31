@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+
 from fastapi import WebSocket
 
 
@@ -6,6 +7,8 @@ class ConnectionManager:
     def __init__(self):
         self.active_connections: dict[WebSocket, dict] = {}
         self.processed_message_ids: set[str] = set()
+        self.message_owners: dict[str, int] = {}
+        self.sequence = 0
 
     async def connect(self, websocket: WebSocket, user: dict):
         await websocket.accept()
@@ -84,7 +87,9 @@ class ConnectionManager:
             return
         if message_id:
             self.processed_message_ids.add(message_id)
+            self.message_owners[message_id] = user["id"]
 
+        self.sequence += 1
         data = {
             "type": "message",
             "messageId": message_id,
@@ -95,10 +100,34 @@ class ConnectionManager:
             "status": user["status"],
             "message": message,
             "timestamp": self.get_timestamp(),
+            "sequence": self.sequence,
         }
         await self.broadcast(data)
         if sender and message_id:
             await sender.send_json({"type": "ack", "messageId": message_id})
+
+    async def edit_message(self, user: dict, message_id: str, message: str, sender: WebSocket):
+        owner_id = self.message_owners.get(message_id)
+        if owner_id is None:
+            await sender.send_json({"type": "error", "action": "edit_message", "messageId": message_id, "message": "Mensagem não encontrada."})
+            return
+        if owner_id != user["id"]:
+            await sender.send_json({"type": "error", "action": "edit_message", "messageId": message_id, "message": "Você só pode editar suas próprias mensagens."})
+            return
+
+        await self.broadcast({
+            "type": "message_edited",
+            "messageId": message_id,
+            "userId": user["id"],
+            "username": user["username"],
+            "displayName": user["displayName"],
+            "avatar": user["avatar"],
+            "status": user["status"],
+            "message": message,
+            "timestamp": self.get_timestamp(),
+            "edited": True,
+        })
+        await sender.send_json({"type": "edit_ack", "messageId": message_id})
 
     @staticmethod
     def get_timestamp():
