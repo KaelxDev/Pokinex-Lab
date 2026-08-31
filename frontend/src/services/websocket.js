@@ -1,15 +1,15 @@
 const WS_URL = "ws://127.0.0.1:8000/ws";
 const RECONNECT_INTERVAL = 10000;
 
-export function createWebSocket(username, { onMessage, onOpen, onClose, onError, onReconnecting } = {}) {
+export function createWebSocket(token, { onMessage, onOpen, onClose, onError, onReconnecting } = {}) {
   let socket = null;
   let reconnectTimer = null;
   let reconnectAttempt = 0;
   let manuallyClosed = false;
 
   function connect() {
-    if (manuallyClosed) return;
-    socket = new WebSocket(`${WS_URL}?username=${encodeURIComponent(username)}`);
+    if (manuallyClosed || !token) return;
+    socket = new WebSocket(`${WS_URL}?token=${encodeURIComponent(token)}`);
     socket.onopen = () => { console.log("WebSocket conectado."); reconnectAttempt = 0; onOpen?.(); };
     socket.onmessage = (event) => { try { onMessage?.(JSON.parse(event.data)); } catch (error) { console.error("Erro ao interpretar mensagem:", error); } };
     socket.onerror = (error) => { console.error("Erro no WebSocket:", error); onError?.(error); };
