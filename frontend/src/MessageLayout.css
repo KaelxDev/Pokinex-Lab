@@ -1,18 +1,21 @@
-/* Stable message alignment */
-.messages{gap:6px!important}
-.message{width:100%;max-width:none!important;display:grid!important;grid-template-columns:34px minmax(0,1fr);align-items:start;column-gap:9px}
-.message.mine{grid-template-columns:minmax(0,1fr) 34px;align-items:start}
-.message-avatar,.message-avatar-spacer{grid-column:1;width:34px;height:34px;min-width:34px;min-height:34px;margin-top:18px}
+/* Message layout: keep every message as a normal vertical block. */
+.messages{display:flex!important;flex-direction:column!important;gap:8px!important}
+.message{width:auto!important;max-width:min(78%,700px)!important;display:flex!important;flex-direction:row!important;align-items:flex-start!important;gap:9px!important;align-self:flex-start!important}
+.message.mine{align-self:flex-end!important;flex-direction:row-reverse!important}
+.message-avatar,.message-avatar-spacer{flex:0 0 34px;width:34px;height:34px;min-width:34px;min-height:34px;margin-top:18px}
 .message-avatar-spacer{visibility:hidden}
-.message.mine .message-avatar,.message.mine .message-avatar-spacer{grid-column:2}
-.message-main{grid-column:2;min-width:0;width:fit-content;max-width:min(70%,680px)}
-.message.mine .message-main{grid-column:1;justify-self:end}
+.message-main{min-width:0;max-width:100%;width:auto}
 .message-row{display:flex;align-items:flex-end;gap:7px;min-width:0}
 .message-bubble-wrap{min-width:0;max-width:100%}
 .message-bubble{max-width:100%;overflow-wrap:anywhere;word-break:break-word}
-.message.grouped{margin-top:-4px!important}
-.message.group-middle .message-bubble{border-radius:9px!important}
+.message.grouped{margin-top:-5px!important}
+.message.grouped .message-avatar,.message.grouped .message-avatar-spacer{visibility:hidden}
+.message.grouped .message-user{display:none}
 .message.group-start .message-bubble{border-radius:14px 14px 9px 9px!important}
+.message.group-middle .message-bubble{border-radius:9px!important}
 .message.group-end .message-bubble{border-radius:9px 9px 14px 14px!important}
-.message.group-end .message-time{display:inline-flex!important;visibility:visible!important;width:auto!important;margin-left:2px!important}
-@media(max-width:520px){.message{grid-template-columns:30px minmax(0,1fr)}.message.mine{grid-template-columns:minmax(0,1fr) 30px}.message-avatar,.message-avatar-spacer{width:30px;height:30px;min-width:30px;min-height:30px;margin-top:19px}.message-main{max-width:82%}.message.grouped{margin-top:-3px!important}.messages{gap:5px!important}}
+.message:not(.grouped) .message-time{visibility:visible;width:auto;overflow:visible}
+.message.group-start .message-time,.message.group-middle .message-time{visibility:hidden;width:0;margin:0;overflow:hidden}
+.message.group-end .message-time{visibility:visible;width:auto;margin-left:2px;overflow:visible}
+@media(max-width:700px){.message{max-width:94%!important}}
+@media(max-width:520px){.messages{gap:7px!important}.message{max-width:94%!important;gap:8px!important}.message-avatar,.message-avatar-spacer{flex-basis:30px;width:30px;height:30px;min-width:30px;min-height:30px;margin-top:19px}.message.grouped{margin-top:-4px!important}}
