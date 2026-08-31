@@ -9,6 +9,7 @@ import './MessageLayout.css'
 import './MessageTimePatch.css'
 import './AppEdit.css'
 import './UIRefinement.css'
+import './AuthRefinement.css'
 import AppEdit from './AppEdit.jsx'
 
 createRoot(document.getElementById('root')).render(
