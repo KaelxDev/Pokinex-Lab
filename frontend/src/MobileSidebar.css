@@ -1,5 +1,6 @@
 .mobile-sidebar-toggle,
-.mobile-sidebar-overlay {
+.mobile-sidebar-overlay,
+.mobile-profile-hit-target {
   display: none;
 }
 
@@ -64,9 +65,30 @@
     animation: mobile-sidebar-in 180ms cubic-bezier(.2,.8,.2,1);
   }
 
-  /* Profile editing must sit above the mobile drawer so the profile remains usable. */
+  /* Dedicated touch target over the profile area. The visual profile remains unchanged. */
+  .mobile-sidebar-shell.mobile-sidebar-open .mobile-profile-hit-target {
+    position: fixed;
+    top: 48px;
+    left: 8px;
+    z-index: 1150;
+    display: block;
+    width: min(84vw, 304px);
+    height: 104px;
+    padding: 0;
+    border: 0;
+    border-radius: 16px;
+    background: transparent;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobile-sidebar-shell.mobile-sidebar-open .mobile-profile-hit-target:active {
+    background: rgba(255,255,255,.025);
+  }
+
+  /* Profile editing must sit above the mobile drawer. */
   .mobile-sidebar-shell.mobile-sidebar-open .profile-overlay {
-    z-index: 1250;
+    z-index: 1300 !important;
   }
 
   .mobile-sidebar-shell.mobile-sidebar-open .chat-header {
