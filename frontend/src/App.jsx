@@ -1,16 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { createWebSocket } from "./services/websocket";
 import "./App.css";
+import "./Profile.css";
 
 const STORAGE_KEY = "poknex_messages";
 const USERNAME_KEY = "poknex_username";
 const SESSION_KEY = "poknex_session";
 const PROFILE_KEY = "poknex_profile";
 
-function formatTime(timestamp) {
-  if (!timestamp) return "";
-  return new Date(timestamp).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-}
+function formatTime(timestamp) { if (!timestamp) return ""; return new Date(timestamp).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }); }
 function loadMessages() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { return []; } }
 function loadUsername() { try { return localStorage.getItem(USERNAME_KEY) || ""; } catch { return ""; } }
 function loadSession() { try { return localStorage.getItem(SESSION_KEY) === "true"; } catch { return false; } }
@@ -162,10 +160,11 @@ function App() {
     const next = {
       username,
       displayName: String(form.get("displayName") || username).trim() || username,
-      avatar: String(form.get("avatar") || "").trim(),
+      avatar: profile?.avatar || "",
       status: String(form.get("status") || "").trim()
     };
     setProfile(next);
+    try { localStorage.setItem(PROFILE_KEY, JSON.stringify(next)); } catch {}
     setProfileOpen(false);
   }
 
@@ -191,16 +190,16 @@ function App() {
 
   return <main className="app"><section className="chat">
     <aside className="sidebar">
-      <div className="sidebar-header"><div className="profile-summary" onClick={() => setProfileOpen(true)}><div className="avatar">{avatar ? <img src={avatar} alt="Avatar" /> : displayName.slice(0, 1).toUpperCase()}</div><div><h2>{displayName}</h2><p>@{username}</p><small>{profile?.status || "Sem status"}</small></div></div></div>
+      <div className="sidebar-header"><div className="profile-summary" onClick={() => setProfileOpen(true)}><div className="avatar profile-avatar">{avatar ? <img src={avatar} alt="Avatar" /> : displayName.slice(0, 1).toUpperCase()}</div><div><h2>{displayName}</h2><p>@{username}</p><small>{profile?.status || "Sem status"}</small></div></div></div>
       <div className="users-title">Usuários online — {users.length}</div><ul className="users">{users.map((user, index) => <li className="user" key={`${user}-${index}`}><span className="online-dot" />{user}</li>)}</ul>
       <button className="logout" onClick={clearLocalHistory}>Limpar histórico local</button>
     </aside>
     <div className="chat-content">
       <header className="chat-header"><div><h1># geral</h1>{connectionStatus === "reconnecting" ? <div className="connection connecting">🟡 Reconectando... tentativa #{reconnectAttempt || 1} • próxima tentativa em {reconnectSeconds || 10}s</div> : connectionStatus === "connecting" ? <div className="connection connecting">🟡 Conectando...</div> : <div className="connection"><span className="online-dot" />Online</div>}</div><button className="logout" onClick={disconnect}>Sair</button></header>
-      <div className="messages">{messages.map((message, index) => { if (message.type === "system") return <div className="system-message" key={index}>{message.message}<span> • {formatTime(message.timestamp)}</span></div>; if (message.type !== "message") return null; const isMine = message.username === username; return <div className={`message ${isMine ? "mine" : "other"}`} key={index}>{!isMine && <div className="message-avatar">{String(message.username || "?").slice(0, 1).toUpperCase()}</div>}<div className="message-main">{!isMine && <span className="message-user">{message.username}</span>}<div className="message-row"><div className="message-bubble">{message.message}</div><span className="message-time">{formatTime(message.timestamp)}</span>{isMine && <div className="message-avatar">{avatar ? <img src={avatar} alt="Avatar" /> : displayName.slice(0, 1).toUpperCase()}</div>}</div></div></div>; })}</div>
+      <div className="messages">{messages.map((message, index) => { if (message.type === "system") return <div className="system-message" key={index}>{message.message}<span> • {formatTime(message.timestamp)}</span></div>; if (message.type !== "message") return null; const isMine = message.username === username; const messageAvatar = isMine ? avatar : ""; const messageInitial = String(message.username || "?").slice(0, 1).toUpperCase(); return <div className={`message ${isMine ? "mine" : "other"}`} key={index}><div className="message-avatar">{messageAvatar ? <img src={messageAvatar} alt="Avatar" /> : messageInitial}</div><div className="message-main"><span className="message-user">{message.username}</span><div className="message-row"><div className="message-bubble">{message.message}</div><span className="message-time">{formatTime(message.timestamp)}</span></div></div></div>; })}</div>
       <form className="message-form" onSubmit={sendMessage}><textarea placeholder={connected ? "Digite uma mensagem..." : "Aguardando conexão..."} value={messageInput} onChange={(event) => setMessageInput(event.target.value)} onKeyDown={handleMessageKeyDown} rows={1} maxLength={1000} disabled={!connected} /><button type="submit" disabled={!connected || !messageInput.trim()}>Enviar</button></form><div className="input-hint">Enter para enviar • Histórico salvo neste navegador</div>
     </div>
-    {profileOpen && <div className="profile-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setProfileOpen(false); }}><form className="profile-modal" onSubmit={saveProfile}><h2>👤 Meu perfil</h2><div className="profile-preview"><div className="avatar large">{avatar ? <img src={avatar} alt="Avatar" /> : displayName.slice(0, 1).toUpperCase()}</div><div><strong>@{username}</strong><p>O username não pode ser alterado.</p></div></div><div className="avatar-picker"><label className="avatar-button" htmlFor="avatar-file">🖼️ Escolher imagem</label><input id="avatar-file" type="file" accept="image/*" onChange={chooseAvatar} hidden /><span>PNG, JPG, GIF ou WebP • até 2 MB</span></div><label>Nome de exibição<input name="displayName" defaultValue={displayName} maxLength={30} /></label><label>Status personalizado<input name="status" placeholder="Ex.: Jogando 🎮" maxLength={60} defaultValue={profile?.status || ""} /></label><div className="profile-actions"><button type="button" onClick={() => setProfileOpen(false)}>Cancelar</button><button type="submit">Salvar perfil</button></div></form></div>}
+    {profileOpen && <div className="profile-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setProfileOpen(false); }}><form className="profile-modal" onSubmit={saveProfile}><h2>👤 Meu perfil</h2><div className="profile-preview"><div className="avatar profile-avatar profile-preview-avatar">{avatar ? <img src={avatar} alt="Avatar" /> : displayName.slice(0, 1).toUpperCase()}</div><div><strong>@{username}</strong><p>O username não pode ser alterado.</p></div></div><div className="avatar-picker"><label className="avatar-button" htmlFor="avatar-file">🖼️ Escolher imagem</label><input id="avatar-file" type="file" accept="image/*" onChange={chooseAvatar} hidden /><span>PNG, JPG, GIF ou WebP • até 2 MB</span></div><label>Nome de exibição<input name="displayName" defaultValue={displayName} maxLength={30} /></label><label>Status personalizado<input name="status" placeholder="Ex.: Jogando 🎮" maxLength={60} defaultValue={profile?.status || ""} /></label><div className="profile-actions"><button type="button" onClick={() => setProfileOpen(false)}>Cancelar</button><button type="submit">Salvar perfil</button></div></form></div>}
   </section></main>;
 }
 export default App;
