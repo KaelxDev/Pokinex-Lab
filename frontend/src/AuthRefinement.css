@@ -1,0 +1,177 @@
+/* =========================================================
+   POKNEX — LOGIN / REGISTER REFINEMENT
+========================================================= */
+
+.login {
+  position: relative;
+  max-width: 440px;
+  padding: 42px;
+  overflow: hidden;
+  background: linear-gradient(145deg, rgba(24, 28, 40, 0.97), rgba(15, 18, 26, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(88, 101, 242, 0.04);
+}
+
+.login::before {
+  content: "";
+  position: absolute;
+  width: 220px;
+  height: 220px;
+  top: -140px;
+  right: -80px;
+  border-radius: 50%;
+  background: rgba(88, 101, 242, 0.16);
+  filter: blur(20px);
+  pointer-events: none;
+}
+
+.login::after {
+  content: "";
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  bottom: -130px;
+  left: -80px;
+  border-radius: 50%;
+  background: rgba(88, 101, 242, 0.08);
+  filter: blur(24px);
+  pointer-events: none;
+}
+
+.login h1,
+.login p,
+.login-form,
+.auth-switch,
+.login .status {
+  position: relative;
+  z-index: 1;
+}
+
+.login h1 {
+  margin-bottom: 10px;
+  font-size: clamp(29px, 5vw, 36px);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+}
+
+.login h1::first-letter {
+  filter: drop-shadow(0 6px 14px rgba(88, 101, 242, 0.28));
+}
+
+.login > p {
+  max-width: 340px;
+  margin-bottom: 30px;
+  color: #9ca4b3;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.login-form {
+  display: grid;
+  gap: 12px;
+}
+
+.login-form input {
+  width: 100%;
+  min-height: 48px;
+  padding: 13px 14px;
+  background: rgba(8, 11, 17, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  color: #f5f7fa;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.login-form input:hover {
+  background: rgba(10, 13, 20, 0.9);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.login-form input:focus {
+  background: rgba(10, 13, 20, 0.96);
+  border-color: rgba(88, 101, 242, 0.9);
+  box-shadow: 0 0 0 4px rgba(88, 101, 242, 0.12), 0 10px 30px rgba(0, 0, 0, 0.18);
+  transform: translateY(-1px);
+}
+
+.login-form input::placeholder {
+  color: #697180;
+}
+
+.login-form button {
+  min-height: 48px;
+  margin-top: 4px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #6975ff, #5865f2);
+  box-shadow: 0 12px 30px rgba(88, 101, 242, 0.2);
+}
+
+.login-form button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 34px rgba(88, 101, 242, 0.28);
+}
+
+.login-form button:active {
+  transform: translateY(0);
+}
+
+.login-form button:disabled {
+  transform: none;
+}
+
+.auth-switch {
+  width: 100%;
+  margin-top: 18px;
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  color: #aeb5ff;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 9px;
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.auth-switch:hover {
+  background: rgba(88, 101, 242, 0.08);
+  color: #c3c8ff;
+}
+
+.auth-switch:focus-visible {
+  outline: 2px solid #6975ff;
+  outline-offset: 2px;
+}
+
+.login .status.disconnected {
+  margin-bottom: 18px;
+  border-radius: 11px;
+  background: rgba(229, 139, 150, 0.07);
+  border-color: rgba(229, 139, 150, 0.16);
+}
+
+@media (max-width: 520px) {
+  .app:has(.login) {
+    padding: 18px;
+  }
+
+  .login {
+    padding: 30px 22px 24px;
+    border-radius: 18px;
+  }
+
+  .login h1 {
+    font-size: 28px;
+  }
+
+  .login > p {
+    margin-bottom: 24px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-form input,
+  .login-form button,
+  .auth-switch {
+    transition: none;
+  }
+}
