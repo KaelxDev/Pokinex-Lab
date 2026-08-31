@@ -34,6 +34,11 @@ export function createWebSocket(token, { onMessage, onOpen, onClose, onError, on
       socket.send(JSON.stringify({ type: "message", message, messageId }));
       return true;
     },
+    sendEditMessage(messageId, message) {
+      if (!socket || socket.readyState !== WebSocket.OPEN) return false;
+      socket.send(JSON.stringify({ type: "edit_message", messageId, message }));
+      return true;
+    },
     close() {
       manuallyClosed = true;
       if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
