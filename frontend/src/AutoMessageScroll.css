@@ -1,0 +1,41 @@
+.auto-message-scroll-shell {
+  width: 100%;
+  min-height: 100dvh;
+}
+
+.auto-message-scroll-content {
+  width: 100%;
+  min-height: 100dvh;
+}
+
+.new-message-indicator {
+  position: fixed;
+  left: 50%;
+  bottom: 74px;
+  z-index: 900;
+  min-height: 40px;
+  padding: 9px 14px;
+  border: 1px solid rgba(88, 101, 242, 0.4);
+  border-radius: 999px;
+  background: rgba(21, 24, 33, 0.96);
+  color: #f5f7fa;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.34);
+  transform: translateX(-50%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.new-message-indicator:hover {
+  transform: translateX(-50%) translateY(-1px);
+}
+
+@media (max-width: 520px) {
+  .new-message-indicator {
+    bottom: max(72px, calc(64px + env(safe-area-inset-bottom)));
+    min-height: 44px;
+    padding: 10px 15px;
+  }
+}
