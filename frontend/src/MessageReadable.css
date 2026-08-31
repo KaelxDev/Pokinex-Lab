@@ -1,4 +1,4 @@
-/* Message readability: more breathing room between text and bubble edges */
+/* Message readability: compact, centered message bubbles */
 .message-bubble-wrap {
   width: fit-content;
   max-width: min(100%, 680px);
@@ -6,10 +6,10 @@
 
 .message-bubble {
   box-sizing: border-box;
-  min-width: 72px;
+  min-width: 56px;
   max-width: 680px;
-  padding: 16px 22px !important;
-  line-height: 1.62 !important;
+  padding: 11px 16px !important;
+  line-height: 1.5 !important;
   letter-spacing: 0.003em;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -30,41 +30,41 @@
 }
 
 .message-user {
-  margin-bottom: 7px !important;
+  margin-bottom: 6px !important;
   line-height: 1.25;
 }
 
 .message-meta {
-  margin-top: 8px !important;
+  margin-top: 6px !important;
   line-height: 1.25;
 }
 
 .reply-preview {
-  margin: 0 0 8px !important;
-  padding: 9px 12px !important;
-  line-height: 1.45 !important;
+  margin: 0 0 7px !important;
+  padding: 8px 10px !important;
+  line-height: 1.4 !important;
 }
 
 .reply-preview strong {
   margin-bottom: 3px;
-  line-height: 1.3;
+  line-height: 1.25;
 }
 
 .reply-preview span {
-  line-height: 1.4;
+  line-height: 1.35;
 }
 
 .message-deleted .message-bubble {
-  padding-top: 14px !important;
-  padding-bottom: 14px !important;
+  padding-top: 11px !important;
+  padding-bottom: 11px !important;
 }
 
 @media (max-width: 700px) {
   .message-bubble {
-    min-width: 64px;
+    min-width: 54px;
     max-width: 100%;
-    padding: 14px 18px !important;
-    line-height: 1.58 !important;
+    padding: 10px 14px !important;
+    line-height: 1.5 !important;
   }
 
   .message {
@@ -74,9 +74,9 @@
 
 @media (max-width: 520px) {
   .message-bubble {
-    min-width: 60px;
-    padding: 13px 17px !important;
-    line-height: 1.58 !important;
+    min-width: 52px;
+    padding: 10px 13px !important;
+    line-height: 1.48 !important;
   }
 
   .message {
@@ -84,15 +84,15 @@
   }
 
   .message-user {
-    margin-bottom: 6px !important;
+    margin-bottom: 5px !important;
   }
 
   .message-meta {
-    margin-top: 7px !important;
+    margin-top: 6px !important;
   }
 
   .reply-preview {
-    padding: 8px 10px !important;
+    padding: 7px 9px !important;
   }
 }
 
