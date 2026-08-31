@@ -1,29 +1,41 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 
+from app.auth import get_user_from_token
+from app.database import initialize_database
+from app.routes.auth import router as auth_router
 from app.websocket.chat import manager
 
 
-app = FastAPI(title="Realtime Chat API", version="1.0.0")
+initialize_database()
+
+app = FastAPI(title="Poknex API", version="2.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(auth_router)
 
 
 @app.get("/")
 async def root():
-    return {"message": "Realtime Chat API", "status": "online"}
+    return {"message": "Poknex API", "status": "online"}
 
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    username = websocket.query_params.get("username")
-    if not username:
+    token = websocket.query_params.get("token")
+    user = get_user_from_token(token)
+    if not user:
         await websocket.close(code=1008)
         return
 
-    username = username.strip()[:20]
-    if not username:
-        await websocket.close(code=1008)
-        return
-
-    await manager.connect(websocket, username)
+    await manager.connect(websocket, user["username"])
 
     try:
         while True:
@@ -41,7 +53,7 @@ async def websocket_endpoint(websocket: WebSocket):
             if message_id is not None and not isinstance(message_id, str):
                 message_id = None
 
-            await manager.send_message(username, message, message_id, websocket)
+            await manager.send_message(user["username"], message, message_id, websocket)
 
     except WebSocketDisconnect:
         disconnected_user = manager.disconnect(websocket)
