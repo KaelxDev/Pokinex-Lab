@@ -1,10 +1,22 @@
-from fastapi import APIRouter, Header, HTTPException, status
+from pathlib import Path
+import secrets
+
+from fastapi import APIRouter, File, Header, HTTPException, Request, UploadFile, status
 from pydantic import BaseModel, Field
 
 from app.auth import authenticate, create_session, create_user, delete_session, get_user_by_id, get_user_from_token, update_profile
 from app.websocket.chat import manager
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+AVATAR_DIR = Path(__file__).resolve().parent.parent / "uploads" / "avatars"
+AVATAR_DIR.mkdir(parents=True, exist_ok=True)
+MAX_AVATAR_SIZE = 2 * 1024 * 1024
+ALLOWED_IMAGE_TYPES = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/gif": ".gif",
+    "image/webp": ".webp",
+}
 
 
 class Credentials(BaseModel):
@@ -59,6 +71,28 @@ def public_user(user_id: int, authorization: str | None = Header(default=None)):
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado.")
     return {"user": user}
+
+
+@router.post("/avatar")
+async def upload_avatar(request: Request, file: UploadFile = File(...), authorization: str | None = Header(default=None)):
+    _, user = require_user(authorization)
+
+    extension = ALLOWED_IMAGE_TYPES.get(file.content_type or "")
+    if not extension:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Formato de imagem não suportado.")
+
+    content = await file.read(MAX_AVATAR_SIZE + 1)
+    if len(content) > MAX_AVATAR_SIZE:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="A imagem deve ter no máximo 2 MB.")
+    if not content:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="A imagem está vazia.")
+
+    filename = f"{user['id']}-{secrets.token_hex(8)}{extension}"
+    destination = AVATAR_DIR / filename
+    destination.write_bytes(content)
+
+    avatar_url = str(request.base_url).rstrip("/") + f"/media/avatars/{filename}"
+    return {"avatar": avatar_url}
 
 
 @router.patch("/profile")
