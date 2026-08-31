@@ -139,8 +139,11 @@ export default function AppEdit() {
         if (data?.type === "profile_updated" && data.user) { mergeUser(data.user); if (String(userRef.current?.id) === String(data.user.id)) syncProfile({ ...userRef.current, ...data.user }); setMessages((current) => current.map((m) => String(m.userId) === String(data.user.id) ? { ...m, ...data.user } : m)); return; }
         if (data?.type === "ack") { setOfflineQueue((current) => current.filter((item) => item.id !== data.messageId)); setMessages((current) => current.map((m) => m.messageId === data.messageId ? { ...m, offline: false, deliveryStatus: "sent" } : m)); return; }
         if (data?.type === "edit_ack") { setEditSaving(false); return; }
+        if (data?.type === "delete_ack") { return; }
         if (data?.type === "error" && data.action === "edit_message") { setEditError(data.message || "Não foi possível editar a mensagem."); setEditSaving(false); return; }
+        if (data?.type === "error" && data.action === "delete_message") { console.error("Não foi possível excluir:", data.message); return; }
         if (data?.type === "message_edited") { setMessages((current) => current.map((m) => m.messageId === data.messageId ? { ...m, ...data, deliveryStatus: "sent", offline: false, editPending: false, edited: true } : m)); return; }
+        if (data?.type === "message_deleted") { setMessages((current) => current.map((m) => m.messageId === data.messageId ? { ...m, ...data, message: "Esta mensagem foi excluída", deleted: true, deliveryStatus: "sent", offline: false, editPending: false } : m)); return; }
         if (data?.type === "message" && data.messageId) {
           mergeUser({ id: data.userId, username: data.username, displayName: data.displayName, avatar: data.avatar || "", status: data.status || "", online: true });
           setMessages((current) => { const index = current.findIndex((m) => m.messageId === data.messageId); const incoming = { ...data, deliveryStatus: "sent", offline: false }; if (index >= 0) { const next = [...current]; next[index] = { ...next[index], ...incoming }; return next; } return [...current, incoming]; });
@@ -182,10 +185,19 @@ export default function AppEdit() {
     setEditSaving(true); setMessages((current) => current.map((m) => m.messageId === editingId ? { ...m, message: text, edited: true, editPending: true } : m));
     setEditingId(null); setEditingText("");
   }
+  function deleteMessage(message) {
+    setContextMenu(null);
+    if (!connected || !socketRef.current?.sendDeleteMessage(message.messageId)) return;
+    setMessages((current) => current.map((m) => m.messageId === message.messageId ? { ...m, message: "Esta mensagem foi excluída", deleted: true, deletePending: true } : m));
+  }
+  function confirmDelete(message) {
+    if (window.confirm("Excluir esta mensagem?")) deleteMessage(message);
+    else setContextMenu(null);
+  }
   function openContextMenu(event, message) {
     event.preventDefault();
     const isMine = message.userId != null ? String(message.userId) === String(user?.id) : String(message.username || "") === String(user?.username || "");
-    setContextMenu({ x: Math.min(event.clientX, window.innerWidth - 160), y: Math.min(event.clientY, window.innerHeight - 100), message, isMine });
+    setContextMenu({ x: Math.min(event.clientX, window.innerWidth - 180), y: Math.min(event.clientY, window.innerHeight - 130), message, isMine });
   }
   function startLongPress(event, message) {
     if (event.touches.length !== 1) return;
@@ -193,8 +205,7 @@ export default function AppEdit() {
     longPressRef.current = setTimeout(() => openContextMenu({ preventDefault() {}, clientX: event.touches[0].clientX, clientY: event.touches[0].clientY }, message), 550);
   }
   function endLongPress() { clearTimeout(longPressRef.current); }
-  function closeContextMenu() { setContextMenu(null); }
-  async function copyMessage(message) { try { await copyText(message.message); setContextMenu(null); } catch (error) { console.error("Não foi possível copiar:", error); } }
+  async function copyMessage(message) { if (message.deleted) return; try { await copyText(message.message); setContextMenu(null); } catch (error) { console.error("Não foi possível copiar:", error); } }
   function handleLogout() { sessionRef.current = false; ++generationRef.current; socketRef.current?.close(); socketRef.current = null; clearToken(); setUser(null); setProfile(null); setUsers([]); setProfilesById({}); setConnected(false); setContextMenu(null); }
   function clearLocalHistory() { setMessages([]); localStorage.removeItem(STORAGE_KEY); }
   async function saveProfile(event) {
@@ -238,11 +249,11 @@ export default function AppEdit() {
           const isMine = message.userId != null ? String(message.userId) === String(user.id) : String(message.username || "") === String(user.username || "");
           const messageProfile = isMine ? profile : profilesById[message.userId] || message;
           const isEditing = editingId === message.messageId;
-          return <div className={`message ${isMine ? "mine" : "other"} ${grouped ? "grouped" : "group-start"} ${groupEnd ? "group-end" : "group-middle"}`} key={message.messageId || index}>
+          return <div className={`message ${isMine ? "mine" : "other"} ${grouped ? "grouped" : "group-start"} ${groupEnd ? "group-end" : "group-middle"} ${message.deleted ? "deleted" : ""}`} key={message.messageId || index}>
             {!grouped ? <div className="message-avatar">{messageProfile?.avatar ? <img src={messageProfile.avatar} alt="" /> : userInitial(messageProfile)}</div> : <div className="message-avatar-spacer" aria-hidden="true" />}
             <div className="message-main">
               {!grouped && <span className="message-user">{messageProfile?.displayName || message.displayName || message.username}</span>}
-              {isEditing ? <form className="message-edit-form" onSubmit={saveEdit}><textarea value={editingText} onChange={(e) => setEditingText(e.target.value)} autoFocus maxLength={1000} rows={2} /><div><button type="button" onClick={cancelEdit} disabled={editSaving}>Cancelar</button><button type="submit" disabled={editSaving || !editingText.trim()}>{editSaving ? "Salvando..." : "Salvar"}</button></div>{editError && <small>{editError}</small>}</form> : <><div className="message-row" onContextMenu={(e) => openContextMenu(e, message)} onTouchStart={(e) => startLongPress(e, message)} onTouchEnd={endLongPress} onTouchMove={endLongPress}><div className="message-bubble-wrap"><div className="message-bubble">{message.message}</div></div></div>{groupEnd && <div className="message-meta"><span className={message.deliveryStatus === "pending" || message.offline ? "message-pending" : ""}>{formatTime(message.timestamp)} • {message.editPending ? "◌ Salvando edição" : message.deliveryStatus === "pending" || message.offline ? "⏳ Pendente" : message.deliveryStatus === "sending" ? "◌ Enviando" : "✓ Enviada"}{message.edited && !message.editPending ? " • editada" : ""}</span></div>}</>}
+              {isEditing ? <form className="message-edit-form" onSubmit={saveEdit}><textarea value={editingText} onChange={(e) => setEditingText(e.target.value)} autoFocus maxLength={1000} rows={2} /><div><button type="button" onClick={cancelEdit} disabled={editSaving}>Cancelar</button><button type="submit" disabled={editSaving || !editingText.trim()}>{editSaving ? "Salvando..." : "Salvar"}</button></div>{editError && <small>{editError}</small>}</form> : <><div className="message-row" onContextMenu={(e) => openContextMenu(e, message)} onTouchStart={(e) => startLongPress(e, message)} onTouchEnd={endLongPress} onTouchMove={endLongPress}><div className={`message-bubble-wrap ${message.deleted ? "message-deleted" : ""}`}><div className="message-bubble">{message.deleted ? "🗑️ Esta mensagem foi excluída" : message.message}</div></div></div>{groupEnd && <div className="message-meta"><span className={message.deliveryStatus === "pending" || message.offline ? "message-pending" : ""}>{formatTime(message.timestamp)} • {message.deletePending ? "◌ Excluindo" : message.editPending ? "◌ Salvando edição" : message.deliveryStatus === "pending" || message.offline ? "⏳ Pendente" : message.deliveryStatus === "sending" ? "◌ Enviando" : "✓ Enviada"}{message.edited && !message.editPending && !message.deleted ? " • editada" : ""}</span></div>}</>}
             </div>
           </div>;
         })}
@@ -251,7 +262,7 @@ export default function AppEdit() {
       <div className="input-hint">Enter para enviar • {offlineQueue.length ? `📦 ${offlineQueue.length} pendente(s)` : "Conta autenticada"}</div>
     </div>
 
-    {contextMenu && <div className="message-context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} onClick={(e) => e.stopPropagation()}><button type="button" onClick={() => copyMessage(contextMenu.message)}>📋 Copiar</button>{contextMenu.isMine && !contextMenu.message.offline && contextMenu.message.deliveryStatus !== "pending" && <button type="button" onClick={() => beginEdit(contextMenu.message)}>✏️ Editar</button>}</div>}
+    {contextMenu && <div className="message-context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} onClick={(e) => e.stopPropagation()}><button type="button" onClick={() => copyMessage(contextMenu.message)} disabled={contextMenu.message.deleted}>📋 Copiar</button>{contextMenu.isMine && !contextMenu.message.deleted && !contextMenu.message.offline && contextMenu.message.deliveryStatus !== "pending" && <button type="button" onClick={() => beginEdit(contextMenu.message)}>✏️ Editar</button>}{contextMenu.isMine && !contextMenu.message.deleted && !contextMenu.message.offline && contextMenu.message.deliveryStatus !== "pending" && <button type="button" onClick={() => confirmDelete(contextMenu.message)}>🗑️ Excluir</button>}</div>}
 
     {profileOpen && <div className="profile-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setProfileOpen(false); }}><form className="profile-modal" onSubmit={saveProfile}><h2>👤 Meu perfil</h2><div className="profile-preview"><div className="avatar profile-avatar profile-preview-avatar">{avatar ? <img src={avatar} alt="" /> : displayName.slice(0, 1).toUpperCase()}</div><div><strong>@{user.username}</strong><p>ID da conta: {user.id}</p></div></div>{profileError && <div className="status disconnected">{profileError}</div>}<div className="avatar-picker"><label className="avatar-button" htmlFor="avatar-file">🖼️ Escolher imagem</label><input id="avatar-file" type="file" accept="image/jpeg,image/png,image/gif,image/webp" onChange={chooseAvatar} hidden /><span>PNG, JPG, GIF ou WebP • até 2 MB</span></div><label>Username<input name="username" defaultValue={user.username} minLength={3} maxLength={20} /></label><label>Nome de exibição<input name="displayName" defaultValue={displayName} maxLength={30} /></label><label>Status personalizado<input name="status" placeholder="Ex.: Jogando 🎮" maxLength={60} defaultValue={profile?.status || ""} /></label><div className="profile-actions"><button type="button" onClick={() => { avatarFileRef.current = null; setProfileOpen(false); }} disabled={profileSaving}>Cancelar</button><button type="submit" disabled={profileSaving}>{profileSaving ? "Salvando..." : "Salvar perfil"}</button></div></form></div>}
   </section></main>;
