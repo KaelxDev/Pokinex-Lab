@@ -98,6 +98,16 @@ function App() {
     for (const item of queueRef.current) socket.sendMessage(item.message, item.id);
   }
 
+  function mergeOnlineUser(incomingUser) {
+    setUsers((current) => {
+      const index = current.findIndex((item) => item.id === incomingUser.id);
+      if (index < 0) return [...current, incomingUser];
+      const next = [...current];
+      next[index] = { ...next[index], ...incomingUser };
+      return next;
+    });
+  }
+
   function connect(token) {
     const generation = ++generationRef.current;
     socketRef.current?.close();
@@ -117,7 +127,7 @@ function App() {
           return;
         }
         if (data?.type === "profile_updated" && data.user) {
-          setUsers((current) => current.map((item) => item.id === data.user.id ? data.user : item));
+          mergeOnlineUser(data.user);
           if (userRef.current?.id === data.user.id) {
             syncProfile({ ...userRef.current, ...data.user });
           }
@@ -131,10 +141,20 @@ function App() {
         }
         if (data?.type === "message" || data?.type === "system") {
           if (data.type === "message" && data.messageId) {
+            if (data.userId) {
+              mergeOnlineUser({
+                id: data.userId,
+                username: data.username,
+                displayName: data.displayName,
+                avatar: data.avatar || "",
+                status: data.status || "",
+                online: true,
+              });
+            }
             setMessages((current) => {
               const existing = current.findIndex((item) => item.messageId === data.messageId);
               const incoming = { ...data, timestamp: data.timestamp || Date.now(), offline: false };
-              if (existing >= 0) { const next = [...current]; next[existing] = incoming; return next; }
+              if (existing >= 0) { const next = [...current]; next[existing] = { ...next[existing], ...incoming }; return next; }
               return [...current, incoming];
             });
           } else {
@@ -245,8 +265,9 @@ function App() {
         if (message.type === "system") return <div className="system-message" key={`system-${index}`}>{message.message}<span> • {formatTime(message.timestamp)}</span></div>;
         if (message.type !== "message") return null;
         const isMine = message.userId ? message.userId === user.id : message.username === user.username;
-        const messageProfile = isMine ? profile : users.find((item) => item.id === message.userId) || message;
-        return <div className={`message ${isMine ? "mine" : "other"}`} key={message.messageId || index}><div className="message-avatar">{messageProfile?.avatar ? <img src={messageProfile.avatar} alt="Avatar" /> : userInitial(messageProfile)}</div><div className="message-main"><span className="message-user">{message.displayName || message.username}</span><div className="message-row"><div className="message-bubble">{message.message}</div><span className="message-time">{formatTime(message.timestamp)}{message.offline ? " • pendente" : ""}</span></div></div></div>;
+        const knownProfile = isMine ? profile : users.find((item) => item.id === message.userId);
+        const messageProfile = { ...(knownProfile || {}), ...message, avatar: message.avatar || knownProfile?.avatar || "", displayName: message.displayName || knownProfile?.displayName || message.username };
+        return <div className={`message ${isMine ? "mine" : "other"}`} key={message.messageId || index}><div className="message-avatar">{messageProfile.avatar ? <img src={messageProfile.avatar} alt="Avatar" /> : userInitial(messageProfile)}</div><div className="message-main"><span className="message-user">{messageProfile.displayName || messageProfile.username}</span><div className="message-row"><div className="message-bubble">{message.message}</div><span className="message-time">{formatTime(message.timestamp)}{message.offline ? " • pendente" : ""}</span></div></div></div>;
       })}</div>
       <form className="message-form" onSubmit={sendMessage}><textarea placeholder={connected ? "Digite uma mensagem..." : "Digite uma mensagem offline..."} value={messageInput} onChange={(event) => setMessageInput(event.target.value)} onKeyDown={handleMessageKeyDown} rows={1} maxLength={1000} /><button type="submit" disabled={!messageInput.trim()}>Enviar</button></form><div className="input-hint">Enter para enviar • {offlineQueue.length ? `📦 ${offlineQueue.length} pendente(s)` : "Conta autenticada"}</div>
     </div>
