@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from fastapi import WebSocket
 
-from app.database import get_message_owner, save_message, update_message
+from app.database import delete_message, get_message_owner, save_message, update_message
 
 
 class ConnectionManager:
@@ -34,12 +34,9 @@ class ConnectionManager:
     async def broadcast(self, data: dict):
         disconnected = []
         for websocket in list(self.active_connections):
-            try:
-                await websocket.send_json(data)
-            except Exception:
-                disconnected.append(websocket)
-        for websocket in disconnected:
-            self.active_connections.pop(websocket, None)
+            try: await websocket.send_json(data)
+            except Exception: disconnected.append(websocket)
+        for websocket in disconnected: self.active_connections.pop(websocket, None)
 
     async def send_users(self):
         users = [{"id": u["id"], "username": u["username"], "displayName": u["displayName"], "avatar": u["avatar"], "status": u["status"], "online": True} for u in self.active_connections.values()]
@@ -52,65 +49,55 @@ class ConnectionManager:
     async def send_message(self, user: dict, message: str, message_id: str | None = None, sender: WebSocket | None = None):
         current_user = self.get_user(sender) if sender else None
         user = current_user or user
-        if user is None:
-            return
+        if user is None: return
         if message_id and message_id in self.processed_message_ids:
-            if sender:
-                await sender.send_json({"type": "ack", "messageId": message_id})
+            if sender: await sender.send_json({"type": "ack", "messageId": message_id})
             return
-
         timestamp = self.get_timestamp()
         if message_id:
             self.processed_message_ids.add(message_id)
             self.message_owners[message_id] = user["id"]
             save_message(message_id, user["id"], message, timestamp)
-
         self.sequence += 1
         await self.broadcast({"type": "message", "messageId": message_id, "userId": user["id"], "username": user["username"], "displayName": user["displayName"], "avatar": user["avatar"], "status": user["status"], "message": message, "timestamp": timestamp, "sequence": self.sequence})
-        if sender and message_id:
-            await sender.send_json({"type": "ack", "messageId": message_id})
+        if sender and message_id: await sender.send_json({"type": "ack", "messageId": message_id})
 
-    async def edit_message(self, user: dict, message_id: str, message: str, sender: WebSocket):
+    def _owner(self, message_id: str):
         owner_id = self.message_owners.get(message_id)
         if owner_id is None:
             owner_id = get_message_owner(message_id)
-            if owner_id is not None:
-                self.message_owners[message_id] = owner_id
+            if owner_id is not None: self.message_owners[message_id] = owner_id
+        return owner_id
+
+    async def edit_message(self, user: dict, message_id: str, message: str, sender: WebSocket):
+        owner_id = self._owner(message_id)
         if owner_id is None:
-            await sender.send_json({"type": "error", "action": "edit_message", "messageId": message_id, "message": "Mensagem não encontrada no servidor."})
-            return
+            await sender.send_json({"type": "error", "action": "edit_message", "messageId": message_id, "message": "Mensagem não encontrada no servidor."}); return
         if owner_id != user["id"]:
-            await sender.send_json({"type": "error", "action": "edit_message", "messageId": message_id, "message": "Você só pode editar suas próprias mensagens."})
-            return
-
+            await sender.send_json({"type": "error", "action": "edit_message", "messageId": message_id, "message": "Você só pode editar suas próprias mensagens."}); return
         edited_at = self.get_timestamp()
-        persisted = update_message(message_id, user["id"], message, edited_at)
-        if not persisted:
-            save_message(message_id, user["id"], message, edited_at)
-
+        if not update_message(message_id, user["id"], message, edited_at): save_message(message_id, user["id"], message, edited_at)
         self.sequence += 1
-        event = {
-            "type": "message_edited",
-            "messageId": message_id,
-            "userId": user["id"],
-            "username": user["username"],
-            "displayName": user["displayName"],
-            "avatar": user["avatar"],
-            "status": user["status"],
-            "message": message,
-            "editedAt": edited_at,
-            "edited": True,
-            "sequence": self.sequence,
-        }
-        await self.broadcast(event)
-        # Also send a normal message-shaped update so every client replaces
-        # the existing message even if it does not handle message_edited yet.
-        await self.broadcast({**event, "type": "message"})
+        event = {"messageId": message_id, "userId": user["id"], "username": user["username"], "displayName": user["displayName"], "avatar": user["avatar"], "status": user["status"], "message": message, "editedAt": edited_at, "edited": True, "sequence": self.sequence}
+        await self.broadcast({"type": "message_edited", **event})
+        await self.broadcast({"type": "message", **event})
         await sender.send_json({"type": "edit_ack", "messageId": message_id})
 
+    async def delete_message(self, user: dict, message_id: str, sender: WebSocket):
+        owner_id = self._owner(message_id)
+        if owner_id is None:
+            await sender.send_json({"type": "error", "action": "delete_message", "messageId": message_id, "message": "Mensagem não encontrada no servidor."}); return
+        if owner_id != user["id"]:
+            await sender.send_json({"type": "error", "action": "delete_message", "messageId": message_id, "message": "Você só pode excluir suas próprias mensagens."}); return
+        deleted_at = self.get_timestamp()
+        if not delete_message(message_id, user["id"], deleted_at):
+            await sender.send_json({"type": "error", "action": "delete_message", "messageId": message_id, "message": "Não foi possível excluir a mensagem."}); return
+        self.sequence += 1
+        await self.broadcast({"type": "message_deleted", "messageId": message_id, "userId": user["id"], "deletedAt": deleted_at, "deleted": True, "sequence": self.sequence})
+        await sender.send_json({"type": "delete_ack", "messageId": message_id})
+
     @staticmethod
-    def get_timestamp():
-        return datetime.now(timezone.utc).isoformat()
+    def get_timestamp(): return datetime.now(timezone.utc).isoformat()
 
 
 manager = ConnectionManager()
