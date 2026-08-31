@@ -12,6 +12,7 @@ import './UIRefinement.css'
 import './AuthRefinement.css'
 import './MessageLayoutFinal.css'
 import './MessageGeometry.css'
+import './MobileUX.css'
 import AppEdit from './AppEdit.jsx'
 
 createRoot(document.getElementById('root')).render(
