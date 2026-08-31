@@ -84,9 +84,9 @@ class ConnectionManager:
             return
 
         edited_at = self.get_timestamp()
-        if not update_message(message_id, user["id"], message, edited_at):
-            await sender.send_json({"type": "error", "action": "edit_message", "messageId": message_id, "message": "Não foi possível salvar a edição."})
-            return
+        persisted = update_message(message_id, user["id"], message, edited_at)
+        if not persisted:
+            save_message(message_id, user["id"], message, edited_at)
 
         await self.broadcast({"type": "message_edited", "messageId": message_id, "userId": user["id"], "username": user["username"], "displayName": user["displayName"], "avatar": user["avatar"], "status": user["status"], "message": message, "editedAt": edited_at, "edited": True})
         await sender.send_json({"type": "edit_ack", "messageId": message_id})
