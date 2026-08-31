@@ -12,20 +12,23 @@ from app.websocket.chat import manager
 
 initialize_database()
 
-MEDIA_DIR = Path(__file__).resolve().parent.parent / "uploads"
-MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+APP_DIR = Path(__file__).resolve().parent
+MEDIA_DIR = APP_DIR / "uploads"
+AVATAR_DIR = MEDIA_DIR / "avatars"
+AVATAR_DIR.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(title="Poknex API", version="2.0.0")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?$",
+    allow_origin_regex=r"^https?://(localhost|127\\.0\\.0\\.1|10\\.\\d+\\.\\d+\\.\\d+|192\\.168\\.\\d+\\.\\d+|172\\.(1[6-9]|2\\d|3[0-1])\\.\\d+\\.\\d+)(:\\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Public local media. The avatar upload endpoint writes into this exact directory.
 app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
 app.include_router(auth_router)
 
