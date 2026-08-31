@@ -1,0 +1,153 @@
+/* =========================================================
+   AVATARS
+========================================================= */
+
+.avatar,
+.message-avatar {
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  min-height: 42px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #222733;
+  color: #f5f7fa;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.avatar img,
+.message-avatar img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.profile-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.profile-avatar {
+  border: 1px solid #303644;
+}
+
+.profile-preview-avatar {
+  width: 88px;
+  height: 88px;
+  min-width: 88px;
+  min-height: 88px;
+  border-radius: 14px;
+  font-size: 30px;
+}
+
+.user-avatar {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  min-height: 30px;
+  font-size: 12px;
+}
+
+.user-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.user-info strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.user-info > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #8b93a1;
+  font-size: 11px;
+}
+
+.message {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 9px;
+  max-width: min(78%, 700px);
+}
+
+.message.mine {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.message.other {
+  align-self: flex-start;
+}
+
+.message-avatar {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  margin-top: 18px;
+  font-size: 12px;
+}
+
+.message-main {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.avatar-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 14px 0;
+}
+
+.avatar-button {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 12px;
+  border: 1px solid #303644;
+  border-radius: 8px;
+  background: #1b1f29;
+  color: #f5f7fa;
+  cursor: pointer;
+}
+
+.avatar-button:hover {
+  border-color: #3a4150;
+  background: #222733;
+}
+
+.avatar-picker span {
+  color: #626a78;
+  font-size: 11px;
+}
+
+@media (max-width: 520px) {
+  .message {
+    max-width: 94%;
+  }
+
+  .message-avatar {
+    width: 30px;
+    height: 30px;
+    min-width: 30px;
+    min-height: 30px;
+    margin-top: 19px;
+  }
+}
