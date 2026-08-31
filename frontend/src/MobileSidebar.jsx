@@ -33,8 +33,17 @@ export default function MobileSidebar({ children }) {
     };
   }, [open]);
 
+  function handleShellClick(event) {
+    if (event.target.closest(".profile-summary")) {
+      setOpen(false);
+    }
+  }
+
   return (
-    <div className={`mobile-sidebar-shell${open ? " mobile-sidebar-open" : ""}`}>
+    <div
+      className={`mobile-sidebar-shell${open ? " mobile-sidebar-open" : ""}`}
+      onClick={handleShellClick}
+    >
       <button
         className="mobile-sidebar-toggle"
         type="button"
