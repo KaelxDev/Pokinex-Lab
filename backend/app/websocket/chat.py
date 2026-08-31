@@ -20,8 +20,15 @@ class ConnectionManager:
         await self.send_users()
 
     def disconnect(self, websocket: WebSocket):
-        user = self.active_connections.pop(websocket, None)
-        return user
+        return self.active_connections.pop(websocket, None)
+
+    def update_user(self, user: dict) -> bool:
+        updated = False
+        for websocket, current in list(self.active_connections.items()):
+            if current["id"] == user["id"]:
+                self.active_connections[websocket] = user
+                updated = True
+        return updated
 
     async def broadcast(self, data: dict):
         disconnected = []
@@ -44,8 +51,21 @@ class ConnectionManager:
                 "status": user["status"],
                 "online": True,
             })
-        data = {"type": "users", "users": users, "timestamp": self.get_timestamp()}
-        await self.broadcast(data)
+        await self.broadcast({"type": "users", "users": users, "timestamp": self.get_timestamp()})
+
+    async def broadcast_profile_update(self, user: dict):
+        await self.broadcast({
+            "type": "profile_updated",
+            "user": {
+                "id": user["id"],
+                "username": user["username"],
+                "displayName": user["displayName"],
+                "avatar": user["avatar"],
+                "status": user["status"],
+            },
+            "timestamp": self.get_timestamp(),
+        })
+        await self.send_users()
 
     async def send_message(self, user: dict, message: str, message_id: str | None = None, sender: WebSocket | None = None):
         if message_id and message_id in self.processed_message_ids:
