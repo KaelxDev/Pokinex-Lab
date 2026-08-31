@@ -1,0 +1,88 @@
+/* =========================================================
+   MESSAGE EDITING
+========================================================= */
+
+.message-edit-form {
+  width: min(100%, 460px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.message-edit-form textarea {
+  width: 100%;
+  min-height: 82px;
+  resize: vertical;
+  padding: 10px 12px;
+  background: #0e1117;
+  color: var(--text, #f5f7fa);
+  border: 1px solid var(--primary, #5865f2);
+  border-radius: 10px;
+  outline: none;
+  font: inherit;
+  line-height: 1.45;
+  box-sizing: border-box;
+}
+
+.message-edit-form > div {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.message-edit-form button {
+  min-height: 34px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #292f3b);
+  background: var(--surface-2, #1b1f29);
+  color: var(--text-secondary, #c5cad4);
+  cursor: pointer;
+}
+
+.message-edit-form button[type="submit"] {
+  border-color: transparent;
+  background: var(--primary, #5865f2);
+  color: #fff;
+  font-weight: 600;
+}
+
+.message-edit-form button:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.message-edit-form button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.message-edit-form small {
+  color: var(--danger, #e58b96);
+  font-size: 11px;
+}
+
+.message-meta {
+  display: flex;
+  align-items: center;
+  margin-top: 3px;
+  min-height: 12px;
+  color: #707785;
+  font-size: 10px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.mine .message-meta {
+  justify-content: flex-end;
+  color: #aeb5ff;
+}
+
+@media (max-width: 520px) {
+  .message-edit-form {
+    width: min(100%, 320px);
+  }
+
+  .message-edit-form textarea {
+    min-height: 74px;
+  }
+}
