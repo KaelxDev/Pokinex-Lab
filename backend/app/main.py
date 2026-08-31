@@ -35,7 +35,7 @@ async def websocket_endpoint(websocket: WebSocket):
         await websocket.close(code=1008)
         return
 
-    await manager.connect(websocket, user["username"])
+    await manager.connect(websocket, user)
 
     try:
         while True:
@@ -53,7 +53,7 @@ async def websocket_endpoint(websocket: WebSocket):
             if message_id is not None and not isinstance(message_id, str):
                 message_id = None
 
-            await manager.send_message(user["username"], message, message_id, websocket)
+            await manager.send_message(user, message, message_id, websocket)
 
     except WebSocketDisconnect:
         disconnected_user = manager.disconnect(websocket)
@@ -61,8 +61,8 @@ async def websocket_endpoint(websocket: WebSocket):
             await manager.broadcast({
                 "type": "system",
                 "event": "user_left",
-                "username": disconnected_user,
-                "message": f"{disconnected_user} saiu do chat.",
+                "username": disconnected_user["username"],
+                "message": f"{disconnected_user['username']} saiu do chat.",
                 "timestamp": manager.get_timestamp(),
             })
             await manager.send_users()
