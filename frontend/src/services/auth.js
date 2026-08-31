@@ -13,31 +13,13 @@ async function request(path, options = {}) {
   return data;
 }
 
-export function getToken() {
-  try { return localStorage.getItem(TOKEN_KEY) || ""; } catch { return ""; }
-}
+export function getToken() { try { return localStorage.getItem(TOKEN_KEY) || ""; } catch { return ""; } }
 export function saveToken(token) { try { localStorage.setItem(TOKEN_KEY, token); } catch {} }
 export function clearToken() { try { localStorage.removeItem(TOKEN_KEY); } catch {} }
 export function hasToken() { return !!getToken(); }
 
-export async function register(username, password) {
-  const data = await request("/register", { method: "POST", body: JSON.stringify({ username, password }) });
-  saveToken(data.token);
-  return data.user;
-}
-
-export async function login(username, password) {
-  const data = await request("/login", { method: "POST", body: JSON.stringify({ username, password }) });
-  saveToken(data.token);
-  return data.user;
-}
-
+export async function register(username, password) { const data = await request("/register", { method: "POST", body: JSON.stringify({ username, password }) }); saveToken(data.token); return data.user; }
+export async function login(username, password) { const data = await request("/login", { method: "POST", body: JSON.stringify({ username, password }) }); saveToken(data.token); return data.user; }
 export async function me() { return (await request("/me")).user; }
-
-export async function updateProfile(profile) {
-  return (await request("/profile", { method: "PATCH", body: JSON.stringify({ displayName: profile.displayName, avatar: profile.avatar || "", status: profile.status || "" }) })).user;
-}
-
-export async function logout() {
-  try { await request("/logout", { method: "POST" }); } finally { clearToken(); }
-}
+export async function updateProfile(profile) { return (await request("/profile", { method: "PATCH", body: JSON.stringify({ username: profile.username, displayName: profile.displayName, avatar: profile.avatar || "", status: profile.status || "" }) })).user; }
+export async function logout() { try { await request("/logout", { method: "POST" }); } finally { clearToken(); } }
