@@ -7,6 +7,7 @@ import "./Avatar.css";
 
 const STORAGE_KEY = "poknex_messages";
 const QUEUE_KEY = "poknex_offline_queue";
+const GROUP_WINDOW_MS = 5 * 60 * 1000;
 
 function formatTime(timestamp) {
   if (!timestamp) return "";
@@ -37,6 +38,40 @@ function makeId() {
 
 function userInitial(user) {
   return String(user?.displayName || user?.username || "?").slice(0, 1).toUpperCase();
+}
+
+function messageStatus(message) {
+  if (message?.offline || message?.deliveryStatus === "pending") return "⏳ Pendente";
+  if (message?.deliveryStatus === "sending") return "◌ Enviando";
+  return "✓ Enviada";
+}
+
+function canGroupMessages(previous, current) {
+  if (!previous || previous.type !== "message" || current.type !== "message") return false;
+  if (previous.userId && current.userId) {
+    if (previous.userId !== current.userId) return false;
+  } else if (previous.username !== current.username) {
+    return false;
+  }
+
+  const previousTime = previous.timestamp ? new Date(previous.timestamp).getTime() : 0;
+  const currentTime = current.timestamp ? new Date(current.timestamp).getTime() : 0;
+  return previousTime > 0 && currentTime >= previousTime && currentTime - previousTime <= GROUP_WINDOW_MS;
+}
+
+async function copyText(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand("copy");
+  textarea.remove();
 }
 
 function AuthScreen({ mode, setMode, onAuthenticated }) {
@@ -91,6 +126,7 @@ function App() {
   const [users, setUsers] = useState([]);
   const [profilesById, setProfilesById] = useState({});
   const [messageInput, setMessageInput] = useState("");
+  const [copiedMessageId, setCopiedMessageId] = useState(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profile, setProfile] = useState(null);
   const [profileError, setProfileError] = useState("");
@@ -166,7 +202,10 @@ function App() {
   function flushQueue() {
     const socket = socketRef.current;
     if (!socket || queueRef.current.length === 0) return;
-    for (const item of queueRef.current) socket.sendMessage(item.message, item.id);
+    for (const item of queueRef.current) {
+      setMessages((current) => current.map((message) => message.messageId === item.id ? { ...message, offline: false, deliveryStatus: "sending" } : message));
+      socket.sendMessage(item.message, item.id);
+    }
   }
 
   function connect(token) {
@@ -207,7 +246,7 @@ function App() {
 
         if (data?.type === "ack") {
           setOfflineQueue((current) => current.filter((item) => item.id !== data.messageId));
-          setMessages((current) => current.map((item) => item.messageId === data.messageId ? { ...item, offline: false } : item));
+          setMessages((current) => current.map((item) => item.messageId === data.messageId ? { ...item, offline: false, deliveryStatus: "sent" } : item));
           return;
         }
 
@@ -216,7 +255,7 @@ function App() {
             if (data.userId) mergeOnlineUser({ id: data.userId, username: data.username, displayName: data.displayName, avatar: data.avatar || "", status: data.status || "", online: true });
             setMessages((current) => {
               const existing = current.findIndex((item) => item.messageId === data.messageId);
-              const incoming = { ...data, timestamp: data.timestamp || Date.now(), offline: false };
+              const incoming = { ...data, timestamp: data.timestamp || Date.now(), offline: false, deliveryStatus: "sent" };
               if (existing >= 0) {
                 const next = [...current];
                 next[existing] = { ...next[existing], ...incoming };
@@ -291,21 +330,56 @@ function App() {
 
   function sendMessage(event) {
     event.preventDefault();
-    const message = messageInput.trim();
-    if (!message) return;
+    const messageText = messageInput.trim();
+    if (!messageText) return;
+
     const id = makeId();
     const sender = userRef.current;
-    if (connected && socketRef.current?.sendMessage(message, id)) {
+    const optimisticMessage = {
+      type: "message",
+      messageId: id,
+      userId: sender?.id,
+      username: sender?.username,
+      displayName: sender?.displayName,
+      avatar: sender?.avatar || "",
+      status: sender?.status || "",
+      message: messageText,
+      timestamp: Date.now(),
+      offline: !connected,
+      deliveryStatus: connected ? "sending" : "pending",
+    };
+
+    if (connected && socketRef.current?.sendMessage(messageText, id)) {
+      setMessages((current) => [...current, optimisticMessage]);
       setMessageInput("");
       return;
     }
-    setOfflineQueue((current) => [...current, { id, message, createdAt: Date.now(), userId: sender?.id, username: sender?.username, displayName: sender?.displayName, avatar: sender?.avatar || "" }]);
-    setMessages((current) => [...current, { type: "message", messageId: id, userId: sender?.id, username: sender?.username, displayName: sender?.displayName, avatar: sender?.avatar || "", message, timestamp: Date.now(), offline: true }]);
+
+    setOfflineQueue((current) => [...current, {
+      id,
+      message: messageText,
+      createdAt: Date.now(),
+      userId: sender?.id,
+      username: sender?.username,
+      displayName: sender?.displayName,
+      avatar: sender?.avatar || ""
+    }]);
+    setMessages((current) => [...current, optimisticMessage]);
     setMessageInput("");
   }
 
   function handleMessageKeyDown(event) {
     if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); sendMessage(event); }
+  }
+
+  async function handleCopyMessage(message) {
+    try {
+      await copyText(message.message);
+      setCopiedMessageId(message.messageId);
+      window.setTimeout(() => setCopiedMessageId((current) => current === message.messageId ? null : current), 1400);
+    } catch (error) {
+      console.error("Não foi possível copiar a mensagem:", error);
+    }
   }
 
   function handleLogout() {
@@ -413,14 +487,29 @@ function App() {
           if (message.type === "system") return <div className="system-message" key={`system-${index}`}>{message.message}<span> • {formatTime(message.timestamp)}</span></div>;
           if (message.type !== "message") return null;
 
+          const previousMessage = messages[index - 1];
+          const grouped = canGroupMessages(previousMessage, message);
           const isMine = message.userId ? message.userId === user.id : message.username === user.username;
           const messageProfile = isMine ? profile : profilesById[message.userId] || message;
+          const status = messageStatus(message);
+          const copied = copiedMessageId === message.messageId;
 
-          return <div className={`message ${isMine ? "mine" : "other"}`} key={message.messageId || index}>
+          return <div className={`message ${isMine ? "mine" : "other"} ${grouped ? "grouped" : ""}`} key={message.messageId || index}>
             <div className="message-avatar">{messageProfile?.avatar ? <img src={messageProfile.avatar} alt="Avatar" /> : userInitial(messageProfile)}</div>
             <div className="message-main">
-              <span className="message-user">{messageProfile?.displayName || message.displayName || message.username}</span>
-              <div className="message-row"><div className="message-bubble">{message.message}</div><span className="message-time">{formatTime(message.timestamp)}{message.offline ? " • pendente" : ""}</span></div>
+              {!grouped && <span className="message-user">{messageProfile?.displayName || message.displayName || message.username}</span>}
+              <div className="message-row">
+                <div className="message-bubble-wrap">
+                  <div className="message-bubble">{message.message}</div>
+                  <button className="copy-message" type="button" onClick={() => handleCopyMessage(message)} aria-label="Copiar mensagem" title={copied ? "Copiado" : "Copiar mensagem"}>
+                    {copied ? "✓" : "⧉"}
+                  </button>
+                </div>
+                <span className={`message-time ${message.deliveryStatus === "pending" || message.offline ? "message-pending" : ""}`}>
+                  {formatTime(message.timestamp)}
+                  <span className="message-status"> • {status}</span>
+                </span>
+              </div>
             </div>
           </div>;
         })}
