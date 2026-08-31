@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import './AvatarPatch.css'
 import './MessageContextMenu.css'
+import './MessageLayout.css'
 import App from './AppFixed.jsx'
 import MessageContextMenu from './MessageContextMenu.jsx'
 
