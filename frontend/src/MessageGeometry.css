@@ -52,24 +52,33 @@
   clear: both;
 }
 
-/* Larger invisible interaction target without enlarging the visible bubble. */
+/* Larger invisible interaction target without changing visible geometry. */
 .message .message-row {
   position: relative;
-  padding: 7px;
-  margin: -7px;
-  border-radius: 16px;
   cursor: context-menu;
   touch-action: pan-y;
+  isolation: isolate;
 }
 
-.message.group-end .message-row {
-  padding-bottom: 22px;
+.message .message-row::before {
+  content: "";
+  position: absolute;
+  inset: -11px -13px;
+  border-radius: 18px;
+  pointer-events: auto;
+  z-index: 0;
 }
 
 .message .message-bubble,
 .message .message-bubble-wrap,
 .message .reply-preview {
+  position: relative;
+  z-index: 1;
   cursor: inherit;
+}
+
+.message.group-end .message-row {
+  padding-bottom: 15px;
 }
 
 @media (max-width: 700px) {
@@ -78,13 +87,12 @@
     padding: 10px 15px !important;
   }
 
-  .message .message-row {
-    padding: 8px;
-    margin: -8px;
+  .message .message-row::before {
+    inset: -12px -14px;
   }
 
   .message.group-end .message-row {
-    padding-bottom: 23px;
+    padding-bottom: 15px;
   }
 }
 
@@ -95,12 +103,12 @@
     line-height: 1.45 !important;
   }
 
-  .message .message-row {
-    padding: 9px;
-    margin: -9px;
+  .message .message-row::before {
+    inset: -13px -15px;
+    border-radius: 18px;
   }
 
   .message.group-end .message-row {
-    padding-bottom: 24px;
+    padding-bottom: 15px;
   }
 }
