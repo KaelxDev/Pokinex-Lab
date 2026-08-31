@@ -13,6 +13,7 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   word-break: normal;
+  text-align: center !important;
 }
 
 .message-main {
@@ -57,7 +58,6 @@
 @media (max-width: 700px) {
   .message-bubble {
     padding: 13px 16px !important;
-    line-height: 1.55 !important;
   }
 
   .message {
