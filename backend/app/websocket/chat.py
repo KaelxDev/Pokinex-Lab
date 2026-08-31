@@ -13,7 +13,10 @@ class ConnectionManager:
         await self.broadcast({
             "type": "system",
             "event": "user_joined",
+            "userId": user["id"],
             "username": user["username"],
+            "displayName": user["displayName"],
+            "avatar": user["avatar"],
             "message": f"{user['username']} entrou no chat.",
             "timestamp": self.get_timestamp(),
         })
@@ -30,6 +33,9 @@ class ConnectionManager:
                 updated = True
         return updated
 
+    def get_user(self, websocket: WebSocket) -> dict | None:
+        return self.active_connections.get(websocket)
+
     async def broadcast(self, data: dict):
         disconnected = []
         for websocket in list(self.active_connections):
@@ -41,16 +47,17 @@ class ConnectionManager:
             self.active_connections.pop(websocket, None)
 
     async def send_users(self):
-        users = []
-        for user in self.active_connections.values():
-            users.append({
+        users = [
+            {
                 "id": user["id"],
                 "username": user["username"],
                 "displayName": user["displayName"],
                 "avatar": user["avatar"],
                 "status": user["status"],
                 "online": True,
-            })
+            }
+            for user in self.active_connections.values()
+        ]
         await self.broadcast({"type": "users", "users": users, "timestamp": self.get_timestamp()})
 
     async def broadcast_profile_update(self, user: dict):
@@ -68,6 +75,9 @@ class ConnectionManager:
         await self.send_users()
 
     async def send_message(self, user: dict, message: str, message_id: str | None = None, sender: WebSocket | None = None):
+        current_user = self.get_user(sender) if sender else None
+        user = current_user or user
+
         if message_id and message_id in self.processed_message_ids:
             if sender:
                 await sender.send_json({"type": "ack", "messageId": message_id})
