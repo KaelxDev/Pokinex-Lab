@@ -13,10 +13,13 @@ import './AuthRefinement.css'
 import './MessageLayoutFinal.css'
 import './MessageGeometry.css'
 import './MobileUX.css'
+import MobileSidebar from './MobileSidebar.jsx'
 import AppEdit from './AppEdit.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <AppEdit />
+    <MobileSidebar>
+      <AppEdit />
+    </MobileSidebar>
   </StrictMode>,
 )
