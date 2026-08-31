@@ -2,6 +2,31 @@ const API_HOST = window.location.hostname || "localhost";
 const API_URL = `http://${API_HOST}:8000/api/auth`;
 const TOKEN_KEY = "poknex_auth_token";
 
+function formatApiError(detail, fallback = "Erro na autenticação.") {
+  if (typeof detail === "string" && detail.trim()) return detail;
+
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => {
+        if (typeof item === "string") return item;
+        if (item && typeof item === "object") {
+          if (typeof item.msg === "string") return item.msg;
+          if (typeof item.message === "string") return item.message;
+        }
+        return null;
+      })
+      .filter(Boolean);
+    if (messages.length) return messages.join(" ");
+  }
+
+  if (detail && typeof detail === "object") {
+    if (typeof detail.message === "string") return detail.message;
+    if (typeof detail.msg === "string") return detail.msg;
+  }
+
+  return fallback;
+}
+
 async function request(path, options = {}) {
   const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
   const token = getToken();
@@ -17,7 +42,11 @@ async function request(path, options = {}) {
 
   let data = null;
   try { data = await response.json(); } catch {}
-  if (!response.ok) throw new Error(data?.detail || "Erro na autenticação.");
+
+  if (!response.ok) {
+    throw new Error(formatApiError(data?.detail));
+  }
+
   return data;
 }
 
@@ -43,7 +72,15 @@ export async function login(username, password) {
 export async function me() { return (await request("/me")).user; }
 
 export async function updateProfile(profile) {
-  return (await request("/profile", { method: "PATCH", body: JSON.stringify({ displayName: profile.displayName, avatar: profile.avatar || "", status: profile.status || "" }) })).user;
+  return (await request("/profile", {
+    method: "PATCH",
+    body: JSON.stringify({
+      username: profile.username,
+      displayName: profile.displayName,
+      avatar: profile.avatar || "",
+      status: profile.status || ""
+    })
+  })).user;
 }
 
 export async function logout() {
