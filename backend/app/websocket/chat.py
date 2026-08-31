@@ -4,17 +4,24 @@ from fastapi import WebSocket
 
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: dict[WebSocket, str] = {}
+        self.active_connections: dict[WebSocket, dict] = {}
         self.processed_message_ids: set[str] = set()
 
-    async def connect(self, websocket: WebSocket, username: str):
+    async def connect(self, websocket: WebSocket, user: dict):
         await websocket.accept()
-        self.active_connections[websocket] = username
-        await self.broadcast({"type": "system", "event": "user_joined", "username": username, "message": f"{username} entrou no chat.", "timestamp": self.get_timestamp()})
+        self.active_connections[websocket] = user
+        await self.broadcast({
+            "type": "system",
+            "event": "user_joined",
+            "username": user["username"],
+            "message": f"{user['username']} entrou no chat.",
+            "timestamp": self.get_timestamp(),
+        })
         await self.send_users()
 
     def disconnect(self, websocket: WebSocket):
-        return self.active_connections.pop(websocket, None)
+        user = self.active_connections.pop(websocket, None)
+        return user
 
     async def broadcast(self, data: dict):
         disconnected = []
@@ -27,14 +34,20 @@ class ConnectionManager:
             self.active_connections.pop(websocket, None)
 
     async def send_users(self):
-        data = {"type": "users", "users": list(self.active_connections.values()), "timestamp": self.get_timestamp()}
-        for websocket in list(self.active_connections):
-            try:
-                await websocket.send_json(data)
-            except Exception:
-                pass
+        users = []
+        for user in self.active_connections.values():
+            users.append({
+                "id": user["id"],
+                "username": user["username"],
+                "displayName": user["displayName"],
+                "avatar": user["avatar"],
+                "status": user["status"],
+                "online": True,
+            })
+        data = {"type": "users", "users": users, "timestamp": self.get_timestamp()}
+        await self.broadcast(data)
 
-    async def send_message(self, username: str, message: str, message_id: str | None = None, sender: WebSocket | None = None):
+    async def send_message(self, user: dict, message: str, message_id: str | None = None, sender: WebSocket | None = None):
         if message_id and message_id in self.processed_message_ids:
             if sender:
                 await sender.send_json({"type": "ack", "messageId": message_id})
@@ -42,7 +55,17 @@ class ConnectionManager:
         if message_id:
             self.processed_message_ids.add(message_id)
 
-        data = {"type": "message", "messageId": message_id, "username": username, "message": message, "timestamp": self.get_timestamp()}
+        data = {
+            "type": "message",
+            "messageId": message_id,
+            "userId": user["id"],
+            "username": user["username"],
+            "displayName": user["displayName"],
+            "avatar": user["avatar"],
+            "status": user["status"],
+            "message": message,
+            "timestamp": self.get_timestamp(),
+        }
         await self.broadcast(data)
         if sender and message_id:
             await sender.send_json({"type": "ack", "messageId": message_id})
