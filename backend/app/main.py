@@ -1,5 +1,8 @@
+from pathlib import Path
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.auth import get_user_from_token
 from app.database import initialize_database
@@ -8,6 +11,9 @@ from app.websocket.chat import manager
 
 
 initialize_database()
+
+MEDIA_DIR = Path(__file__).resolve().parent.parent / "uploads"
+MEDIA_DIR.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(title="Poknex API", version="2.0.0")
 
@@ -19,6 +25,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
 app.include_router(auth_router)
 
 
@@ -61,7 +68,10 @@ async def websocket_endpoint(websocket: WebSocket):
             await manager.broadcast({
                 "type": "system",
                 "event": "user_left",
+                "userId": disconnected_user["id"],
                 "username": disconnected_user["username"],
+                "displayName": disconnected_user["displayName"],
+                "avatar": disconnected_user["avatar"],
                 "message": f"{disconnected_user['username']} saiu do chat.",
                 "timestamp": manager.get_timestamp(),
             })
