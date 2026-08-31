@@ -6,6 +6,7 @@ __pycache__/
 # Poknex local database
 backend/poknex.db
 backend/*.db
+backend/uploads/
 
 # Environment files
 .env
