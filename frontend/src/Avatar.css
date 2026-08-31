@@ -109,8 +109,12 @@
   max-width: 100%;
 }
 
+/* =========================================================
+   MESSAGE GROUPING
+========================================================= */
+
 .message.grouped {
-  margin-top: -7px;
+  margin-top: -8px;
 }
 
 .message.grouped .message-avatar {
@@ -121,64 +125,52 @@
   display: none;
 }
 
-.message-bubble-wrap {
-  position: relative;
-  display: flex;
-  align-items: flex-end;
-  min-width: 0;
+.message.grouped .message-bubble {
+  border-radius: 9px;
 }
 
-.copy-message {
-  position: absolute;
-  right: 6px;
-  top: 50%;
-  transform: translateY(-50%);
+.message:not(.grouped):has(+ .message.grouped) .message-time,
+.message.grouped .message-time {
+  visibility: hidden;
+  width: 0;
+  margin: 0;
+  overflow: hidden;
+}
 
-  width: 28px;
-  height: 28px;
-  padding: 0;
+.message.grouped:has(+ .message:not(.grouped)) .message-time,
+.message.grouped:not(:has(~ .message)) .message-time {
+  visibility: visible;
+  width: auto;
+  margin: 0;
+  overflow: visible;
+}
 
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.message:not(.grouped) .message-bubble {
+  border-top-left-radius: 14px;
+  border-top-right-radius: 14px;
+}
 
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
+.message.mine:not(.grouped) .message-bubble {
+  border-top-right-radius: 14px;
+  border-top-left-radius: 14px;
+}
 
-  background: rgba(11, 13, 18, 0.72);
-  color: #f5f7fa;
+.message.grouped + .message:not(.grouped) {
+  margin-top: 3px;
+}
 
-  font-size: 13px;
-  line-height: 1;
-
+/* Keep the text column aligned even when a grouped message hides its avatar. */
+.message.grouped .message-avatar {
   opacity: 0;
-  pointer-events: none;
-  transition: opacity 140ms ease, background 140ms ease;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
 }
 
-.message:hover .copy-message,
-.copy-message:focus-visible {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.copy-message:hover {
-  background: rgba(34, 39, 51, 0.95);
-}
-
-.copy-message:focus-visible {
-  outline: 2px solid #6975ff;
-  outline-offset: 2px;
-}
-
-.message-bubble-wrap .message-bubble {
-  padding-right: 42px;
-}
+/* =========================================================
+   MESSAGE ACTIONS / DELIVERY
+========================================================= */
 
 .message-status {
   font-size: 9px;
+  letter-spacing: 0.01em;
 }
 
 .message-pending {
@@ -192,6 +184,15 @@
 .message.grouped .message-row {
   gap: 7px;
 }
+
+.message:not(.grouped):has(+ .message.grouped) .message-bubble-wrap {
+  border-bottom-left-radius: 9px;
+  border-bottom-right-radius: 9px;
+}
+
+/* =========================================================
+   AVATAR PICKER
+========================================================= */
 
 .avatar-picker {
   display: flex;
@@ -224,31 +225,17 @@
 }
 
 @media (max-width: 700px) {
-  .copy-message {
-    opacity: 0;
-  }
-
-  .message:focus-within .copy-message,
-  .copy-message:focus-visible {
-    opacity: 1;
-    pointer-events: auto;
+  .message {
+    max-width: 94%;
   }
 }
 
 @media (max-width: 520px) {
-  .message {
-    max-width: 94%;
-  }
-
   .message-avatar {
     width: 30px;
     height: 30px;
     min-width: 30px;
     min-height: 30px;
     margin-top: 19px;
-  }
-
-  .message-bubble-wrap .message-bubble {
-    padding-right: 40px;
   }
 }
