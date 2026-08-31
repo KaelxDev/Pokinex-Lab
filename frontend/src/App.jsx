@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { clearToken, getPublicProfile, getToken, login, me, register, updateProfile } from "./services/auth";
+import { clearToken, getPublicProfile, getToken, login, me, register, updateProfile, uploadAvatar } from "./services/auth";
 import { createWebSocket } from "./services/websocket";
 import "./App.css";
 import "./Profile.css";
+import "./Avatar.css";
 
 const STORAGE_KEY = "poknex_messages";
 const QUEUE_KEY = "poknex_offline_queue";
@@ -101,6 +102,7 @@ function App() {
   const queueRef = useRef(offlineQueue);
   const userRef = useRef(null);
   const profileFetchesRef = useRef(new Set());
+  const avatarFileRef = useRef(null);
 
   useEffect(() => {
     queueRef.current = offlineQueue;
@@ -111,9 +113,7 @@ function App() {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(messages)); } catch {}
   }, [messages]);
 
-  useEffect(() => {
-    userRef.current = user;
-  }, [user]);
+  useEffect(() => { userRef.current = user; }, [user]);
 
   useEffect(() => {
     if (connectionStatus !== "reconnecting") return;
@@ -127,7 +127,7 @@ function App() {
       if (message?.userId && !profilesById[message.userId] && !profileFetchesRef.current.has(message.userId)) profileIds.add(message.userId);
     }
     for (const onlineUser of users) {
-      if (onlineUser?.id) profileIds.add(onlineUser.id);
+      if (onlineUser?.id && !profilesById[onlineUser.id]?.avatar && onlineUser.avatar === "") profileIds.add(onlineUser.id);
     }
 
     for (const userId of profileIds) {
@@ -187,7 +187,6 @@ function App() {
       },
       onMessage(data) {
         if (generation !== generationRef.current) return;
-
         if (data?.type === "users") {
           const nextUsers = Array.isArray(data.users) ? data.users : [];
           setUsers(nextUsers);
@@ -214,9 +213,7 @@ function App() {
 
         if (data?.type === "message" || data?.type === "system") {
           if (data.type === "message" && data.messageId) {
-            if (data.userId) {
-              mergeOnlineUser({ id: data.userId, username: data.username, displayName: data.displayName, avatar: data.avatar || "", status: data.status || "", online: true });
-            }
+            if (data.userId) mergeOnlineUser({ id: data.userId, username: data.username, displayName: data.displayName, avatar: data.avatar || "", status: data.status || "", online: true });
             setMessages((current) => {
               const existing = current.findIndex((item) => item.messageId === data.messageId);
               const incoming = { ...data, timestamp: data.timestamp || Date.now(), offline: false };
@@ -296,45 +293,22 @@ function App() {
     event.preventDefault();
     const message = messageInput.trim();
     if (!message) return;
-
     const id = makeId();
     const sender = userRef.current;
     if (connected && socketRef.current?.sendMessage(message, id)) {
       setMessageInput("");
       return;
     }
-
-    setOfflineQueue((current) => [...current, {
-      id,
-      message,
-      createdAt: Date.now(),
-      userId: sender?.id,
-      username: sender?.username,
-      displayName: sender?.displayName,
-      avatar: sender?.avatar || ""
-    }]);
-    setMessages((current) => [...current, {
-      type: "message",
-      messageId: id,
-      userId: sender?.id,
-      username: sender?.username,
-      displayName: sender?.displayName,
-      avatar: sender?.avatar || "",
-      message,
-      timestamp: Date.now(),
-      offline: true
-    }]);
+    setOfflineQueue((current) => [...current, { id, message, createdAt: Date.now(), userId: sender?.id, username: sender?.username, displayName: sender?.displayName, avatar: sender?.avatar || "" }]);
+    setMessages((current) => [...current, { type: "message", messageId: id, userId: sender?.id, username: sender?.username, displayName: sender?.displayName, avatar: sender?.avatar || "", message, timestamp: Date.now(), offline: true }]);
     setMessageInput("");
   }
 
   function handleMessageKeyDown(event) {
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      sendMessage(event);
-    }
+    if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); sendMessage(event); }
   }
 
-  async function handleLogout() {
+  function handleLogout() {
     sessionRef.current = false;
     ++generationRef.current;
     socketRef.current?.close();
@@ -359,15 +333,20 @@ function App() {
     setProfileSaving(true);
     const form = new FormData(event.currentTarget);
     const oldUsername = user.username;
-    const next = {
-      username: String(form.get("username") || oldUsername).trim(),
-      displayName: String(form.get("displayName") || oldUsername).trim() || oldUsername,
-      avatar: profile?.avatar || "",
-      status: String(form.get("status") || "").trim()
-    };
 
     try {
+      let nextAvatar = profile?.avatar || "";
+      if (avatarFileRef.current) nextAvatar = await uploadAvatar(avatarFileRef.current);
+
+      const next = {
+        username: String(form.get("username") || oldUsername).trim(),
+        displayName: String(form.get("displayName") || oldUsername).trim() || oldUsername,
+        avatar: nextAvatar,
+        status: String(form.get("status") || "").trim()
+      };
+
       const updated = await updateProfile(next);
+      avatarFileRef.current = null;
       syncProfile(updated);
       setProfileOpen(false);
       if (updated.username !== oldUsername) connect(getToken());
@@ -381,15 +360,13 @@ function App() {
   function chooseAvatar(event) {
     const file = event.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      event.target.value = "";
-      return;
-    }
+    if (!file.type.startsWith("image/")) { event.target.value = ""; return; }
     if (file.size > 2 * 1024 * 1024) {
       alert("Escolha uma imagem de até 2 MB.");
       event.target.value = "";
       return;
     }
+    avatarFileRef.current = file;
     const reader = new FileReader();
     reader.onload = () => setProfile((current) => ({ ...(current || userRef.current), avatar: String(reader.result) }));
     reader.readAsDataURL(file);
@@ -464,11 +441,11 @@ function App() {
           <div><strong>@{user.username}</strong><p>ID da conta: {user.id}</p></div>
         </div>
         {profileError && <div className="status disconnected">{profileError}</div>}
-        <div className="avatar-picker"><label className="avatar-button" htmlFor="avatar-file">🖼️ Escolher imagem</label><input id="avatar-file" type="file" accept="image/*" onChange={chooseAvatar} hidden /><span>PNG, JPG, GIF ou WebP • até 2 MB</span></div>
+        <div className="avatar-picker"><label className="avatar-button" htmlFor="avatar-file">🖼️ Escolher imagem</label><input id="avatar-file" type="file" accept="image/jpeg,image/png,image/gif,image/webp" onChange={chooseAvatar} hidden /><span>PNG, JPG, GIF ou WebP • até 2 MB</span></div>
         <label>Username<input name="username" defaultValue={user.username} minLength={3} maxLength={20} autoComplete="username" /></label>
         <label>Nome de exibição<input name="displayName" defaultValue={displayName} maxLength={30} /></label>
         <label>Status personalizado<input name="status" placeholder="Ex.: Jogando 🎮" maxLength={60} defaultValue={profile?.status || ""} /></label>
-        <div className="profile-actions"><button type="button" onClick={() => setProfileOpen(false)} disabled={profileSaving}>Cancelar</button><button type="submit" disabled={profileSaving}>{profileSaving ? "Salvando..." : "Salvar perfil"}</button></div>
+        <div className="profile-actions"><button type="button" onClick={() => { avatarFileRef.current = null; setProfileOpen(false); }} disabled={profileSaving}>Cancelar</button><button type="submit" disabled={profileSaving}>{profileSaving ? "Salvando..." : "Salvar perfil"}</button></div>
       </form>
     </div>}
   </section></main>;
