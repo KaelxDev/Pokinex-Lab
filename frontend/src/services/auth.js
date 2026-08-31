@@ -48,6 +48,25 @@ export async function login(username, password) {
 }
 export async function me() { return (await request("/me")).user; }
 export async function getPublicProfile(userId) { return (await request(`/users/${encodeURIComponent(userId)}`)).user; }
+
+export async function uploadAvatar(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const token = getToken();
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  let response;
+  try {
+    response = await fetch(`${API_URL}/avatar`, { method: "POST", headers, body: formData });
+  } catch (error) {
+    console.error("Falha ao enviar avatar:", error);
+    throw new Error("Não foi possível enviar a imagem ao backend.");
+  }
+  let data = null;
+  try { data = await response.json(); } catch {}
+  if (!response.ok) throw new Error(formatApiError(data?.detail, "Não foi possível enviar a imagem."));
+  return data.avatar;
+}
+
 export async function updateProfile(profile) {
   return (await request("/profile", { method: "PATCH", body: JSON.stringify({ username: profile.username, displayName: profile.displayName, avatar: profile.avatar || "", status: profile.status || "" }) })).user;
 }
