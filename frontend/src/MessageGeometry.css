@@ -52,10 +52,39 @@
   clear: both;
 }
 
+/* Larger invisible interaction target without enlarging the visible bubble. */
+.message .message-row {
+  position: relative;
+  padding: 7px;
+  margin: -7px;
+  border-radius: 16px;
+  cursor: context-menu;
+  touch-action: pan-y;
+}
+
+.message.group-end .message-row {
+  padding-bottom: 22px;
+}
+
+.message .message-bubble,
+.message .message-bubble-wrap,
+.message .reply-preview {
+  cursor: inherit;
+}
+
 @media (max-width: 700px) {
   .message .message-bubble {
     min-width: 52px !important;
     padding: 10px 15px !important;
+  }
+
+  .message .message-row {
+    padding: 8px;
+    margin: -8px;
+  }
+
+  .message.group-end .message-row {
+    padding-bottom: 23px;
   }
 }
 
@@ -64,5 +93,14 @@
     min-width: 48px !important;
     padding: 9px 14px !important;
     line-height: 1.45 !important;
+  }
+
+  .message .message-row {
+    padding: 9px;
+    margin: -9px;
+  }
+
+  .message.group-end .message-row {
+    padding-bottom: 24px;
   }
 }
