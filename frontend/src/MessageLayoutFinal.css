@@ -1,0 +1,13 @@
+/* Final message layout — single authority over message geometry */
+.message{width:auto!important;max-width:min(78%,700px)!important;display:flex!important;flex-direction:row!important;align-items:flex-start!important;gap:9px!important;align-self:flex-start!important}
+.message.mine{align-self:flex-end!important;flex-direction:row-reverse!important}
+.message-main{min-width:0!important;max-width:100%!important;width:auto!important}
+.message-row{display:block!important;min-width:0!important;max-width:100%!important}
+.message-bubble-wrap{display:block!important;width:fit-content!important;max-width:100%!important;min-width:0!important}
+.message-bubble{display:block!important;box-sizing:border-box!important;width:fit-content!important;max-width:100%!important;min-width:0!important;margin:0!important;padding:10px 14px!important;font-size:16px!important;line-height:1.45!important;text-align:left!important;white-space:pre-wrap!important;overflow-wrap:anywhere!important;word-break:normal!important}
+.message-user{margin:0 0 5px 2px!important;line-height:1.25!important}
+.message-meta{margin-top:5px!important;padding:0 3px;line-height:1.25!important;white-space:nowrap}
+.message.grouped{margin-top:-5px!important}.message.grouped .message-user{display:none!important}
+.message.group-start .message-bubble{border-radius:14px 14px 9px 9px!important}.message.group-middle .message-bubble{border-radius:9px!important}.message.group-end .message-bubble{border-radius:9px 9px 14px 14px!important}
+@media(max-width:700px){.message{max-width:94%!important}.message-bubble{padding:10px 13px!important}}
+@media(max-width:520px){.message{max-width:94%!important;gap:8px!important}.message-bubble{padding:9px 12px!important;font-size:15px!important;line-height:1.45!important}.message.grouped{margin-top:-4px!important}}
