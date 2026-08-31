@@ -10,22 +10,10 @@ export function createWebSocket(username, { onMessage, onOpen, onClose, onError,
   function connect() {
     if (manuallyClosed) return;
     socket = new WebSocket(`${WS_URL}?username=${encodeURIComponent(username)}`);
-
-    socket.onopen = () => {
-      console.log("WebSocket conectado.");
-      reconnectAttempt = 0;
-      onOpen?.();
-    };
-    socket.onmessage = (event) => {
-      try { onMessage?.(JSON.parse(event.data)); }
-      catch (error) { console.error("Erro ao interpretar mensagem:", error); }
-    };
+    socket.onopen = () => { console.log("WebSocket conectado."); reconnectAttempt = 0; onOpen?.(); };
+    socket.onmessage = (event) => { try { onMessage?.(JSON.parse(event.data)); } catch (error) { console.error("Erro ao interpretar mensagem:", error); } };
     socket.onerror = (error) => { console.error("Erro no WebSocket:", error); onError?.(error); };
-    socket.onclose = () => {
-      console.log("WebSocket desconectado.");
-      if (manuallyClosed) { onClose?.(); return; }
-      scheduleReconnect();
-    };
+    socket.onclose = () => { console.log("WebSocket desconectado."); if (manuallyClosed) { onClose?.(); return; } scheduleReconnect(); };
   }
 
   function scheduleReconnect() {
@@ -40,9 +28,9 @@ export function createWebSocket(username, { onMessage, onOpen, onClose, onError,
 
   return {
     get socket() { return socket; },
-    sendMessage(message) {
+    sendMessage(message, messageId = null) {
       if (!socket || socket.readyState !== WebSocket.OPEN) return false;
-      socket.send(JSON.stringify({ type: "message", message }));
+      socket.send(JSON.stringify({ type: "message", message, messageId }));
       return true;
     },
     close() {
