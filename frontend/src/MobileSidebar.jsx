@@ -33,17 +33,24 @@ export default function MobileSidebar({ children }) {
     };
   }, [open]);
 
-  function handleShellClick(event) {
-    if (event.target.closest(".profile-summary")) {
-      setOpen(false);
+  function openProfileFromMobile(event) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const profileSummary = document.querySelector(".profile-summary");
+    if (profileSummary) {
+      profileSummary.dispatchEvent(new MouseEvent("click", {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+      }));
     }
+
+    setOpen(false);
   }
 
   return (
-    <div
-      className={`mobile-sidebar-shell${open ? " mobile-sidebar-open" : ""}`}
-      onClick={handleShellClick}
-    >
+    <div className={`mobile-sidebar-shell${open ? " mobile-sidebar-open" : ""}`}>
       <button
         className="mobile-sidebar-toggle"
         type="button"
@@ -60,6 +67,15 @@ export default function MobileSidebar({ children }) {
           type="button"
           aria-label="Fechar menu"
           onClick={() => setOpen(false)}
+        />
+      )}
+
+      {open && (
+        <button
+          className="mobile-profile-hit-target"
+          type="button"
+          aria-label="Abrir perfil"
+          onClick={openProfileFromMobile}
         />
       )}
 
