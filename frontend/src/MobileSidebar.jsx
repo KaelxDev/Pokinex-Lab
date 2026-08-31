@@ -33,20 +33,28 @@ export default function MobileSidebar({ children }) {
     };
   }, [open]);
 
+  function dispatchInternalClick(selector) {
+    const target = document.querySelector(selector);
+    if (!target) return false;
+    target.dispatchEvent(new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+      view: window,
+    }));
+    return true;
+  }
+
   function openProfileFromMobile(event) {
     event.preventDefault();
     event.stopPropagation();
-
-    const profileSummary = document.querySelector(".profile-summary");
-    if (profileSummary) {
-      profileSummary.dispatchEvent(new MouseEvent("click", {
-        bubbles: true,
-        cancelable: true,
-        view: window,
-      }));
-    }
-
+    dispatchInternalClick(".profile-summary");
     setOpen(false);
+  }
+
+  function clearHistoryFromMobile(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    dispatchInternalClick(".sidebar .logout");
   }
 
   return (
@@ -71,12 +79,22 @@ export default function MobileSidebar({ children }) {
       )}
 
       {open && (
-        <button
-          className="mobile-profile-hit-target"
-          type="button"
-          aria-label="Abrir perfil"
-          onClick={openProfileFromMobile}
-        />
+        <>
+          <button
+            className="mobile-profile-hit-target"
+            type="button"
+            aria-label="Abrir perfil"
+            onClick={openProfileFromMobile}
+          />
+          <button
+            className="mobile-history-hit-target"
+            type="button"
+            aria-label="Limpar histórico local"
+            onClick={clearHistoryFromMobile}
+          >
+            🗑️ Limpar histórico local
+          </button>
+        </>
       )}
 
       {children}
