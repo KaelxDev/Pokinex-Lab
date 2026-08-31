@@ -64,6 +64,11 @@
     animation: mobile-sidebar-in 180ms cubic-bezier(.2,.8,.2,1);
   }
 
+  /* Profile editing must sit above the mobile drawer so the profile remains usable. */
+  .mobile-sidebar-shell.mobile-sidebar-open .profile-overlay {
+    z-index: 1250;
+  }
+
   .mobile-sidebar-shell.mobile-sidebar-open .chat-header {
     padding-left: 62px;
   }
