@@ -1,0 +1,207 @@
+from datetime import datetime, timedelta, timezone
+import hashlib
+import hmac
+import secrets
+import sqlite3
+
+from app.database import get_connection
+
+SESSION_DAYS = 30
+PASSWORD_ITERATIONS = 600_000
+
+
+def now_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _derive_password(password: str, salt: bytes) -> bytes:
+    return hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        salt,
+        PASSWORD_ITERATIONS,
+    )
+
+
+def hash_password(password: str) -> tuple[str, str]:
+    salt = secrets.token_bytes(16)
+    digest = _derive_password(password, salt)
+    return digest.hex(), salt.hex()
+
+
+def verify_password(password: str, password_hash: str, password_salt: str) -> bool:
+    try:
+        expected = bytes.fromhex(password_hash)
+        salt = bytes.fromhex(password_salt)
+    except ValueError:
+        return False
+    actual = _derive_password(password, salt)
+    return hmac.compare_digest(actual, expected)
+
+
+def validate_credentials(username: str, password: str) -> tuple[str | None, str | None]:
+    username = username.strip()
+    if len(username) < 3 or len(username) > 20:
+        return None, "Username deve ter entre 3 e 20 caracteres."
+    if not all(char.isalnum() or char in "_-" for char in username):
+        return None, "Username deve usar apenas letras, números, _ ou -."
+    if len(password) < 8 or len(password) > 128:
+        return None, "Senha deve ter entre 8 e 128 caracteres."
+    return username, None
+
+
+def create_user(username: str, password: str) -> dict:
+    username, error = validate_credentials(username, password)
+    if error:
+        raise ValueError(error)
+
+    password_hash, password_salt = hash_password(password)
+    display_name = username
+    created_at = now_utc().isoformat()
+
+    connection = get_connection()
+    try:
+        cursor = connection.execute(
+            """
+            INSERT INTO users (username, password_hash, password_salt, display_name, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (username, password_hash, password_salt, display_name, created_at),
+        )
+        connection.commit()
+        user_id = cursor.lastrowid
+        return {
+            "id": user_id,
+            "username": username,
+            "displayName": display_name,
+            "avatar": "",
+            "status": "",
+        }
+    except sqlite3.IntegrityError as exc:
+        raise ValueError("Username já está em uso.") from exc
+    finally:
+        connection.close()
+
+
+def authenticate(username: str, password: str) -> dict | None:
+    connection = get_connection()
+    try:
+        user = connection.execute(
+            "SELECT id, username, password_hash, password_salt, display_name, avatar, status FROM users WHERE username = ? COLLATE NOCASE",
+            (username.strip(),),
+        ).fetchone()
+    finally:
+        connection.close()
+
+    if not user or not verify_password(password, user["password_hash"], user["password_salt"]):
+        return None
+
+    return {
+        "id": user["id"],
+        "username": user["username"],
+        "displayName": user["display_name"],
+        "avatar": user["avatar"],
+        "status": user["status"],
+    }
+
+
+def create_session(user_id: int) -> str:
+    raw_token = secrets.token_urlsafe(48)
+    token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+    created_at = now_utc()
+    expires_at = created_at + timedelta(days=SESSION_DAYS)
+
+    connection = get_connection()
+    try:
+        connection.execute(
+            "INSERT INTO sessions (token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)",
+            (token_hash, user_id, expires_at.isoformat(), created_at.isoformat()),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    return raw_token
+
+
+def get_user_from_token(token: str | None) -> dict | None:
+    if not token:
+        return None
+
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    connection = get_connection()
+    try:
+        row = connection.execute(
+            """
+            SELECT u.id, u.username, u.display_name, u.avatar, u.status, s.expires_at
+            FROM sessions s
+            JOIN users u ON u.id = s.user_id
+            WHERE s.token_hash = ?
+            """,
+            (token_hash,),
+        ).fetchone()
+        if not row:
+            return None
+
+        try:
+            expires_at = datetime.fromisoformat(row["expires_at"])
+        except ValueError:
+            return None
+
+        if expires_at <= now_utc():
+            connection.execute("DELETE FROM sessions WHERE token_hash = ?", (token_hash,))
+            connection.commit()
+            return None
+
+        return {
+            "id": row["id"],
+            "username": row["username"],
+            "displayName": row["display_name"],
+            "avatar": row["avatar"],
+            "status": row["status"],
+        }
+    finally:
+        connection.close()
+
+
+def delete_session(token: str | None) -> None:
+    if not token:
+        return
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    connection = get_connection()
+    try:
+        connection.execute("DELETE FROM sessions WHERE token_hash = ?", (token_hash,))
+        connection.commit()
+    finally:
+        connection.close()
+
+
+def update_profile(user_id: int, display_name: str, avatar: str, status: str) -> dict | None:
+    display_name = display_name.strip()[:30]
+    status = status.strip()[:60]
+    avatar = avatar.strip()
+    if not display_name:
+        return None
+
+    connection = get_connection()
+    try:
+        connection.execute(
+            "UPDATE users SET display_name = ?, avatar = ?, status = ? WHERE id = ?",
+            (display_name, avatar, status, user_id),
+        )
+        connection.commit()
+        row = connection.execute(
+            "SELECT id, username, display_name, avatar, status FROM users WHERE id = ?",
+            (user_id,),
+        ).fetchone()
+        if not row:
+            return None
+        return {
+            "id": row["id"],
+            "username": row["username"],
+            "displayName": row["display_name"],
+            "avatar": row["avatar"],
+            "status": row["status"],
+        }
+    finally:
+        connection.close()
