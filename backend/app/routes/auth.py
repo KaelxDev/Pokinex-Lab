@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Header, HTTPException, status
 from pydantic import BaseModel, Field
 
-from app.auth import authenticate, create_session, create_user, delete_session, get_user_from_token, update_profile
+from app.auth import authenticate, create_session, create_user, delete_session, get_user_by_id, get_user_from_token, update_profile
 from app.websocket.chat import manager
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -49,6 +49,15 @@ def login(data: Credentials):
 @router.get("/me")
 def me(authorization: str | None = Header(default=None)):
     _, user = require_user(authorization)
+    return {"user": user}
+
+
+@router.get("/users/{user_id}")
+def public_user(user_id: int, authorization: str | None = Header(default=None)):
+    require_user(authorization)
+    user = get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado.")
     return {"user": user}
 
 
