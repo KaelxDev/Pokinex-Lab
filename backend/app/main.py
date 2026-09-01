@@ -29,7 +29,7 @@ app = FastAPI(title="Poknex API", version="2.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-    allow_origin_regex=r"^https?://(localhost|127\\.0\\.0\\.1|10\\.\\d+\\.\\d+\\.\\d+|192\\.\\d+\\.\\d+\\.\\d+|172\\.(1[6-9]|2\\d|3[0-1])\\.\\d+\\.\\d+)(:\\d+)?$",
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -50,19 +50,20 @@ def _websocket_token(websocket: WebSocket) -> str | None:
 
 async def _send_validation_error(websocket: WebSocket, action: str, error: ValidationError) -> None:
     first_error = error.errors()[0]
-    message = "Dados do evento inválidos."
+    error_type = first_error.get("type")
 
-    if first_error.get("type") == "string_too_long":
-        message = "Um dos campos excedeu o limite permitido."
-    elif first_error.get("type") == "string_too_short":
-        message = "Um dos campos é obrigatório."
-    elif first_error.get("type") == "literal_error":
-        message = "Valor não permitido."
-    elif first_error.get("type") == "missing":
-        message = "Campo obrigatório ausente."
+    messages = {
+        "string_too_long": "Um dos campos excedeu o limite permitido.",
+        "string_too_short": "Um dos campos é obrigatório.",
+        "literal_error": "Valor não permitido.",
+        "missing": "Campo obrigatório ausente.",
+    }
 
-    payload = {"type": "error", "action": action, "message": message}
-    await websocket.send_json(payload)
+    await websocket.send_json({
+        "type": "error",
+        "action": action,
+        "message": messages.get(error_type, "Dados do evento inválidos."),
+    })
 
 
 @app.websocket("/ws")
