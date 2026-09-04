@@ -1,31 +1,83 @@
 """Package-level compatibility hooks for the Pokinex moderation engine."""
 
+import asyncio
 import re
 import time
 
 from fastapi import WebSocket
 
 from .auth import get_user_from_token
-from .moderation_bot import ModerationBot, moderation_bot
+from .moderation_bot import ModerationBot, ModerationResult, moderation_bot
+from .websocket.chat import manager
 
 
-# Laughter such as "kkkkkkkk" is normal chat behavior. We only collapse very
-# long laughter runs before the existing repetition detector sees the message.
-# Other repeated characters (for example "!!!!!!!!!!" or "zzzzzzzzzz") keep the
-# stricter moderation behavior.
+# Laughter such as "kkkkkkkk" is normal chat behavior. Other repeated
+# characters keep the stricter moderation behavior.
 _LAUGHTER_RUN = re.compile(r"([kha])\1{8,}", re.IGNORECASE)
 _original_moderate = ModerationBot.moderate
 
 
-def _moderate_with_laughter_tolerance(self, message, user_id=None):
-    safe_message = _LAUGHTER_RUN.sub(
-        lambda match: match.group(1) * 4,
-        message,
-    )
+def _moderate_with_pokinex_rules(self, message, user_id=None):
+    safe_message = _LAUGHTER_RUN.sub(lambda match: match.group(1) * 4, message)
+
+    current_message_id = getattr(self, "_current_message_id", None)
+    self._pending_cleanup_ids = []
+    history = getattr(self, "_duplicate_burst_history", None)
+    if history is None:
+        history = {}
+        self._duplicate_burst_history = history
+
+    key = str(user_id) if user_id is not None else None
+    normalized = self.normalize_for_moderation(message).casefold()
+    now = time.time()
+    window = getattr(self, "DUPLICATE_WINDOW_SECONDS", 20.0)
+    threshold = 5
+
+    if key is not None and normalized:
+        entries = history.setdefault(key, [])
+        entries[:] = [
+            entry for entry in entries
+            if now - entry[0] <= window and entry[1] == normalized
+        ]
+
+        if entries:
+            count = len(entries) + 1
+            if count >= threshold:
+                self._pending_cleanup_ids = [
+                    entry[2] for entry in entries[-4:] if entry[2]
+                ]
+                entries.clear()
+                return ModerationResult(
+                    False,
+                    "A mesma mensagem foi enviada 5 vezes seguidas.",
+                    "🔁 Ocorrência registrada por repetição excessiva. As 4 mensagens anteriores foram removidas e esta tentativa foi bloqueada.",
+                    "duplicate_burst",
+                    "duplicate_burst",
+                    "medium",
+                    0,
+                )
+
+            # The base engine has a single-duplicate rule. During the first
+            # four copies of a burst, give that internal check a unique marker;
+            # the actual message shown/stored by the chat remains unchanged.
+            internal_message = (
+                f"{safe_message} [pokinex-duplicate-check-"
+                f"{count}-{current_message_id or now}]"
+            )
+            result = _original_moderate(self, internal_message, user_id)
+            if result.allowed:
+                entries.append((now, normalized, current_message_id))
+            return result
+
+        result = _original_moderate(self, safe_message, user_id)
+        if result.allowed:
+            entries.append((now, normalized, current_message_id))
+        return result
+
     return _original_moderate(self, safe_message, user_id)
 
 
-ModerationBot.moderate = _moderate_with_laughter_tolerance
+ModerationBot.moderate = _moderate_with_pokinex_rules
 
 
 def _remaining_mute_seconds(self, user_id) -> int:
@@ -41,20 +93,49 @@ def _remaining_mute_seconds(self, user_id) -> int:
 ModerationBot.remaining_mute_seconds = _remaining_mute_seconds
 
 
+async def _purge_repeated_messages(websocket: WebSocket, user, message_ids: list[str]):
+    for message_id in message_ids:
+        try:
+            await manager.delete_message(user, message_id, websocket)
+        except Exception:
+            # Moderation must remain fail-closed: a cleanup failure should not
+            # restore the blocked fifth message or break the WebSocket loop.
+            continue
+
+
 _original_send_json = WebSocket.send_json
 
 
 async def _send_json_with_moderation_countdown(self, data, *args, **kwargs):
+    cleanup_ids = []
     if isinstance(data, dict) and data.get("type") == "moderation":
         action = data.get("action")
-        if action in {"blocked", "duplicate", "flood", "muted"}:
+
+        # A duplicate burst is handled after the warning is sent. The four
+        # previously accepted messages are hard-deleted from persistence and
+        # broadcast as deletions. The frontend also receives the IDs in the
+        # same event so they disappear immediately instead of becoming tombstones.
+        if action == "duplicate_burst":
+            cleanup_ids = list(getattr(moderation_bot, "_pending_cleanup_ids", []))
+            if cleanup_ids:
+                data = {**data, "removeMessageIds": cleanup_ids}
+            moderation_bot._pending_cleanup_ids = []
+
+        if action in {"blocked", "duplicate", "flood", "muted", "duplicate_burst"}:
             token = self.cookies.get("session")
             user = get_user_from_token(token) if token else None
             if user:
                 remaining = moderation_bot.remaining_mute_seconds(user["id"])
                 if remaining > 0:
                     data = {**data, "muteRemainingSeconds": remaining}
+
     await _original_send_json(self, data, *args, **kwargs)
+
+    if cleanup_ids:
+        token = self.cookies.get("session")
+        user = get_user_from_token(token) if token else None
+        if user:
+            await _purge_repeated_messages(self, user, cleanup_ids)
 
 
 WebSocket.send_json = _send_json_with_moderation_countdown
