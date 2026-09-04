@@ -2,24 +2,22 @@ import { useEffect, useMemo, useState } from "react";
 import { normalizeAvatarUrl, userInitial } from "../utils/chat";
 import { onDirectMessage, onDirectMessageRead, markDirectMessageRead } from "../notifications";
 
+function roleLabel(role) {
+  const normalized = String(role || "").toLowerCase();
+  if (normalized === "owner") return "OWNER";
+  if (normalized === "admin") return "ADMIN";
+  if (["moderator", "staff"].includes(normalized)) return "STAFF";
+  return null;
+}
+
 export default function ChatSidebar({ user, profile, users, onOpenProfile, onClearHistory }) {
   const displayName = profile?.displayName || user?.displayName || user?.username || "Usuário";
   const avatar = normalizeAvatarUrl(profile?.avatar || user?.avatar, user?.id);
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 700);
   const [unreadByUser, setUnreadByUser] = useState({});
 
-  function roleLabel(role) {
-    const normalized = String(role || "").toLowerCase();
-    if (normalized === "owner") return "OWNER";
-    if (normalized === "admin") return "ADMIN";
-    if (["moderator", "staff"].includes(normalized)) return "STAFF";
-    return null;
-  }
-
-  const ownRole = useMemo(
-    () => roleLabel(users.find((item) => String(item.id) === String(user?.id))?.role),
-    [users, user?.id],
-  );
+  const ownRole = roleLabel(user?.role) || roleLabel(users.find((item) => String(item.id) === String(user?.id))?.role);
+  const isModerator = Boolean(ownRole && ["OWNER", "ADMIN", "STAFF"].includes(ownRole));
 
   useEffect(() => {
     const toggle = (event) => {
@@ -166,7 +164,7 @@ export default function ChatSidebar({ user, profile, users, onOpenProfile, onCle
               const name = onlineUser.displayName || onlineUser.username || "Usuário";
               const isSelf = String(onlineUser.id) === String(user?.id);
               const isBot = onlineUser.role === "bot" || String(onlineUser.id) === "moderation-bot";
-              const role = roleLabel(onlineUser.role);
+              const role = roleLabel(isSelf ? user?.role : onlineUser.role);
               const canDM = !isSelf && !isBot && Number.isFinite(Number(onlineUser.id));
               const unread = Number(unreadByUser[onlineUser.id] || 0);
 
@@ -224,7 +222,7 @@ export default function ChatSidebar({ user, profile, users, onOpenProfile, onCle
                 <strong>{displayName}</strong>
                 <span>@{user.username}</span>
               </div>
-              {ownRole && <span className={`profile-role-badge ${ownRole.toLowerCase()}`}>{ownRole}</span>}
+              {ownRole && isModerator && <span className={`profile-role-badge ${ownRole.toLowerCase()}`}>{ownRole}</span>}
               <span className="profile-arrow" aria-hidden="true">↗</span>
             </button>
 
