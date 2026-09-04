@@ -4,8 +4,8 @@ import { copyText } from "../utils/chat";
 export function useChatActions({
   user,
   userRef,
-  connected,
-  socketRef,
+  isConnected,
+  getSocket,
   messageInput,
   setMessageInput,
   replyingTo,
@@ -27,6 +27,8 @@ export function useChatActions({
     const text = messageInput.trim();
     if (!text) return;
 
+    const connected = isConnected();
+    const socket = getSocket();
     const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const sender = userRef.current;
     const role = String(sender?.role || "").toLowerCase();
@@ -66,8 +68,8 @@ export function useChatActions({
 
     const sent = connected &&
       (replyingTo
-        ? socketRef.current?.sendReplyMessage(text, id, replyingTo.messageId)
-        : socketRef.current?.sendMessage(text, id));
+        ? socket?.sendReplyMessage(text, id, replyingTo.messageId)
+        : socket?.sendMessage(text, id));
 
     if (!sent) {
       setOfflineQueue((current) => [
@@ -87,7 +89,7 @@ export function useChatActions({
 
     setMessageInput("");
     setReplyingTo(null);
-  }, [connected, messageInput, replyingTo, setMessageInput, setMessages, setOfflineQueue, setReplyingTo, socketRef, userRef]);
+  }, [getSocket, isConnected, messageInput, replyingTo, setMessageInput, setMessages, setOfflineQueue, setReplyingTo, userRef]);
 
   const beginEdit = useCallback((message) => {
     setContextMenu(null);
@@ -112,7 +114,8 @@ export function useChatActions({
       setEditError("A mensagem não pode ficar vazia.");
       return;
     }
-    if (!connected || !socketRef.current?.sendEditMessage(editingId, text)) {
+    const socket = getSocket();
+    if (!isConnected() || !socket?.sendEditMessage(editingId, text)) {
       setEditError("Aguardando conexão para editar.");
       return;
     }
@@ -127,12 +130,13 @@ export function useChatActions({
     );
     setEditingId(null);
     setEditingText("");
-  }, [connected, editingId, editingText, setMessages, socketRef]);
+  }, [editingId, editingText, getSocket, isConnected, setMessages]);
 
   const deleteMessage = useCallback((message) => {
     setContextMenu(null);
     setReactionPickerMessageId(null);
-    if (!connected || !socketRef.current?.sendDeleteMessage(message.messageId)) return;
+    const socket = getSocket();
+    if (!isConnected() || !socket?.sendDeleteMessage(message.messageId)) return;
 
     setMessages((current) =>
       current.map((item) =>
@@ -146,7 +150,7 @@ export function useChatActions({
           : item,
       ),
     );
-  }, [connected, setMessages, socketRef]);
+  }, [getSocket, isConnected, setMessages]);
 
   const confirmDelete = useCallback((message) => {
     if (window.confirm("Excluir esta mensagem?")) deleteMessage(message);
@@ -162,9 +166,10 @@ export function useChatActions({
   }, [setReplyingTo]);
 
   const handleReaction = useCallback((messageId, reaction) => {
-    if (!connected || !socketRef.current?.sendReaction(messageId, reaction)) return;
+    const socket = getSocket();
+    if (!isConnected() || !socket?.sendReaction(messageId, reaction)) return;
     setReactionPickerMessageId(null);
-  }, [connected, socketRef]);
+  }, [getSocket, isConnected]);
 
   const toggleReactionPicker = useCallback((event, messageId) => {
     event.preventDefault();
@@ -177,10 +182,11 @@ export function useChatActions({
     event.preventDefault();
     event.stopPropagation();
     setReactionPickerMessageId(null);
+    const currentUser = userRef.current || user;
     const isMine =
       message.userId != null
-        ? String(message.userId) === String(user?.id)
-        : String(message.username || "") === String(user?.username || "");
+        ? String(message.userId) === String(currentUser?.id)
+        : String(message.username || "") === String(currentUser?.username || "");
 
     setContextMenu({
       x: Math.max(8, Math.min(event.clientX, window.innerWidth - 190)),
@@ -188,7 +194,7 @@ export function useChatActions({
       message,
       isMine,
     });
-  }, [user?.id, user?.username]);
+  }, [user, userRef]);
 
   const startLongPress = useCallback((event, message) => {
     if (event.touches.length !== 1) return;
@@ -223,7 +229,7 @@ export function useChatActions({
   }, []);
 
   const flushQueue = useCallback(() => {
-    const socket = socketRef.current;
+    const socket = getSocket();
     if (!socket || offlineQueue.length === 0) return;
 
     for (const item of offlineQueue) {
@@ -236,23 +242,9 @@ export function useChatActions({
       );
       socket.sendMessage(item.message, item.id);
     }
-  }, [offlineQueue, setMessages, socketRef]);
-
-  useEffect(() => {
-    if (connected) flushQueue();
-  }, [connected, flushQueue]);
+  }, [getSocket, offlineQueue, setMessages]);
 
   useEffect(() => () => clearTimeout(longPressRef.current), []);
-
-  useEffect(() => {
-    function closeOverlays() {
-      setContextMenu(null);
-      setReactionPickerMessageId(null);
-    }
-
-    window.addEventListener("click", closeOverlays);
-    return () => window.removeEventListener("click", closeOverlays);
-  }, []);
 
   return {
     contextMenu,
@@ -279,5 +271,6 @@ export function useChatActions({
     startLongPress,
     endLongPress,
     copyMessage,
+    flushQueue,
   };
 }
