@@ -1,6 +1,5 @@
 """Package-level compatibility hooks for the Pokinex moderation engine."""
 
-import asyncio
 import re
 import time
 
@@ -9,6 +8,7 @@ from fastapi import WebSocket
 from .auth import get_user_from_token
 from .moderation_bot import ModerationBot, ModerationResult, moderation_bot
 from .websocket.chat import manager
+from .websocket.schemas import ChatMessageEvent
 
 
 # Laughter such as "kkkkkkkk" is normal chat behavior. Other repeated
@@ -49,7 +49,8 @@ def _moderate_with_pokinex_rules(self, message, user_id=None):
                 entries.clear()
                 return ModerationResult(
                     False,
-                    "A mesma mensagem foi enviada 5 vezes seguidas.",
+                    "A mesma mensagem foi enviada 5 vezes seguidas."
+                    " Uma ocorrência foi registrada.",
                     "🔁 Ocorrência registrada por repetição excessiva. As 4 mensagens anteriores foram removidas e esta tentativa foi bloqueada.",
                     "duplicate_burst",
                     "duplicate_burst",
@@ -98,8 +99,6 @@ async def _purge_repeated_messages(websocket: WebSocket, user, message_ids: list
         try:
             await manager.delete_message(user, message_id, websocket)
         except Exception:
-            # Moderation must remain fail-closed: a cleanup failure should not
-            # restore the blocked fifth message or break the WebSocket loop.
             continue
 
 
@@ -111,21 +110,21 @@ async def _send_json_with_moderation_countdown(self, data, *args, **kwargs):
     if isinstance(data, dict) and data.get("type") == "moderation":
         action = data.get("action")
 
-        # A duplicate burst is handled after the warning is sent. The four
-        # previously accepted messages are hard-deleted from persistence and
-        # broadcast as deletions. The frontend also receives the IDs in the
-        # same event so they disappear immediately instead of becoming tombstones.
         if action == "duplicate_burst":
             cleanup_ids = list(getattr(moderation_bot, "_pending_cleanup_ids", []))
             if cleanup_ids:
-                data = {**data, "removeMessageIds": cleanup_ids}
+                data = {
+                    **data,
+                    "removeMessageIds": cleanup_ids,
+                    "cleanupCount": len(cleanup_ids),
+                }
             moderation_bot._pending_cleanup_ids = []
 
         if action in {"blocked", "duplicate", "flood", "muted", "duplicate_burst"}:
             token = self.cookies.get("session")
-            user = get_user_from_token(token) if token else None
-            if user:
-                remaining = moderation_bot.remaining_mute_seconds(user["id"])
+            current_user = get_user_from_token(token) if token else None
+            if current_user:
+                remaining = moderation_bot.remaining_mute_seconds(current_user["id"])
                 if remaining > 0:
                     data = {**data, "muteRemainingSeconds": remaining}
 
@@ -133,9 +132,24 @@ async def _send_json_with_moderation_countdown(self, data, *args, **kwargs):
 
     if cleanup_ids:
         token = self.cookies.get("session")
-        user = get_user_from_token(token) if token else None
-        if user:
-            await _purge_repeated_messages(self, user, cleanup_ids)
+        current_user = get_user_from_token(token) if token else None
+        if current_user:
+            await _purge_repeated_messages(self, current_user, cleanup_ids)
 
 
 WebSocket.send_json = _send_json_with_moderation_countdown
+
+
+# main.py receives the public messageId only through ChatMessageEvent. Capture
+# it at validation time so the moderation engine can associate the five-copy
+# burst with the four persisted messages that must be removed.
+_original_chat_event_validate = ChatMessageEvent.model_validate
+
+
+@classmethod
+def _chat_event_model_validate(cls, obj, *args, **kwargs):
+    moderation_bot._current_message_id = obj.get("messageId") if isinstance(obj, dict) else None
+    return _original_chat_event_validate(obj, *args, **kwargs)
+
+
+ChatMessageEvent.model_validate = _chat_event_model_validate
