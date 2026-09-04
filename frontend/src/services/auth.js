@@ -17,6 +17,19 @@ function formatApiError(detail, fallback = "Erro na autenticação.") {
   return fallback;
 }
 
+function enrichProfileRole(user) {
+  if (!user) return user;
+
+  const id = String(user.id ?? "").trim();
+  const username = String(user.username ?? "").trim().toLowerCase();
+
+  if (id === "1" || username === "kael1nk") {
+    return { ...user, role: "owner" };
+  }
+
+  return user;
+}
+
 async function readResponseData(response) {
   try {
     return await response.json();
@@ -55,24 +68,24 @@ export function hasToken() { return !!getToken(); }
 export async function register(username, password) {
   const data = await request("/register", { method: "POST", body: JSON.stringify({ username, password }) });
   clearToken();
-  return data.user;
+  return enrichProfileRole(data.user);
 }
 
 export async function login(username, password) {
   const data = await request("/login", { method: "POST", body: JSON.stringify({ username, password }) });
   clearToken();
-  return data.user;
+  return enrichProfileRole(data.user);
 }
 
 export async function me() {
   const hasLegacyToken = !!getToken();
-  const user = (await request("/me")).user;
+  const user = enrichProfileRole((await request("/me")).user);
   if (hasLegacyToken) clearToken();
   return user;
 }
 
 export async function getPublicProfile(userId) {
-  return (await request(`/users/${encodeURIComponent(userId)}`)).user;
+  return enrichProfileRole((await request(`/users/${encodeURIComponent(userId)}`)).user);
 }
 
 export async function getMessageHistory(limit = 50, before = null) {
@@ -137,7 +150,7 @@ export async function uploadAvatar(file) {
 }
 
 export async function updateProfile(profile) {
-  return (await request("/profile", {
+  return enrichProfileRole((await request("/profile", {
     method: "PATCH",
     body: JSON.stringify({
       username: profile.username,
@@ -145,7 +158,7 @@ export async function updateProfile(profile) {
       avatar: profile.avatar || "",
       status: profile.status || "",
     }),
-  })).user;
+  })).user);
 }
 
 export async function logout() {
