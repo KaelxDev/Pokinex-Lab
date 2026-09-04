@@ -9,6 +9,15 @@ from app.infrastructure.database import (
     using_postgres,
 )
 
+__all__ = [
+    "close_db_pool",
+    "get_connection",
+    "initialize_database",
+    "init_db_pool",
+    "postgres_or_sqlite",
+    "using_postgres",
+]
+
 
 def _persistent_avatar_reference(connection, user_id, fallback=""):
     query = postgres_or_sqlite(
