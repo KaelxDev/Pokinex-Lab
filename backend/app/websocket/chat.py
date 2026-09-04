@@ -11,10 +11,25 @@ from app.database import (
     toggle_reaction as toggle_reaction_record,
     update_message as update_message_record,
 )
+from app.roles import get_user_role
 
 REACTIONS = ("❤️", "😂", "😮", "😢", "😡", "👍")
 MAX_PROCESSED_MESSAGE_IDS = 10_000
 MAX_MESSAGE_OWNERS = 4_096
+
+
+def public_user_payload(user, *, online: bool | None = None) -> dict:
+    payload = {
+        "id": user["id"],
+        "username": user["username"],
+        "displayName": user["displayName"],
+        "avatar": user["avatar"],
+        "status": user["status"],
+        "role": get_user_role(user),
+    }
+    if online is not None:
+        payload["online"] = online
+    return payload
 
 
 class ConnectionManager:
@@ -77,10 +92,7 @@ class ConnectionManager:
                 {
                     "type": "system",
                     "event": "user_joined",
-                    "userId": user["id"],
-                    "username": user["username"],
-                    "displayName": user["displayName"],
-                    "avatar": user["avatar"],
+                    **public_user_payload(user, online=True),
                     "message": f"{user['username']} entrou no chat.",
                     "timestamp": self.get_timestamp(),
                 }
@@ -120,16 +132,7 @@ class ConnectionManager:
             if user["id"] in seen:
                 continue
             seen.add(user["id"])
-            users.append(
-                {
-                    "id": user["id"],
-                    "username": user["username"],
-                    "displayName": user["displayName"],
-                    "avatar": user["avatar"],
-                    "status": user["status"],
-                    "online": True,
-                }
-            )
+            users.append(public_user_payload(user, online=True))
 
         await self.broadcast(
             {
@@ -143,13 +146,7 @@ class ConnectionManager:
         await self.broadcast(
             {
                 "type": "profile_updated",
-                "user": {
-                    "id": user["id"],
-                    "username": user["username"],
-                    "displayName": user["displayName"],
-                    "avatar": user["avatar"],
-                    "status": user["status"],
-                },
+                "user": public_user_payload(user),
                 "timestamp": self.get_timestamp(),
             }
         )
@@ -212,11 +209,7 @@ class ConnectionManager:
         event = {
             "type": "message",
             "messageId": message_id,
-            "userId": user["id"],
-            "username": user["username"],
-            "displayName": user["displayName"],
-            "avatar": user["avatar"],
-            "status": user["status"],
+            **public_user_payload(user),
             "message": message,
             "timestamp": timestamp,
             "sequence": self.sequence,
@@ -339,11 +332,7 @@ class ConnectionManager:
         self.sequence += 1
         event = {
             "messageId": message_id,
-            "userId": user["id"],
-            "username": user["username"],
-            "displayName": user["displayName"],
-            "avatar": user["avatar"],
-            "status": user["status"],
+            **public_user_payload(user),
             "message": message,
             "editedAt": edited_at,
             "edited": True,
