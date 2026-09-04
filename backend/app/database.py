@@ -1,8 +1,12 @@
 """Compatibility-facing message repository using the database infrastructure layer."""
 
 from app.infrastructure.database import (
+    close_db_pool,
     get_connection,
+    initialize_database,
+    init_db_pool,
     postgres_or_sqlite,
+    using_postgres,
 )
 
 
@@ -154,13 +158,10 @@ def toggle_reaction(message_id, user_id, reaction, created_at):
     connection = get_connection()
 
     try:
-        if not connection.execute:
-            raise RuntimeError("Conexão de banco inválida.")
-
-        if not postgres_or_sqlite("true", "false") == "true":
+        if not using_postgres():
             connection.execute("BEGIN IMMEDIATE")
 
-        if postgres_or_sqlite("true", "false") == "true":
+        if using_postgres():
             toggle_query = """
                 WITH deleted AS (
                     DELETE FROM message_reactions
