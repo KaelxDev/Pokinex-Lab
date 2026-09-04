@@ -1,19 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { clearToken, me } from "../services/auth";
+import { clearLegacyToken, me } from "../services/auth";
 
-function withRole(currentUser) {
-  if (!currentUser) return currentUser;
-
-  const id = String(currentUser.id ?? "").trim();
-  const username = String(currentUser.username ?? "").trim().toLowerCase();
-
-  if (id === "1" || username === "kael1nk") {
-    return { ...currentUser, role: "owner" };
-  }
-
-  return currentUser.role
-    ? currentUser
-    : { ...currentUser, role: "member" };
+function normalizeUser(currentUser) {
+  if (!currentUser) return null;
+  return {
+    ...currentUser,
+    role: currentUser.role || "member",
+  };
 }
 
 export function useAuthSession() {
@@ -22,9 +15,9 @@ export function useAuthSession() {
   const userRef = useRef(null);
 
   const syncUser = useCallback((nextUser) => {
-    const enrichedUser = withRole(nextUser);
-    setUser(enrichedUser);
-    userRef.current = enrichedUser;
+    const normalizedUser = normalizeUser(nextUser);
+    setUser(normalizedUser);
+    userRef.current = normalizedUser;
   }, []);
 
   useEffect(() => {
@@ -37,7 +30,7 @@ export function useAuthSession() {
         syncUser(currentUser);
       } catch {
         if (!cancelled) {
-          clearToken();
+          clearLegacyToken();
           syncUser(null);
         }
       } finally {
@@ -52,7 +45,7 @@ export function useAuthSession() {
   }, [syncUser]);
 
   function logout() {
-    clearToken();
+    clearLegacyToken();
     syncUser(null);
   }
 

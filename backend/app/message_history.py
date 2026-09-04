@@ -1,6 +1,11 @@
 from app.database import get_connection, using_postgres
+from app.roles import get_user_role
 
 MAX_HISTORY_LIMIT = 100
+
+
+def _user_role(user_id, username) -> str:
+    return get_user_role({"id": user_id, "username": username})
 
 
 def get_message_history(limit: int = 50, before: str | None = None) -> dict:
@@ -23,6 +28,7 @@ def get_message_history(limit: int = 50, before: str | None = None) -> dict:
                 m.reply_to_message_id,
                 u.username,
                 u.display_name,
+                u.status,
                 CASE
                     WHEN ua.user_id IS NOT NULL THEN
                         '/api/auth/avatar/' || CAST(u.id AS TEXT) || '?v=' || ua.updated_at
@@ -88,6 +94,7 @@ def get_message_history(limit: int = 50, before: str | None = None) -> dict:
                 "username": row["username"],
                 "displayName": row["display_name"],
                 "avatar": row["avatar"] or "",
+                "role": _user_role(row["user_id"], row["username"]),
                 "message": "Esta mensagem foi excluída" if row["deleted_at"] else row["message"],
                 "timestamp": row["created_at"],
                 "edited": bool(row["edited_at"]),
@@ -106,6 +113,7 @@ def get_message_history(limit: int = 50, before: str | None = None) -> dict:
                     "username": row["reply_username"],
                     "displayName": row["reply_display_name"],
                     "avatar": row["reply_avatar"] or "",
+                    "role": _user_role(row["reply_user_id"], row["reply_username"]),
                     "message": "Esta mensagem foi excluída"
                     if row["reply_deleted_at"]
                     else row["reply_message"],

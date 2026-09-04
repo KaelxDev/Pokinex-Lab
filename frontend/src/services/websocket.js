@@ -1,8 +1,6 @@
+import { WS_URL } from "../config/runtime";
 import { notifyDirectMessage } from "../notifications";
 
-const DEFAULT_WS_URL = "wss://nexchat-backend-2cyf.onrender.com/ws";
-const LOCAL_WS_URL = `ws://${window.location.hostname}:8000/ws`;
-const WS_URL = import.meta.env.VITE_WS_URL || (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" ? LOCAL_WS_URL : DEFAULT_WS_URL);
 const RECONNECT_INTERVAL = 10000;
 const AUTH_CLOSE_CODE = 1008;
 const AUTH_CLOSE_REASON = "authentication required";
