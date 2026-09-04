@@ -18,7 +18,6 @@ from app.moderation_store import (
     delete_single_message,
     get_user_by_username,
 )
-from app.moderation_store import clear_recent_messages as _clear_recent_messages_legacy
 from app.routes.auth import router as auth_router
 from app.routes.messages import router as messages_router
 from app.security import ALLOWED_ORIGINS, is_allowed_origin
@@ -104,6 +103,16 @@ async def _send_validation_error(websocket: WebSocket, action: str, error: Valid
     })
 
 
+def _user_role(user) -> str:
+    user_id = str(user.get("id", "")).strip()
+    username = str(user.get("username", "")).strip().casefold()
+    if user_id == "1" or username == "kael1nk":
+        return "owner"
+    if is_moderator(user):
+        return "moderator"
+    return "member"
+
+
 async def _send_users_with_bot():
     users = [{
         "id": BOT_USER["id"],
@@ -127,7 +136,7 @@ async def _send_users_with_bot():
             "avatar": user["avatar"],
             "status": user["status"],
             "online": True,
-            "role": "moderator" if is_moderator(user) else "member",
+            "role": _user_role(user),
         })
 
     await manager.broadcast({
@@ -195,7 +204,20 @@ async def _broadcast_messages_cleared(message_ids: list[str], moderator_username
     })
 
 
-async def _moderation_command(websocket: WebSocket, user, message: str) -> bool:
+async def _broadcast_chat_reset(command_message: dict):
+    await manager.broadcast({
+        "type": "chat_reset",
+        "commandMessage": command_message,
+        "timestamp": manager.get_timestamp(),
+    })
+
+
+async def _moderation_command(
+    websocket: WebSocket,
+    user,
+    message: str,
+    message_id: str | None = None,
+) -> bool:
     if not message.startswith("!"):
         return False
 
@@ -251,19 +273,37 @@ async def _moderation_command(websocket: WebSocket, user, message: str) -> bool:
                     limit,
                 )
                 await _broadcast_messages_cleared(message_ids, user["username"])
-                scope = f" de @{target_user['username']}"
-                amount_text = "todas as" if limit is None else f"{len(message_ids)}"
-                await _send_bot_message(
-                    f"🧹 {len(message_ids)} mensagem(ns) removida(s){scope}."
-                    if limit is not None
-                    else f"🧹 Todas as mensagens de @{target_user['username']} foram removidas ({len(message_ids)})."
-                )
+                if limit is not None:
+                    await _send_bot_message(
+                        f"🧹 {len(message_ids)} mensagem(ns) removida(s) de @{target_user['username']}."
+                    )
+                else:
+                    await _send_bot_message(
+                        f"🧹 Todas as mensagens de @{target_user['username']} foram removidas ({len(message_ids)})."
+                    )
                 return True
 
             if target and target.casefold() == "all":
                 message_ids = await to_thread.run_sync(clear_all_messages)
-                await _broadcast_messages_cleared(message_ids, user["username"])
-                await _send_bot_message(f"🧹 Histórico do #geral apagado. {len(message_ids)} mensagem(ns) removida(s).")
+                command_message = {
+                    "type": "message",
+                    "messageId": message_id or f"modcmd-{manager.sequence + 1}-{manager.get_timestamp()}",
+                    "userId": user["id"],
+                    "username": user["username"],
+                    "displayName": user["displayName"],
+                    "avatar": user["avatar"],
+                    "status": user["status"],
+                    "role": _user_role(user),
+                    "message": message,
+                    "timestamp": manager.get_timestamp(),
+                    "ephemeral": True,
+                    "deliveryStatus": "sent",
+                    "offline": False,
+                }
+                await _broadcast_chat_reset(command_message)
+                await _send_bot_message(
+                    f"Histórico do #geral apagado. {len(message_ids)} mensagem(ns) removida(s)."
+                )
                 return True
 
             limit = _parse_clear_limit(target or "50")
@@ -361,7 +401,7 @@ async def _handle_public_message(websocket: WebSocket, user, event: ChatMessageE
     if not message:
         return True
 
-    if await _moderation_command(websocket, user, message):
+    if await _moderation_command(websocket, user, message, event.messageId):
         return True
 
     if not is_moderator(user) and moderation_bot.is_muted(user["id"]):
