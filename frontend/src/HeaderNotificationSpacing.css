@@ -1,0 +1,30 @@
+/* Header spacing: keep Online, notification and Sair visually separated. */
+.chat-header-status {
+  gap: 10px;
+}
+
+.chat-header .logout {
+  margin-left: 50px;
+}
+
+.dm-notification-center {
+  top: 15px;
+  right: 118px;
+}
+
+@media (max-width: 700px) {
+  .chat-header .logout {
+    margin-left: 42px;
+  }
+
+  .dm-notification-center {
+    top: 8px;
+    right: 114px;
+  }
+}
+
+@media (max-width: 520px) {
+  .chat-header .connection {
+    display: none !important;
+  }
+}
