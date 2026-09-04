@@ -1,7 +1,7 @@
-"""Compatibility facade for database infrastructure and chat repositories.
+"""Compatibility facade for database infrastructure and repositories.
 
-New code should import infrastructure helpers from `app.infrastructure.database`
-and message persistence from `app.repositories.message_repository`.
+New code should import database infrastructure from `app.infrastructure.database`
+and entity-specific persistence from `app.repositories`.
 """
 
 from app.infrastructure.database import (
@@ -13,8 +13,6 @@ from app.infrastructure.database import (
     using_postgres,
 )
 from app.repositories.message_repository import (
-    _persistent_avatar_reference,
-    _profile_from_row,
     delete_message,
     get_message,
     get_message_owner,
@@ -23,6 +21,14 @@ from app.repositories.message_repository import (
     toggle_reaction,
     update_message,
 )
+from app.repositories.user_repository import (
+    persistent_avatar_reference,
+    profile_from_row,
+)
+
+# Temporary compatibility aliases for older imports and tests.
+_persistent_avatar_reference = persistent_avatar_reference
+_profile_from_row = profile_from_row
 
 __all__ = [
     "close_db_pool",
@@ -31,6 +37,8 @@ __all__ = [
     "init_db_pool",
     "postgres_or_sqlite",
     "using_postgres",
+    "persistent_avatar_reference",
+    "profile_from_row",
     "_persistent_avatar_reference",
     "_profile_from_row",
     "delete_message",

@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from app.database import get_connection, using_postgres
+from app.infrastructure.database import get_connection, using_postgres
 
 
 def store_avatar(user_id: int, content: bytes, content_type: str) -> str:
