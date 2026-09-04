@@ -1,8 +1,10 @@
+from collections import defaultdict, deque
 from dataclasses import dataclass
+from datetime import datetime
 import os
+import random
 import re
 import time
-from collections import defaultdict, deque
 
 
 BOT_USER = {
@@ -37,13 +39,16 @@ class ModerationResult:
 
 class ModerationBot:
     PUBLIC_COMMANDS = {
-        "!help": "🤖 Comandos públicos: !help, !rules, !bot, !about, !ping, !status",
+        "!help": "🤖 Comandos: !help, !rules, !bot, !about, !ping, !status, !online, !time",
         "!rules": "📜 Regras: respeito, nada de spam/scam, abuso ou flood. Em caso de problema, fale com a moderação.",
-        "!bot": "🤖 Eu sou o PokiBot, moderador automático do #geral. Também posso responder quando você me mencionar.",
+        "!bot": "🤖 Eu sou o PokiBot, assistente e moderador automático do #geral. Também respondo quando você me menciona.",
         "!about": "🤖 PokiBot • moderação automática • respostas contextuais • proteção contra flood.",
         "!ping": "🏓 Pong. PokiBot está online.",
     }
-    MOD_HELP = "🛡️ Moderador: !mod, !clear [n], !warn @usuário [motivo], !mute @usuário [min], !unmute @usuário, !kick @usuário"
+    MOD_HELP = (
+        "🛡️ Moderador: !mod, !clear [n], !warn @usuário [motivo], "
+        "!mute @usuário [min], !unmute @usuário, !kick @usuário"
+    )
     BLOCKED_PATTERNS = (
         re.compile(r"\bspam\b", re.IGNORECASE),
         re.compile(r"\bscam\b", re.IGNORECASE),
@@ -56,17 +61,23 @@ class ModerationBot:
     DUPLICATE_WINDOW_SECONDS = 20.0
     BOT_REPLY_COOLDOWN_SECONDS = 3.0
     GREETINGS = {
-        "oi": "👋 Oi! Eu sou o PokiBot. Pode me mencionar quando precisar.",
-        "olá": "👋 Olá! PokiBot na área. Precisa de alguma coisa?",
-        "ola": "👋 Olá! PokiBot na área. Precisa de alguma coisa?",
-        "hey": "👋 Hey! PokiBot online.",
-        "eae": "👋 Eae! Tudo certo por aí?",
-        "e aí": "👋 E aí! PokiBot online.",
+        "oi": [
+            "👋 Oi! Eu sou o PokiBot. Pode me mencionar quando precisar.",
+            "👋 Opa! PokiBot online. Em que posso ajudar?",
+        ],
+        "olá": [
+            "👋 Olá! PokiBot na área. Precisa de alguma coisa?",
+            "👋 Olá! Estou por aqui. Manda a pergunta.",
+        ],
+        "ola": [
+            "👋 Olá! PokiBot na área. Precisa de alguma coisa?",
+            "👋 Oi! Estou ouvindo.",
+        ],
+        "hey": ["👋 Hey! PokiBot online.", "🤖 Hey! Tudo certo?"],
+        "eae": ["👋 Eae! Tudo certo por aí?", "😎 Eae! PokiBot presente."],
+        "e aí": ["👋 E aí! PokiBot online.", "🤖 E aí! Manda a boa."],
     }
-    ADDRESS_PATTERNS = (
-        re.compile(r"@poki\s*bot\b", re.IGNORECASE),
-        re.compile(r"\bpoki\s*bot\b", re.IGNORECASE),
-    )
+    THANKS = ("obrigado", "obrigada", "valeu", "tmj", "tamo junto")
 
     def __init__(self):
         self._muted_until: dict[str, float] = {}
@@ -76,14 +87,19 @@ class ModerationBot:
         self._total_checked = 0
         self._total_blocked = 0
         self._started_at = time.time()
+        self._rng = random.Random()
 
     def command_name(self, message: str) -> str:
         return message.strip().split()[0].lower() if message.strip() else ""
 
-    def public_command(self, message: str) -> str | None:
+    def public_command(self, message: str, *, online_count: int | None = None) -> str | None:
         command = self.command_name(message)
         if command == "!status":
             return self.status_message()
+        if command == "!online":
+            return self.online_message(online_count)
+        if command == "!time":
+            return self.time_message()
         return self.PUBLIC_COMMANDS.get(command)
 
     def _remember_message(self, user_id: int, message: str) -> tuple[bool, bool]:
@@ -95,7 +111,11 @@ class ModerationBot:
         timestamps.append(now)
         normalized = " ".join(message.split()).casefold()
         previous = self._last_messages.get(key)
-        duplicate = bool(previous and previous[0] == normalized and now - previous[1] <= self.DUPLICATE_WINDOW_SECONDS)
+        duplicate = bool(
+            previous
+            and previous[0] == normalized
+            and now - previous[1] <= self.DUPLICATE_WINDOW_SECONDS
+        )
         self._last_messages[key] = (normalized, now)
         return len(timestamps) > self.FLOOD_MAX_MESSAGES, duplicate
 
@@ -105,15 +125,30 @@ class ModerationBot:
         for pattern in self.BLOCKED_PATTERNS:
             if pattern.search(normalized):
                 self._total_blocked += 1
-                return ModerationResult(False, "Mensagem bloqueada pela moderação automática.", "⚠️ Essa mensagem foi bloqueada pela moderação automática.", "blocked")
+                return ModerationResult(
+                    False,
+                    "Mensagem bloqueada pela moderação automática.",
+                    "⚠️ Essa mensagem foi bloqueada pela moderação automática.",
+                    "blocked",
+                )
         if user_id is not None:
             flood, duplicate = self._remember_message(user_id, normalized)
             if duplicate and len(normalized) >= 4:
                 self._total_blocked += 1
-                return ModerationResult(False, "Mensagem repetida detectada.", "⚠️ Evite enviar a mesma mensagem repetidamente.", "duplicate")
+                return ModerationResult(
+                    False,
+                    "Mensagem repetida detectada.",
+                    "⚠️ Evite enviar a mesma mensagem repetidamente.",
+                    "duplicate",
+                )
             if flood:
                 self._total_blocked += 1
-                return ModerationResult(False, "Flood detectado.", "🐌 Calma aí. Você está enviando mensagens rápido demais.", "flood")
+                return ModerationResult(
+                    False,
+                    "Flood detectado.",
+                    "🐌 Calma aí. Você está enviando mensagens rápido demais.",
+                    "flood",
+                )
         return ModerationResult(True)
 
     def _can_reply(self, user_id: int | None) -> bool:
@@ -126,17 +161,30 @@ class ModerationBot:
         self._last_bot_reply_at[key] = now
         return True
 
+    def _pick(self, values: list[str]) -> str:
+        return self._rng.choice(values)
+
     def _addressed_to_bot(self, text: str) -> tuple[bool, str]:
         cleaned = text
         addressed = False
-        for pattern in self.ADDRESS_PATTERNS:
+        patterns = (
+            re.compile(r"@poki\s*bot\b", re.IGNORECASE),
+            re.compile(r"\bpoki\s*bot\b", re.IGNORECASE),
+        )
+        for pattern in patterns:
             if pattern.search(cleaned):
                 addressed = True
                 cleaned = pattern.sub(" ", cleaned)
-        cleaned = re.sub(r"\s+", " ", cleaned).strip(" ,:;!?-\t")
+        cleaned = re.sub(r"\s+", " ", cleaned).strip(" ,.!?:;-\t")
         return addressed, cleaned
 
-    def conversational_response(self, message: str, user_id: int | None = None) -> str | None:
+    def conversational_response(
+        self,
+        message: str,
+        user_id: int | None = None,
+        *,
+        online_count: int | None = None,
+    ) -> str | None:
         text = " ".join(message.strip().split())
         if not text:
             return None
@@ -149,24 +197,54 @@ class ModerationBot:
             return None
 
         if lowered in self.GREETINGS:
-            return self.GREETINGS[lowered]
+            return self._pick(self.GREETINGS[lowered])
         if not lowered:
-            return "🤖 Estou aqui. Use `!help` para ver os comandos ou me faça uma pergunta."
+            return "🤖 Estou aqui. Use `!help` ou me faça uma pergunta."
         if any(term in lowered for term in ("como você está", "como voce esta", "tudo bem", "como ta", "como está")):
-            return "🤖 Operacional e de olho no #geral. Obrigado por perguntar."
+            return self._pick([
+                "🤖 Operacional e de olho no #geral. Obrigado por perguntar.",
+                "🤖 Tudo certo por aqui. Estou online e atento ao canal.",
+            ])
         if any(term in lowered for term in ("regras", "qual a regra", "quais as regras")):
             return self.PUBLIC_COMMANDS["!rules"]
         if any(term in lowered for term in ("o que você faz", "o que voce faz", "quem é você", "quem voce e")):
             return self.PUBLIC_COMMANDS["!bot"]
-        if any(term in lowered for term in ("obrigado", "obrigada", "valeu")):
-            return "😎 Tamo junto."
-        return "🤖 Recebi sua mensagem. Ainda estou aprendendo, mas posso responder a `!help`, `!rules`, `!about`, `!ping` e `!status`."
+        if any(term in lowered for term in ("me ajuda", "preciso de ajuda", "comandos", "o que posso fazer")):
+            return "🧭 Posso moderar o canal, detectar spam/flood e responder perguntas simples. Use `!help` para ver minhas funções."
+        if any(term in lowered for term in ("quem está online", "quem esta online", "tem alguém online", "tem alguem online", "quantas pessoas")):
+            return self.online_message(online_count)
+        if any(term in lowered for term in ("que horas", "qual a hora", "horas agora", "hora agora")):
+            return self.time_message()
+        if any(term in lowered for term in self.THANKS):
+            return self._pick(["😎 Tamo junto.", "🤖 Sempre à disposição.", "🫡 É nóis."])
+
+        return self._pick([
+            "🤖 Entendi sua mensagem. Ainda estou aprendendo, mas posso ajudar com `!help`, `!rules`, `!online`, `!time` e `!status`.",
+            "🤖 Recebi. Minha especialidade atual é moderar o #geral e responder perguntas simples quando você me chama.",
+            "🤖 Estou acompanhando. Tente uma pergunta mais direta ou use `!help` para ver minhas funções.",
+        ])
+
+    def online_message(self, online_count: int | None) -> str:
+        if online_count is None:
+            return "👥 Não consegui consultar a lista de usuários agora."
+        if online_count <= 0:
+            return "👥 No momento, não há usuários conectados."
+        if online_count == 1:
+            return "👥 Tem 1 usuário online no Pokinex agora."
+        return f"👥 Tem {online_count} usuários online no Pokinex agora."
+
+    def time_message(self) -> str:
+        now = datetime.now().astimezone()
+        return f"🕒 Agora são {now.strftime('%H:%M:%S')} ({now.strftime('%d/%m/%Y')})."
 
     def status_message(self) -> str:
         uptime = max(0, int(time.time() - self._started_at))
         hours, remainder = divmod(uptime, 3600)
         minutes, seconds = divmod(remainder, 60)
-        return f"📊 PokiBot status • online • uptime {hours:02d}:{minutes:02d}:{seconds:02d} • mensagens analisadas: {self._total_checked} • bloqueadas: {self._total_blocked}"
+        return (
+            f"📊 PokiBot status • online • uptime {hours:02d}:{minutes:02d}:{seconds:02d} "
+            f"• mensagens analisadas: {self._total_checked} • bloqueadas: {self._total_blocked}"
+        )
 
     def parse_target(self, message: str):
         parts = message.strip().split(maxsplit=2)
