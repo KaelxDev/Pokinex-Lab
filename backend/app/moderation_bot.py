@@ -5,6 +5,7 @@ import os
 import random
 import re
 import time
+import unicodedata
 
 
 BOT_USER = {
@@ -18,7 +19,11 @@ BOT_USER = {
 
 
 def _csv_env(name: str) -> set[str]:
-    return {item.strip().casefold() for item in os.getenv(name, "").split(",") if item.strip()}
+    return {
+        item.strip().casefold()
+        for item in os.getenv(name, "").split(",")
+        if item.strip()
+    }
 
 
 def is_moderator(user) -> bool:
@@ -26,7 +31,9 @@ def is_moderator(user) -> bool:
     usernames = _csv_env("POKINEX_MODERATOR_USERNAMES")
     user_id = str(user.get("id", "")).strip()
     username = str(user.get("username", "")).strip().casefold()
-    return (bool(user_id) and user_id in ids) or (bool(username) and username in usernames)
+    return (bool(user_id) and user_id in ids) or (
+        bool(username) and username in usernames
+    )
 
 
 @dataclass(frozen=True)
@@ -35,32 +42,65 @@ class ModerationResult:
     reason: str | None = None
     bot_message: str | None = None
     action: str | None = None
+    category: str | None = None
+    severity: str = "low"
+    mute_minutes: int = 0
 
 
 class ModerationBot:
     PUBLIC_COMMANDS = {
         "!help": "🤖 Comandos: !help, !rules, !bot, !about, !ping, !status, !online, !time, !memory",
-        "!rules": "📜 Regras: respeito, nada de spam/scam, abuso ou flood. Em caso de problema, fale com a moderação.",
+        "!rules": "📜 Regras: respeito, nada de spam/scam, abuso, flood ou links suspeitos. Em caso de problema, fale com a moderação.",
         "!bot": "🤖 Eu sou o PokiBot, assistente e moderador automático do #geral. Também respondo quando você me menciona.",
-        "!about": "🤖 PokiBot • moderação automática • respostas contextuais • memória curta • proteção contra flood.",
+        "!about": "🤖 PokiBot • moderação automática em camadas • respostas contextuais • memória curta • proteção contra spam e flood.",
         "!ping": "🏓 Pong. PokiBot está online.",
     }
     MOD_HELP = (
         "🛡️ Moderador: !mod, !clear [n], !warn @usuário [motivo], "
         "!mute @usuário [min], !unmute @usuário, !kick @usuário"
     )
-    BLOCKED_PATTERNS = (
-        re.compile(r"\bspam\b", re.IGNORECASE),
-        re.compile(r"\bscam\b", re.IGNORECASE),
-        re.compile(r"free\s+nitro", re.IGNORECASE),
-        re.compile(r"discord\.gg/[a-z0-9]+", re.IGNORECASE),
-        re.compile(r"bit\.ly/[a-z0-9]+", re.IGNORECASE),
+
+    # Scam/phishing patterns. Legitimate discord.gg invitations are not blocked by themselves.
+    SCAM_PATTERNS = (
+        re.compile(r"\bfree\s+nitro\b", re.IGNORECASE),
+        re.compile(r"\bnitro\s+(gr[aá]tis|free)\b", re.IGNORECASE),
+        re.compile(r"\bganhe\s+(?:discord\s+)?nitro\b", re.IGNORECASE),
+        re.compile(r"\b(?:premio|pr[eê]mio|recompensa)\s+(?:gr[aá]tis|exclusiv[oa])\b", re.IGNORECASE),
+        re.compile(r"\bverifique\s+sua\s+conta\b.*\b(?:login|senha|password)\b", re.IGNORECASE),
+        re.compile(r"\b(?:senha|password|c[oó]digo)\b.*\b(?:verifique|confirme|valid[ea])\b.*\bhttps?://", re.IGNORECASE),
+        re.compile(r"\b(?:pix|pagamento)\b.*\b(?:premio|pr[eê]mio|recompensa)\b", re.IGNORECASE),
     )
+    SUSPICIOUS_LINK_PATTERNS = (
+        re.compile(r"\b(?:bit\.ly|tinyurl\.com|cutt\.ly|is\.gd|t\.co)/\S+", re.IGNORECASE),
+        re.compile(r"\bhttps?://\S+\b.*\b(?:senha|login|password|confirmar|verificar|nitro|premio|pix)\b", re.IGNORECASE),
+    )
+
+    THREAT_PATTERNS = (
+        re.compile(r"\b(?:vou|vai)\s+(?:te\s+)?(?:matar|machucar|ferir)\b", re.IGNORECASE),
+        re.compile(r"\b(?:eu\s+)?te\s+mato\b", re.IGNORECASE),
+        re.compile(r"\b(?:vou|vai)\s+(?:acabar|dar\s+um\s+fim)\s+(?:com\s+)?você\b", re.IGNORECASE),
+    )
+
+    HARASSMENT_PATTERNS = (
+        re.compile(r"\b(?:vai\s+se\s+fuder|vai\s+tomar\s+no\s+cu)\b", re.IGNORECASE),
+        re.compile(r"\bfilho\s+da\s+puta\b", re.IGNORECASE),
+        re.compile(r"\b(?:fdp|ot[aá]rio|idiota|imbecil|retardado)\b", re.IGNORECASE),
+    )
+
     FLOOD_WINDOW_SECONDS = 8.0
     FLOOD_MAX_MESSAGES = 6
     DUPLICATE_WINDOW_SECONDS = 20.0
+    DUPLICATE_MIN_LENGTH = 4
+    VIOLATION_WINDOW_SECONDS = 120.0
     BOT_REPLY_COOLDOWN_SECONDS = 3.0
     MEMORY_MAX_TURNS = 6
+    MAX_NORMALIZED_MESSAGE_LENGTH = 1000
+    MAX_LINKS_PER_MESSAGE = 3
+    MAX_MENTIONS_PER_MESSAGE = 4
+    CAPS_MIN_ALPHA = 10
+    CAPS_RATIO_LIMIT = 0.82
+    REPEATED_CHARACTER_LIMIT = 8
+
     GREETINGS = {
         "oi": [
             "👋 Oi! Eu sou o PokiBot. Pode me mencionar quando precisar.",
@@ -83,15 +123,27 @@ class ModerationBot:
         re.compile(r"@poki\s*bot\b", re.IGNORECASE),
         re.compile(r"\bpoki\s*bot\b", re.IGNORECASE),
     )
+    LEET_TRANSLATION = str.maketrans({
+        "0": "o",
+        "1": "i",
+        "3": "e",
+        "4": "a",
+        "5": "s",
+        "7": "t",
+        "@": "a",
+        "$": "s",
+    })
 
     def __init__(self):
         self._muted_until: dict[str, float] = {}
         self._message_times: dict[str, deque[float]] = defaultdict(deque)
         self._last_messages: dict[str, tuple[str, float]] = {}
+        self._violation_times: dict[str, deque[float]] = defaultdict(deque)
         self._last_bot_reply_at: dict[str, float] = {}
         self._conversation_memory: dict[str, deque[tuple[str, str]]] = defaultdict(
             lambda: deque(maxlen=self.MEMORY_MAX_TURNS)
         )
+        self._categories: dict[str, int] = defaultdict(int)
         self._total_checked = 0
         self._total_blocked = 0
         self._started_at = time.time()
@@ -118,6 +170,31 @@ class ModerationBot:
             return self.memory_message(user_id=user_id)
         return self.PUBLIC_COMMANDS.get(command)
 
+    @classmethod
+    def normalize_for_moderation(cls, message: str) -> str:
+        normalized = unicodedata.normalize("NFKC", message)
+        normalized = normalized.translate(cls.LEET_TRANSLATION)
+        normalized = re.sub(r"[\u200b-\u200f\u202a-\u202e\u2060\ufeff]", "", normalized)
+        normalized = re.sub(r"(.)\1{8,}", r"\1\1\1", normalized, flags=re.IGNORECASE)
+        normalized = re.sub(r"\s+", " ", normalized).strip()
+        return normalized
+
+    @staticmethod
+    def _link_count(message: str) -> int:
+        return len(re.findall(r"https?://\S+|www\.\S+", message, flags=re.IGNORECASE))
+
+    @staticmethod
+    def _mention_count(message: str) -> int:
+        return len(re.findall(r"@[A-Za-z0-9_.-]{2,32}", message))
+
+    @classmethod
+    def _caps_ratio(cls, message: str) -> float:
+        letters = [char for char in message if char.isalpha()]
+        if len(letters) < cls.CAPS_MIN_ALPHA:
+            return 0.0
+        upper = sum(1 for char in letters if char.isupper())
+        return upper / len(letters)
+
     def _remember_message(self, user_id: int, message: str) -> tuple[bool, bool]:
         key = str(user_id)
         now = time.time()
@@ -125,7 +202,7 @@ class ModerationBot:
         while timestamps and now - timestamps[0] > self.FLOOD_WINDOW_SECONDS:
             timestamps.popleft()
         timestamps.append(now)
-        normalized = " ".join(message.split()).casefold()
+        normalized = self.normalize_for_moderation(message).casefold()
         previous = self._last_messages.get(key)
         duplicate = bool(
             previous
@@ -135,36 +212,188 @@ class ModerationBot:
         self._last_messages[key] = (normalized, now)
         return len(timestamps) > self.FLOOD_MAX_MESSAGES, duplicate
 
+    def _register_violation(self, user_id: int | None) -> tuple[int, int]:
+        if user_id is None:
+            return 1, 0
+        key = str(user_id)
+        now = time.time()
+        violations = self._violation_times[key]
+        while violations and now - violations[0] > self.VIOLATION_WINDOW_SECONDS:
+            violations.popleft()
+        violations.append(now)
+        strike = len(violations)
+        mute_minutes = {1: 0, 2: 1, 3: 5}.get(strike, 15)
+        return strike, mute_minutes
+
     def moderate(self, message: str, user_id: int | None = None) -> ModerationResult:
         self._total_checked += 1
-        normalized = " ".join(message.split())
-        for pattern in self.BLOCKED_PATTERNS:
+        normalized = self.normalize_for_moderation(message)
+        folded = normalized.casefold()
+
+        if len(normalized) > self.MAX_NORMALIZED_MESSAGE_LENGTH:
+            self._total_blocked += 1
+            self._categories["length"] += 1
+            return ModerationResult(
+                False,
+                "Mensagem acima do limite permitido.",
+                "✂️ Essa mensagem é grande demais para o #geral.",
+                "blocked",
+                "length",
+                "medium",
+                0,
+            )
+
+        for pattern in self.SCAM_PATTERNS:
             if pattern.search(normalized):
                 self._total_blocked += 1
+                self._categories["scam"] += 1
+                strike, escalation = self._register_violation(user_id)
+                mute_minutes = max(5, escalation)
                 return ModerationResult(
                     False,
-                    "Mensagem bloqueada pela moderação automática.",
-                    "⚠️ Essa mensagem foi bloqueada pela moderação automática.",
+                    "Possível golpe/phishing detectado.",
+                    f"🚨 Possível golpe detectado. Mensagem bloqueada. (ocorrência {strike})",
                     "blocked",
+                    "scam",
+                    "high",
+                    mute_minutes,
                 )
-        if user_id is not None:
-            flood, duplicate = self._remember_message(user_id, normalized)
-            if duplicate and len(normalized) >= 4:
+
+        for pattern in self.SUSPICIOUS_LINK_PATTERNS:
+            if pattern.search(normalized):
                 self._total_blocked += 1
+                self._categories["suspicious_link"] += 1
+                strike, escalation = self._register_violation(user_id)
+                mute_minutes = max(5, escalation)
+                return ModerationResult(
+                    False,
+                    "Link potencialmente suspeito.",
+                    f"🔗 O link foi bloqueado por segurança. (ocorrência {strike})",
+                    "blocked",
+                    "suspicious_link",
+                    "high",
+                    mute_minutes,
+                )
+
+        for pattern in self.THREAT_PATTERNS:
+            if pattern.search(normalized):
+                self._total_blocked += 1
+                self._categories["threat"] += 1
+                strike, escalation = self._register_violation(user_id)
+                mute_minutes = max(5, escalation)
+                return ModerationResult(
+                    False,
+                    "Ameaça detectada.",
+                    f"🛑 Essa mensagem foi bloqueada por conter uma ameaça. (ocorrência {strike})",
+                    "blocked",
+                    "threat",
+                    "high",
+                    mute_minutes,
+                )
+
+        for pattern in self.HARASSMENT_PATTERNS:
+            if pattern.search(normalized):
+                self._total_blocked += 1
+                self._categories["harassment"] += 1
+                strike, escalation = self._register_violation(user_id)
+                mute_minutes = escalation
+                return ModerationResult(
+                    False,
+                    "Abuso ou assédio detectado.",
+                    f"⚠️ Evite ataques pessoais e linguagem abusiva. (ocorrência {strike})",
+                    "blocked",
+                    "harassment",
+                    "medium",
+                    mute_minutes,
+                )
+
+        link_count = self._link_count(normalized)
+        if link_count > self.MAX_LINKS_PER_MESSAGE:
+            self._total_blocked += 1
+            self._categories["link_spam"] += 1
+            strike, escalation = self._register_violation(user_id)
+            return ModerationResult(
+                False,
+                "Excesso de links na mensagem.",
+                f"🔗 Evite enviar vários links de uma vez. (ocorrência {strike})",
+                "blocked",
+                "link_spam",
+                "medium",
+                escalation,
+            )
+
+        mention_count = self._mention_count(normalized)
+        if mention_count > self.MAX_MENTIONS_PER_MESSAGE:
+            self._total_blocked += 1
+            self._categories["mention_spam"] += 1
+            strike, escalation = self._register_violation(user_id)
+            return ModerationResult(
+                False,
+                "Excesso de menções detectado.",
+                f"📣 Evite mencionar muitas pessoas de uma vez. (ocorrência {strike})",
+                "blocked",
+                "mention_spam",
+                "medium",
+                escalation,
+            )
+
+        if self._caps_ratio(normalized) >= self.CAPS_RATIO_LIMIT and len(normalized) >= 14:
+            self._total_blocked += 1
+            self._categories["caps"] += 1
+            strike, escalation = self._register_violation(user_id)
+            return ModerationResult(
+                False,
+                "Excesso de texto em caixa alta.",
+                f"🔈 Evite escrever tudo em CAPS. (ocorrência {strike})",
+                "blocked",
+                "caps",
+                "low",
+                escalation,
+            )
+
+        if re.search(r"(.)\1{" + str(self.REPEATED_CHARACTER_LIMIT) + r",}", normalized, flags=re.IGNORECASE):
+            self._total_blocked += 1
+            self._categories["repeated_chars"] += 1
+            strike, escalation = self._register_violation(user_id)
+            return ModerationResult(
+                False,
+                "Repetição excessiva de caracteres detectada.",
+                f"🔁 Evite repetir caracteres excessivamente. (ocorrência {strike})",
+                "blocked",
+                "repeated_chars",
+                "low",
+                escalation,
+            )
+
+        if user_id is not None:
+            flood, duplicate = self._remember_message(user_id, folded)
+            if duplicate and len(folded) >= self.DUPLICATE_MIN_LENGTH:
+                self._total_blocked += 1
+                self._categories["duplicate"] += 1
+                strike, escalation = self._register_violation(user_id)
                 return ModerationResult(
                     False,
                     "Mensagem repetida detectada.",
-                    "⚠️ Evite enviar a mesma mensagem repetidamente.",
+                    f"⚠️ Evite enviar a mesma mensagem repetidamente. (ocorrência {strike})",
                     "duplicate",
+                    "duplicate",
+                    "medium",
+                    escalation,
                 )
             if flood:
                 self._total_blocked += 1
+                self._categories["flood"] += 1
+                strike, escalation = self._register_violation(user_id)
                 return ModerationResult(
                     False,
                     "Flood detectado.",
-                    "🐌 Calma aí. Você está enviando mensagens rápido demais.",
+                    f"🐌 Calma aí. Você está enviando mensagens rápido demais. (ocorrência {strike})",
                     "flood",
+                    "flood",
+                    "medium",
+                    escalation,
                 )
+
         return ModerationResult(True)
 
     def _can_reply(self, user_id: int | None, *, is_follow_up: bool = False) -> bool:
@@ -176,7 +405,6 @@ class ModerationBot:
         key = str(user_id)
         if now - self._last_bot_reply_at.get(key, 0.0) < self.BOT_REPLY_COOLDOWN_SECONDS:
             return False
-        self._last_bot_reply_at[key] = now
         return True
 
     def _pick(self, values: list[str]) -> str:
@@ -196,14 +424,6 @@ class ModerationBot:
         if user_id is None or not text:
             return
         self._conversation_memory[str(user_id)].append((role, text))
-
-    def _last_bot_message(self, user_id: int | None) -> str | None:
-        if user_id is None:
-            return None
-        for role, text in reversed(self._conversation_memory.get(str(user_id), ())):
-            if role == "bot":
-                return text
-        return None
 
     def conversational_response(
         self,
@@ -245,7 +465,7 @@ class ModerationBot:
         elif any(term in lowered for term in ("o que você faz", "o que voce faz", "quem é você", "quem voce e")):
             response = self.PUBLIC_COMMANDS["!bot"]
         elif any(term in lowered for term in ("me ajuda", "preciso de ajuda", "comandos", "o que posso fazer")):
-            response = "🧭 Posso moderar o canal, detectar spam/flood e responder perguntas simples. Use `!help` para ver minhas funções."
+            response = "🧭 Posso moderar o canal, detectar spam/flood, bloquear links suspeitos e responder perguntas simples. Use `!help` para ver minhas funções."
         elif any(term in lowered for term in ("quem está online", "quem esta online", "tem alguém online", "tem alguem online", "quantas pessoas")):
             response = self.online_message(online_count)
         elif any(term in lowered for term in ("que horas", "qual a hora", "horas agora", "hora agora")):
@@ -262,7 +482,8 @@ class ModerationBot:
             ])
 
         self._remember_turn(user_id, "bot", response)
-        self._last_bot_reply_at[str(user_id)] = time.time() if user_id is not None else 0.0
+        if user_id is not None:
+            self._last_bot_reply_at[str(user_id)] = time.time()
         return response
 
     def memory_message(self, user_id: int | None = None) -> str:
@@ -275,7 +496,9 @@ class ModerationBot:
         recent = user_turns[-3:]
         if len(recent) == 1:
             return f"🧠 Lembro que você falou sobre: “{recent[0]}”."
-        return "🧠 Das últimas mensagens, lembro de: " + "; ".join(f"“{item}”" for item in recent) + "."
+        return "🧠 Das últimas mensagens, lembro de: " + "; ".join(
+            f"“{item}”" for item in recent
+        ) + "."
 
     def online_message(self, online_count: int | None) -> str:
         if online_count is None:
@@ -294,9 +517,14 @@ class ModerationBot:
         uptime = max(0, int(time.time() - self._started_at))
         hours, remainder = divmod(uptime, 3600)
         minutes, seconds = divmod(remainder, 60)
+        top_categories = sorted(
+            self._categories.items(), key=lambda item: item[1], reverse=True
+        )[:4]
+        categories = ", ".join(f"{name}:{count}" for name, count in top_categories) or "nenhuma"
         return (
             f"📊 PokiBot status • online • uptime {hours:02d}:{minutes:02d}:{seconds:02d} "
-            f"• mensagens analisadas: {self._total_checked} • bloqueadas: {self._total_blocked}"
+            f"• analisadas: {self._total_checked} • bloqueadas: {self._total_blocked} "
+            f"• categorias: {categories}"
         )
 
     def parse_target(self, message: str):
