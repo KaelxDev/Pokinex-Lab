@@ -100,7 +100,13 @@ class ModerationBot:
     def command_name(self, message: str) -> str:
         return message.strip().split()[0].lower() if message.strip() else ""
 
-    def public_command(self, message: str, *, online_count: int | None = None) -> str | None:
+    def public_command(
+        self,
+        message: str,
+        *,
+        online_count: int | None = None,
+        user_id: int | None = None,
+    ) -> str | None:
         command = self.command_name(message)
         if command == "!status":
             return self.status_message()
@@ -109,7 +115,7 @@ class ModerationBot:
         if command == "!time":
             return self.time_message()
         if command == "!memory":
-            return self.memory_message()
+            return self.memory_message(user_id=user_id)
         return self.PUBLIC_COMMANDS.get(command)
 
     def _remember_message(self, user_id: int, message: str) -> tuple[bool, bool]:
@@ -161,8 +167,10 @@ class ModerationBot:
                 )
         return ModerationResult(True)
 
-    def _can_reply(self, user_id: int | None) -> bool:
+    def _can_reply(self, user_id: int | None, *, is_follow_up: bool = False) -> bool:
         if user_id is None:
+            return True
+        if is_follow_up:
             return True
         now = time.time()
         key = str(user_id)
@@ -185,7 +193,7 @@ class ModerationBot:
         return addressed, cleaned
 
     def _remember_turn(self, user_id: int | None, role: str, text: str) -> None:
-        if user_id is None:
+        if user_id is None or not text:
             return
         self._conversation_memory[str(user_id)].append((role, text))
 
@@ -211,10 +219,11 @@ class ModerationBot:
         addressed, cleaned = self._addressed_to_bot(text)
         lowered = cleaned.casefold()
         direct = addressed or lowered.startswith(("pokibot", "poki bot"))
+        follow_up = lowered in {"e você", "e voce", "e vc", "e tu", "e contigo"}
 
         if not direct:
             return None
-        if not self._can_reply(user_id):
+        if not self._can_reply(user_id, is_follow_up=follow_up):
             return None
 
         self._remember_turn(user_id, "user", cleaned)
@@ -229,13 +238,8 @@ class ModerationBot:
                 "🤖 Operacional e de olho no #geral. Obrigado por perguntar.",
                 "🤖 Tudo certo por aqui. Estou online e atento ao canal.",
             ])
-        elif lowered in {"e você", "e voce", "e vc", "e tu", "e contigo"}:
-            previous = self._last_bot_message(user_id)
-            response = (
-                "😎 Eu estou de boa e continuo online."
-                if previous
-                else "🤖 Tudo certo por aqui também."
-            )
+        elif follow_up:
+            response = "😎 Eu também estou de boa. Continuo online e prestando atenção por aqui."
         elif any(term in lowered for term in ("regras", "qual a regra", "quais as regras")):
             response = self.PUBLIC_COMMANDS["!rules"]
         elif any(term in lowered for term in ("o que você faz", "o que voce faz", "quem é você", "quem voce e")):
@@ -252,12 +256,13 @@ class ModerationBot:
             response = self.memory_message(user_id=user_id)
         else:
             response = self._pick([
-                "🤖 Entendi sua mensagem. Ainda estou aprendendo, mas posso ajudar com `!help`, `!rules`, `!online`, `!time` e `!status`.",
+                "🤖 Entendi sua mensagem. Ainda estou aprendendo, mas posso ajudar com `!help`, `!rules`, `!online`, `!time`, `!memory` e `!status`.",
                 "🤖 Recebi. Minha especialidade atual é moderar o #geral e responder perguntas simples quando você me chama.",
                 "🤖 Estou acompanhando. Tente uma pergunta mais direta ou use `!help` para ver minhas funções.",
             ])
 
         self._remember_turn(user_id, "bot", response)
+        self._last_bot_reply_at[str(user_id)] = time.time() if user_id is not None else 0.0
         return response
 
     def memory_message(self, user_id: int | None = None) -> str:
