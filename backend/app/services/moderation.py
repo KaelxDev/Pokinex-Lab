@@ -2,7 +2,7 @@
 
 from anyio import to_thread
 
-from app.moderation_bot import BOT_USER, is_moderator, moderation_bot
+from app.moderation_bot import BOT_USER, moderation_bot
 from app.moderation_store import (
     clear_all_messages,
     clear_recent_messages,
@@ -10,6 +10,7 @@ from app.moderation_store import (
     delete_single_message,
     get_user_by_username,
 )
+from app.roles import has_moderator_access
 from app.websocket.chat import manager, public_user_payload
 from app.websocket.schemas import ChatMessageEvent
 
@@ -115,7 +116,7 @@ async def handle_moderation_command(
         await send_bot_message(public_response)
         return True
 
-    moderator = is_moderator(user)
+    moderator = has_moderator_access(user)
     if command == "!mod":
         if not moderator:
             await send_bot_message(
@@ -240,7 +241,7 @@ async def handle_moderation_command(
         if target["id"] == BOT_USER["id"]:
             await send_bot_message("🤖 O PokiBot não pode ser moderado.")
             return True
-        if is_moderator(target):
+        if has_moderator_access(target):
             await send_bot_message("🛡️ Moderadores não podem ser punidos por este conjunto de comandos.")
             return True
 
@@ -301,7 +302,7 @@ async def handle_public_message(websocket, user, event: ChatMessageEvent) -> boo
     if await handle_moderation_command(websocket, user, message, event.messageId):
         return True
 
-    if not is_moderator(user) and moderation_bot.is_muted(user["id"]):
+    if not has_moderator_access(user) and moderation_bot.is_muted(user["id"]):
         await websocket.send_json(
             {
                 "type": "moderation",
@@ -314,7 +315,7 @@ async def handle_public_message(websocket, user, event: ChatMessageEvent) -> boo
     moderation = moderation_bot.moderate(message, user["id"])
     if not moderation.allowed:
         mute_minutes = moderation.mute_minutes
-        if mute_minutes > 0 and not is_moderator(user):
+        if mute_minutes > 0 and not has_moderator_access(user):
             moderation_bot.mute(user["id"], mute_minutes)
 
         moderation_message = moderation.reason or "Mensagem bloqueada pela moderação automática."
