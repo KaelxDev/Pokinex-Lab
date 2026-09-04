@@ -7,6 +7,7 @@ const RECONNECT_INTERVAL = 10000;
 const AUTH_CLOSE_CODE = 1008;
 const AUTH_CLOSE_REASON = "authentication required";
 const MODERATION_LOCK_STORAGE_KEY = "pokinex.moderationLock";
+const CLEAR_ALL_MARKER = "__pokinex_clear_all__::";
 
 function publishModerationLock(data) {
   const muteMinutes = Number(data?.muteMinutes || 0);
@@ -80,6 +81,78 @@ export function createWebSocket(
     return pendingMessageIds.shift() || null;
   }
 
+  function readCachedMessageIds() {
+    const ids = new Set();
+
+    try {
+      for (let index = 0; index < localStorage.length; index += 1) {
+        const key = localStorage.key(index);
+        if (!key || (!key.startsWith("poknex_messages:user:") && key !== "poknex_messages")) continue;
+
+        const raw = localStorage.getItem(key);
+        const cached = JSON.parse(raw || "[]");
+        if (!Array.isArray(cached)) continue;
+
+        for (const item of cached) {
+          if (item?.messageId) ids.add(String(item.messageId));
+        }
+      }
+    } catch {
+      // Ignore cache parsing failures.
+    }
+
+    for (const messageId of pendingMessageIds) {
+      if (messageId) ids.add(String(messageId));
+    }
+
+    return [...ids];
+  }
+
+  function emitFullChannelClear(data) {
+    const rawIds = Array.isArray(data?.messageIds)
+      ? data.messageIds.map((id) => String(id))
+      : [];
+    const marker = rawIds.find((id) => id.startsWith(CLEAR_ALL_MARKER));
+    if (!marker) return false;
+
+    const databaseIds = rawIds
+      .filter((id) => !id.startsWith(CLEAR_ALL_MARKER))
+      .map((id) => id.trim())
+      .filter(Boolean);
+    const localIds = readCachedMessageIds();
+    const commandId = pendingMessageIds.length
+      ? pendingMessageIds[pendingMessageIds.length - 1]
+      : `moderation-command-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+    pendingMessageIds.length = 0;
+
+    const clearIds = [...new Set([...localIds, ...databaseIds, commandId])];
+    onMessage?.({
+      ...data,
+      messageIds: clearIds,
+      clearAll: true,
+    });
+
+    const moderatorUsername = String(data?.moderator || "staff").trim() || "staff";
+    const role = moderatorUsername.casefold?.() === "kael1nk" ? "owner" : "moderator";
+    onMessage?.({
+      type: "message",
+      messageId: commandId,
+      username: moderatorUsername,
+      displayName: moderatorUsername,
+      role,
+      message: "!clear all",
+      timestamp: data?.timestamp || Date.now(),
+      deliveryStatus: "sent",
+      offline: false,
+      reactions: {},
+      moderationCommand: true,
+      ephemeral: true,
+    });
+
+    return true;
+  }
+
   function emitModerationEvent(data) {
     const messageId = data.messageId || rejectOldestOutgoingMessage();
     const enriched = messageId ? { ...data, messageId } : data;
@@ -116,6 +189,9 @@ export function createWebSocket(
         }
         if (data?.type === "moderation") {
           emitModerationEvent(data);
+        }
+        if (data?.type === "messages_cleared" && emitFullChannelClear(data)) {
+          return;
         }
         onMessage?.(data);
       } catch (error) {
