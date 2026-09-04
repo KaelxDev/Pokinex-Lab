@@ -1,155 +1,179 @@
-/* Current Pokinex session-loading screen */
-.app.auth-loading-page {
+/* POKINEX — SESSION BOOT SCREEN
+   Uses the same red / graphite visual language as the current interface. */
+
+.app:has(> .login > .status.connecting) {
   position: relative;
   width: 100vw;
   height: 100dvh;
   min-height: 100dvh;
-  min-width: 0;
   margin: 0;
-  padding: 24px;
+  padding: clamp(18px, 4vw, 40px);
   display: grid;
   place-items: center;
-  box-sizing: border-box;
   overflow: hidden;
+  box-sizing: border-box;
   background:
-    radial-gradient(circle at 50% 35%, rgba(226,58,73,.07), transparent 34%),
-    #0b0e13;
+    radial-gradient(circle at 18% 24%, rgba(226, 58, 73, 0.11), transparent 30%),
+    radial-gradient(circle at 82% 78%, rgba(255, 255, 255, 0.035), transparent 28%),
+    linear-gradient(180deg, #090a0d 0%, #0b0c10 100%);
 }
 
-.app.auth-loading-page > .login {
+.app:has(> .login > .status.connecting)::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255,255,255,.008) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.008) 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: linear-gradient(to bottom, rgba(0,0,0,.6), transparent 90%);
+}
+
+.app:has(> .login > .status.connecting) > .login {
   position: relative;
-  width: min(460px, calc(100vw - 48px));
-  max-width: 460px;
-  min-height: 250px;
+  isolation: isolate;
+  width: min(460px, 100%);
+  min-height: 248px;
   margin: 0;
-  padding: 34px 34px 30px;
+  padding: 30px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   overflow: hidden;
   box-sizing: border-box;
-  background: linear-gradient(180deg, rgba(21,24,33,.98), rgba(14,17,23,.98));
-  border: 1px solid rgba(255,255,255,.075);
-  border-radius: 20px;
-  box-shadow: 0 28px 80px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.025);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(226,58,73,.10), transparent 34%),
+    linear-gradient(145deg, #17181d, #0e0f13 76%);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 16px;
+  box-shadow:
+    0 28px 80px rgba(0,0,0,.50),
+    inset 0 1px 0 rgba(255,255,255,.025);
 }
 
-.app.auth-loading-page > .login::before {
-  content: "";
-  position: absolute;
-  top: -90px;
-  right: -70px;
-  width: 190px;
-  height: 190px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(226,58,73,.14), transparent 68%);
-  pointer-events: none;
-}
-
-.app.auth-loading-page > .login::after {
+.app:has(> .login > .status.connecting) > .login::before {
   content: "PKX / 01";
   position: absolute;
-  right: 22px;
-  bottom: 17px;
-  color: #4f5662;
+  right: 24px;
+  bottom: 20px;
+  color: #545963;
   font-size: 8px;
   font-weight: 800;
   letter-spacing: .16em;
 }
 
-.app.auth-loading-page > .login h1 {
+.app:has(> .login > .status.connecting) > .login::after {
+  content: "";
+  position: absolute;
+  top: -95px;
+  right: -80px;
+  width: 210px;
+  height: 210px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(226,58,73,.16), transparent 68%);
+  pointer-events: none;
+}
+
+.app:has(> .login > .status.connecting) > .login h1 {
   position: relative;
   z-index: 1;
-  margin: 0 0 8px;
-  font-size: 28px;
-  line-height: 1.15;
-  letter-spacing: -.035em;
-  color: #f5f7fa;
+  margin: 0 0 22px;
+  font-size: 0;
+  line-height: 1;
+  letter-spacing: -.04em;
+  color: #fff;
 }
 
-.app.auth-loading-page > .login h1::before {
+.app:has(> .login > .status.connecting) > .login h1::before {
   content: "";
   display: inline-block;
-  width: 10px;
-  height: 10px;
-  margin: 0 9px 2px 0;
+  width: 9px;
+  height: 9px;
+  margin: 0 10px 3px 0;
   border-radius: 50%;
-  background: #36d07f;
-  box-shadow: 0 0 0 5px rgba(54,208,127,.08), 0 0 18px rgba(54,208,127,.18);
+  background: #e23a49;
+  box-shadow:
+    0 0 0 5px rgba(226,58,73,.08),
+    0 0 18px rgba(226,58,73,.22);
   vertical-align: middle;
 }
 
-.app.auth-loading-page > .login h1 {
-  font-size: 0;
-}
-
-.app.auth-loading-page > .login h1::after {
+.app:has(> .login > .status.connecting) > .login h1::after {
   content: "Pokinex";
+  display: inline-block;
   font-size: 28px;
+  font-weight: 800;
   vertical-align: middle;
 }
 
-.app.auth-loading-page > .login .status.connecting {
+.app:has(> .login > .status.connecting) > .login .status.connecting {
   position: relative;
   z-index: 1;
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin: 12px 0 0;
-  padding: 12px 13px;
-  border: 1px solid rgba(255,255,255,.06);
-  border-radius: 11px;
+  gap: 11px;
+  margin: 0;
+  padding: 13px 14px;
+  border: 1px solid rgba(255,255,255,.065);
+  border-radius: 10px;
   background: rgba(255,255,255,.025);
-  color: #959ca8;
+  color: #aeb2ba;
   font-size: 0;
   line-height: 1.4;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.018);
 }
 
-.app.auth-loading-page > .login .status.connecting::before {
+.app:has(> .login > .status.connecting) > .login .status.connecting::before {
   content: "";
-  width: 9px;
-  height: 9px;
-  flex: 0 0 9px;
+  width: 11px;
+  height: 11px;
+  flex: 0 0 11px;
   border: 2px solid rgba(255,255,255,.12);
-  border-top-color: #ff6674;
+  border-top-color: #ff4c5b;
   border-radius: 50%;
-  animation: session-loading-spin .8s linear infinite;
+  animation: pokinex-session-spin .8s linear infinite;
 }
 
-.app.auth-loading-page > .login .status.connecting::after {
-  content: "Preparando sua sessão...";
-  color: #a0a6b1;
+.app:has(> .login > .status.connecting) > .login .status.connecting::after {
+  content: "Verificando sessão...";
+  color: #b7bac2;
   font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .005em;
 }
 
-@keyframes session-loading-spin {
+@keyframes pokinex-session-spin {
   to { transform: rotate(360deg); }
 }
 
 @media (max-width: 520px) {
-  .app.auth-loading-page {
-    padding: 12px;
+  .app:has(> .login > .status.connecting) {
+    padding: 14px;
   }
 
-  .app.auth-loading-page > .login {
-    width: min(100%, 420px);
+  .app:has(> .login > .status.connecting) > .login {
     min-height: 220px;
-    padding: 28px 22px 26px;
-    border-radius: 17px;
+    padding: 26px 22px 24px;
+    border-radius: 14px;
   }
 
-  .app.auth-loading-page > .login h1::after {
+  .app:has(> .login > .status.connecting) > .login h1 {
+    margin-bottom: 18px;
+  }
+
+  .app:has(> .login > .status.connecting) > .login h1::after {
     font-size: 25px;
   }
 
-  .app.auth-loading-page > .login::after {
-    right: 17px;
-    bottom: 14px;
+  .app:has(> .login > .status.connecting) > .login::before {
+    right: 18px;
+    bottom: 15px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .app.auth-loading-page > .login .status.connecting::before {
+  .app:has(> .login > .status.connecting) > .login .status.connecting::before {
     animation: none;
   }
 }
