@@ -7,6 +7,7 @@ def test_owner_role_has_priority(monkeypatch):
     user = {"id": 1, "username": "someone"}
 
     assert roles.is_owner(user)
+    assert roles.has_moderator_access(user)
     assert roles.get_user_role(user) == "owner"
 
 
@@ -17,6 +18,7 @@ def test_configured_moderator_by_id(monkeypatch):
     user = {"id": 42, "username": "moderator"}
 
     assert roles.is_moderator(user)
+    assert roles.has_moderator_access(user)
     assert roles.get_user_role(user) == "moderator"
 
 
@@ -27,6 +29,7 @@ def test_configured_moderator_by_username(monkeypatch):
     user = {"id": 99, "username": "teamlead"}
 
     assert roles.is_moderator(user)
+    assert roles.has_moderator_access(user)
     assert roles.get_user_role(user) == "moderator"
 
 
@@ -38,4 +41,5 @@ def test_unconfigured_user_is_member(monkeypatch):
 
     assert not roles.is_owner(user)
     assert not roles.is_moderator(user)
+    assert not roles.has_moderator_access(user)
     assert roles.get_user_role(user) == "member"
