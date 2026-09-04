@@ -17,35 +17,27 @@ export default function ChatSidebar({ user, profile, users, onOpenProfile, onCle
   );
 
   useEffect(() => {
-    const toggle = () => {
-      setSidebarOpen((current) => {
-        const next = !current;
-        window.dispatchEvent(
-          new CustomEvent("pokinex:sidebar-state", { detail: { open: next } }),
-        );
-        return next;
-      });
+    const toggle = (event) => {
+      if (typeof event.detail?.open === "boolean") {
+        setSidebarOpen(event.detail.open);
+      } else {
+        setSidebarOpen((current) => !current);
+      }
     };
 
-    const close = () => {
-      setSidebarOpen((current) => {
-        if (current) {
-          window.dispatchEvent(
-            new CustomEvent("pokinex:sidebar-state", { detail: { open: false } }),
-          );
-        }
-        return false;
-      });
+    const close = () => setSidebarOpen(false);
+    const handleResize = () => {
+      setSidebarOpen(window.innerWidth > 700);
     };
 
     window.addEventListener("pokinex:sidebar-toggle", toggle);
     window.addEventListener("pokinex:sidebar-close", close);
-    window.addEventListener("resize", close);
+    window.addEventListener("resize", handleResize);
 
     return () => {
       window.removeEventListener("pokinex:sidebar-toggle", toggle);
       window.removeEventListener("pokinex:sidebar-close", close);
-      window.removeEventListener("resize", close);
+      window.removeEventListener("resize", handleResize);
     };
   }, []);
 
@@ -88,6 +80,7 @@ export default function ChatSidebar({ user, profile, users, onOpenProfile, onCle
   );
 
   function closeSidebar() {
+    setSidebarOpen(false);
     window.dispatchEvent(new CustomEvent("pokinex:sidebar-close"));
   }
 
