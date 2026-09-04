@@ -44,6 +44,8 @@ export default function App() {
     syncProfile,
   } = useUserDirectory({ messages, setMessages, syncUser });
 
+  const profile = users.find((item) => String(item.id) === String(user?.id)) || user;
+
   const {
     contextMenu,
     setContextMenu,
@@ -93,7 +95,7 @@ export default function App() {
     saveProfile,
     chooseAvatar,
     closeProfile,
-  } = useProfileEditor({ user, profile: users.find((item) => String(item.id) === String(user?.id)) || null, syncProfile });
+  } = useProfileEditor({ user, profile, syncProfile });
 
   const handleWebSocketMessage = useChatMessageEvents({
     clearLocalHistory,
@@ -156,8 +158,6 @@ export default function App() {
       setEditError("");
     }
   }
-
-  const profile = users.find((item) => String(item.id) === String(user?.id)) || null;
 
   if (!authChecked) {
     return (
