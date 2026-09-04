@@ -1,88 +1,37 @@
-from pathlib import Path
-import os
-import sqlite3
+"""Compatibility-facing message repository using the database infrastructure layer."""
 
-from app.migrations import migrate
+from app.infrastructure.database import (
+    close_db_pool,
+    get_connection,
+    initialize_database,
+    init_db_pool,
+    postgres_or_sqlite,
+    using_postgres,
+)
 
-DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
-BASE_DIR = Path(__file__).resolve().parent.parent
-SQLITE_DB_PATH = BASE_DIR / "poknex.db"
-
-PG_POOL_MIN_SIZE = 1
-PG_POOL_MAX_SIZE = 5
-PG_POOL_TIMEOUT = 10
-
-_pg_pool = None
-
-
-def using_postgres() -> bool:
-    return bool(DATABASE_URL)
-
-
-def init_db_pool() -> None:
-    global _pg_pool
-
-    if not using_postgres() or _pg_pool is not None:
-        return
-
-    from psycopg.rows import dict_row
-    from psycopg_pool import ConnectionPool
-
-    _pg_pool = ConnectionPool(
-        conninfo=DATABASE_URL,
-        kwargs={"row_factory": dict_row},
-        min_size=PG_POOL_MIN_SIZE,
-        max_size=PG_POOL_MAX_SIZE,
-        timeout=PG_POOL_TIMEOUT,
-        open=False,
-        close_returns=True,
-        name="nexchat-pg",
-    )
-    _pg_pool.open(wait=True, timeout=PG_POOL_TIMEOUT)
-
-
-def close_db_pool() -> None:
-    global _pg_pool
-
-    if _pg_pool is None:
-        return
-
-    _pg_pool.close()
-    _pg_pool = None
-
-
-def get_connection():
-    if using_postgres():
-        if _pg_pool is None:
-            raise RuntimeError("PostgreSQL pool não foi inicializado.")
-        return _pg_pool.getconn(timeout=PG_POOL_TIMEOUT)
-
-    connection = sqlite3.connect(SQLITE_DB_PATH)
-    connection.row_factory = sqlite3.Row
-    return connection
-
-
-def initialize_database():
-    connection = get_connection()
-    try:
-        migrate(connection, using_postgres())
-    finally:
-        connection.close()
-
-
-def _postgres_or_sqlite(postgres_query: str, sqlite_query: str) -> str:
-    return postgres_query if using_postgres() else sqlite_query
+__all__ = [
+    "close_db_pool",
+    "get_connection",
+    "initialize_database",
+    "init_db_pool",
+    "postgres_or_sqlite",
+    "using_postgres",
+]
 
 
 def _persistent_avatar_reference(connection, user_id, fallback=""):
-    query = _postgres_or_sqlite(
+    query = postgres_or_sqlite(
         "SELECT updated_at FROM user_avatars WHERE user_id = %s",
         "SELECT updated_at FROM user_avatars WHERE user_id = ?",
     )
     row = connection.execute(query, (user_id,)).fetchone()
     if row:
         version = str(row["updated_at"] or "")
-        return f"/api/auth/avatar/{user_id}?v={version}" if version else f"/api/auth/avatar/{user_id}"
+        return (
+            f"/api/auth/avatar/{user_id}?v={version}"
+            if version
+            else f"/api/auth/avatar/{user_id}"
+        )
 
     fallback_value = str(fallback or "").strip()
     if fallback_value.startswith("/api/auth/avatar/") or fallback_value.startswith("/media/"):
@@ -107,7 +56,7 @@ def _profile_from_row(connection, row):
 def save_message(message_id, user_id, message, created_at, reply_to_message_id=None):
     connection = get_connection()
     try:
-        query = _postgres_or_sqlite(
+        query = postgres_or_sqlite(
             """
             INSERT INTO messages
                 (message_id, user_id, message, created_at, reply_to_message_id)
@@ -129,7 +78,7 @@ def save_message(message_id, user_id, message, created_at, reply_to_message_id=N
 def get_message_owner(message_id):
     connection = get_connection()
     try:
-        query = _postgres_or_sqlite(
+        query = postgres_or_sqlite(
             "SELECT user_id FROM messages WHERE message_id = %s",
             "SELECT user_id FROM messages WHERE message_id = ?",
         )
@@ -142,7 +91,7 @@ def get_message_owner(message_id):
 def get_message(message_id):
     connection = get_connection()
     try:
-        query = _postgres_or_sqlite(
+        query = postgres_or_sqlite(
             """
             SELECT m.message_id, m.user_id, m.message, m.created_at,
                    m.edited_at, m.deleted_at, m.reply_to_message_id,
@@ -173,7 +122,7 @@ def get_message(message_id):
 def update_message(message_id, user_id, message, edited_at):
     connection = get_connection()
     try:
-        query = _postgres_or_sqlite(
+        query = postgres_or_sqlite(
             """
             UPDATE messages
             SET message = %s, edited_at = %s, deleted_at = NULL
@@ -195,7 +144,7 @@ def update_message(message_id, user_id, message, edited_at):
 def delete_message(message_id, user_id, deleted_at):
     connection = get_connection()
     try:
-        query = _postgres_or_sqlite(
+        query = postgres_or_sqlite(
             """
             UPDATE messages
             SET deleted_at = %s
@@ -281,7 +230,7 @@ def toggle_reaction(message_id, user_id, reaction, created_at):
                 )
                 active = True
 
-        count_query = _postgres_or_sqlite(
+        count_query = postgres_or_sqlite(
             """
             SELECT reaction, COUNT(*) AS count
             FROM message_reactions
@@ -308,7 +257,7 @@ def toggle_reaction(message_id, user_id, reaction, created_at):
 def get_reactions(message_id):
     connection = get_connection()
     try:
-        query = _postgres_or_sqlite(
+        query = postgres_or_sqlite(
             """
             SELECT reaction, COUNT(*) AS count
             FROM message_reactions

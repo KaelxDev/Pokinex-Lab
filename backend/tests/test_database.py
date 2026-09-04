@@ -1,11 +1,12 @@
 from datetime import datetime, timezone
 
 import app.database as database
+import app.infrastructure.database as database_infra
 
 
 def _prepare_database(tmp_path, monkeypatch):
     db_path = tmp_path / "test.db"
-    monkeypatch.setattr(database, "SQLITE_DB_PATH", db_path)
+    monkeypatch.setattr(database_infra, "SQLITE_DB_PATH", db_path)
     database.initialize_database()
     return db_path
 
