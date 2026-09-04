@@ -63,6 +63,10 @@ class ModerationBot:
         "eae": "👋 Eae! Tudo certo por aí?",
         "e aí": "👋 E aí! PokiBot online.",
     }
+    ADDRESS_PATTERNS = (
+        re.compile(r"@poki\s*bot\b", re.IGNORECASE),
+        re.compile(r"\bpoki\s*bot\b", re.IGNORECASE),
+    )
 
     def __init__(self):
         self._muted_until: dict[str, float] = {}
@@ -122,29 +126,39 @@ class ModerationBot:
         self._last_bot_reply_at[key] = now
         return True
 
+    def _addressed_to_bot(self, text: str) -> tuple[bool, str]:
+        cleaned = text
+        addressed = False
+        for pattern in self.ADDRESS_PATTERNS:
+            if pattern.search(cleaned):
+                addressed = True
+                cleaned = pattern.sub(" ", cleaned)
+        cleaned = re.sub(r"\s+", " ", cleaned).strip(" ,:;!?-\t")
+        return addressed, cleaned
+
     def conversational_response(self, message: str, user_id: int | None = None) -> str | None:
         text = " ".join(message.strip().split())
         if not text:
             return None
-        lowered = text.casefold()
-        mention = bool(re.search(r"(?:^|\s)@pokibot\b", lowered))
-        cleaned = re.sub(r"(?:^|\s)@pokibot\b", " ", lowered).strip()
-        direct = mention or cleaned.startswith(("pokibot", "poki"))
-        if cleaned in self.GREETINGS:
-            direct = True
+
+        addressed, cleaned = self._addressed_to_bot(text)
+        lowered = cleaned.casefold()
+        direct = addressed or lowered.startswith(("pokibot", "poki bot"))
+
         if not direct or not self._can_reply(user_id):
             return None
-        if cleaned in self.GREETINGS:
-            return self.GREETINGS[cleaned]
-        if not cleaned or cleaned in {"oi pokibot", "olá pokibot", "ola pokibot", "poki"}:
-            return "🤖 Estou aqui. Use `!help` para ver o que eu sei fazer ou me mencione com uma pergunta."
-        if any(term in cleaned for term in ("como você está", "como voce esta", "tudo bem", "como ta", "como está")):
+
+        if lowered in self.GREETINGS:
+            return self.GREETINGS[lowered]
+        if not lowered:
+            return "🤖 Estou aqui. Use `!help` para ver os comandos ou me faça uma pergunta."
+        if any(term in lowered for term in ("como você está", "como voce esta", "tudo bem", "como ta", "como está")):
             return "🤖 Operacional e de olho no #geral. Obrigado por perguntar."
-        if any(term in cleaned for term in ("regras", "qual a regra", "quais as regras")):
+        if any(term in lowered for term in ("regras", "qual a regra", "quais as regras")):
             return self.PUBLIC_COMMANDS["!rules"]
-        if any(term in cleaned for term in ("o que você faz", "o que voce faz", "quem é você", "quem voce e")):
+        if any(term in lowered for term in ("o que você faz", "o que voce faz", "quem é você", "quem voce e")):
             return self.PUBLIC_COMMANDS["!bot"]
-        if any(term in cleaned for term in ("obrigado", "obrigada", "valeu")):
+        if any(term in lowered for term in ("obrigado", "obrigada", "valeu")):
             return "😎 Tamo junto."
         return "🤖 Recebi sua mensagem. Ainda estou aprendendo, mas posso responder a `!help`, `!rules`, `!about`, `!ping` e `!status`."
 
