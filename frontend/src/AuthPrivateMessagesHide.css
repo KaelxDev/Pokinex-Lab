@@ -1,0 +1,8 @@
+/* Private-message controls are only available after authentication. */
+
+#root > .auth-page ~ .dm-notification-center,
+#root > .app:not(:has(.chat)) ~ .dm-notification-center {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
