@@ -172,6 +172,7 @@ async def _moderation_command(websocket: WebSocket, user, message: str) -> bool:
     public_response = moderation_bot.public_command(
         message,
         online_count=_online_user_count(),
+        user_id=user["id"],
     )
     if public_response:
         await _send_bot_message(public_response)
@@ -300,10 +301,21 @@ async def _handle_public_message(websocket: WebSocket, user, event: ChatMessageE
 
     moderation = moderation_bot.moderate(message, user["id"])
     if not moderation.allowed:
+        mute_minutes = moderation.mute_minutes
+        if mute_minutes > 0 and not is_moderator(user):
+            moderation_bot.mute(user["id"], mute_minutes)
+
+        moderation_message = moderation.reason or "Mensagem bloqueada pela moderação automática."
+        if mute_minutes > 0:
+            moderation_message += f" Você foi silenciado por {mute_minutes} minuto(s)."
+
         await websocket.send_json({
             "type": "moderation",
             "action": moderation.action or "blocked",
-            "message": moderation.reason,
+            "category": moderation.category,
+            "severity": moderation.severity,
+            "muteMinutes": mute_minutes,
+            "message": moderation_message,
         })
         if moderation.bot_message:
             await _send_bot_message(moderation.bot_message)
