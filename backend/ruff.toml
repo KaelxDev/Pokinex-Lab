@@ -1,0 +1,7 @@
+line-length = 100
+
+[lint]
+per-file-ignores = {
+  "app/__init__.py" = ["E402"],
+  "app/migrations.py" = ["F841"],
+}
