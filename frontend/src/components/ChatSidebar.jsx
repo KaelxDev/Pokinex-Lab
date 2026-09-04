@@ -8,11 +8,16 @@ export default function ChatSidebar({ user, profile, users, onOpenProfile, onCle
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 700);
   const [unreadByUser, setUnreadByUser] = useState({});
 
-  const isModerator = useMemo(
-    () => users.some(
-      (item) => String(item.id) === String(user?.id) &&
-        ["moderator", "staff", "admin", "owner"].includes(String(item.role || "").toLowerCase()),
-    ),
+  function roleLabel(role) {
+    const normalized = String(role || "").toLowerCase();
+    if (normalized === "owner") return "OWNER";
+    if (normalized === "admin") return "ADMIN";
+    if (["moderator", "staff"].includes(normalized)) return "STAFF";
+    return null;
+  }
+
+  const ownRole = useMemo(
+    () => roleLabel(users.find((item) => String(item.id) === String(user?.id))?.role),
     [users, user?.id],
   );
 
@@ -93,14 +98,6 @@ export default function ChatSidebar({ user, profile, users, onOpenProfile, onCle
     const userId = Number(event.currentTarget.dataset.dmUserId);
     if (Number.isFinite(userId)) markDirectMessageRead(userId);
     closeSidebar();
-  }
-
-  function roleLabel(role) {
-    const normalized = String(role || "").toLowerCase();
-    if (normalized === "owner") return "OWNER";
-    if (normalized === "admin") return "ADMIN";
-    if (["moderator", "staff"].includes(normalized)) return "STAFF";
-    return null;
   }
 
   return (
@@ -227,7 +224,7 @@ export default function ChatSidebar({ user, profile, users, onOpenProfile, onCle
                 <strong>{displayName}</strong>
                 <span>@{user.username}</span>
               </div>
-              {isModerator && <span className="profile-role-badge">STAFF</span>}
+              {ownRole && <span className={`profile-role-badge ${ownRole.toLowerCase()}`}>{ownRole}</span>}
               <span className="profile-arrow" aria-hidden="true">↗</span>
             </button>
 
