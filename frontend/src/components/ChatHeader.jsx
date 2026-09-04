@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+
 export default function ChatHeader({ connectionStatus, reconnectAttempt, reconnectSeconds, onLogout }) {
   const connectionState =
     connectionStatus === "reconnecting"
@@ -5,6 +7,23 @@ export default function ChatHeader({ connectionStatus, reconnectAttempt, reconne
       : connectionStatus === "connecting"
         ? "connecting"
         : "online";
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    const handleSidebarState = (event) => {
+      setMobileSidebarOpen(Boolean(event.detail?.open));
+    };
+
+    const handleSidebarClosed = () => setMobileSidebarOpen(false);
+
+    window.addEventListener("pokinex:mobile-sidebar-state", handleSidebarState);
+    window.addEventListener("pokinex:mobile-sidebar-close", handleSidebarClosed);
+
+    return () => {
+      window.removeEventListener("pokinex:mobile-sidebar-state", handleSidebarState);
+      window.removeEventListener("pokinex:mobile-sidebar-close", handleSidebarClosed);
+    };
+  }, []);
 
   function toggleMobileSidebar() {
     window.dispatchEvent(new CustomEvent("pokinex:mobile-sidebar-toggle"));
@@ -17,10 +36,16 @@ export default function ChatHeader({ connectionStatus, reconnectAttempt, reconne
           className="chat-menu-toggle"
           type="button"
           onClick={toggleMobileSidebar}
-          aria-label="Abrir navegação"
-          title="Abrir navegação"
+          aria-label={mobileSidebarOpen ? "Fechar navegação" : "Abrir navegação"}
+          aria-expanded={mobileSidebarOpen}
+          aria-controls="pokinex-mobile-sidebar"
+          title={mobileSidebarOpen ? "Fechar navegação" : "Abrir navegação"}
         >
-          <span aria-hidden="true">☰</span>
+          <span className="chat-menu-icon" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </span>
         </button>
 
         <div className="channel-copy">
