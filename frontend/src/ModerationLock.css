@@ -1,0 +1,95 @@
+.moderation-lock {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 10px;
+  padding: 11px 13px;
+  border: 1px solid rgba(255, 89, 89, 0.28);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(87, 24, 31, 0.92), rgba(38, 20, 23, 0.98));
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+}
+
+.moderation-lock-icon {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 19px;
+}
+
+.moderation-lock-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.moderation-lock-body strong {
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.moderation-lock-body span {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.moderation-lock-timer {
+  min-width: 76px;
+  text-align: right;
+}
+
+.moderation-lock-timer small {
+  display: block;
+  margin-bottom: 3px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.moderation-lock-timer b {
+  color: #fff;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.message-form.moderation-locked .composer-input-shell {
+  opacity: 0.7;
+}
+
+.message-form.moderation-locked textarea {
+  cursor: not-allowed;
+}
+
+.message-form.moderation-locked .composer-send {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+@media (max-width: 560px) {
+  .moderation-lock {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .moderation-lock-timer {
+    grid-column: 2;
+    text-align: left;
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+  }
+
+  .moderation-lock-timer small {
+    margin: 0;
+  }
+}
