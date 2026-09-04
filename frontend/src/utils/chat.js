@@ -60,10 +60,20 @@ export function formatTime(timestamp) {
   });
 }
 
+function isTransientCachedMessage(item) {
+  if (!item || item.ephemeral) return true;
+
+  return (
+    item.type === "message" &&
+    String(item.userId || "") === "moderation-bot" &&
+    String(item.message || "").startsWith("Histórico do #geral apagado.")
+  );
+}
+
 export function loadJson(key) {
   try {
     const value = JSON.parse(localStorage.getItem(key) || "[]");
-    return Array.isArray(value) ? value : [];
+    return Array.isArray(value) ? value.filter((item) => !isTransientCachedMessage(item)) : [];
   } catch {
     return [];
   }
@@ -103,13 +113,13 @@ export function mergeServerHistory(current, incoming) {
       systemMessages.push(item);
       continue;
     }
-    if (item?.type === "message" && item.messageId) {
+    if (item?.type === "message" && item.messageId && !item.ephemeral) {
       messageMap.set(item.messageId, item);
     }
   }
 
   for (const item of incoming) {
-    if (!item?.messageId) continue;
+    if (!item?.messageId || item.ephemeral) continue;
     const previous = messageMap.get(item.messageId);
     messageMap.set(item.messageId, {
       ...previous,
