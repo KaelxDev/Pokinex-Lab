@@ -164,15 +164,20 @@ const RECENT = ["😀", "😂", "😍", "🥹", "😎", "😭", "😡", "👍", 
 
 export default function EmojiPicker({ onSelect }) {
   const [activeCategory, setActiveCategory] = useState("people");
+  const [showRecent, setShowRecent] = useState(false);
   const [query, setQuery] = useState("");
 
   const active = CATEGORIES.find((category) => category.id === activeCategory) || CATEGORIES[0];
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    if (!normalized) return active.emojis;
+    if (!normalized) {
+      if (showRecent) return RECENT.map((emoji) => [emoji, `recent ${emoji}`]);
+      return active.emojis;
+    }
+
     return CATEGORIES.flatMap((category) => category.emojis).filter(([, keywords]) => keywords.includes(normalized));
-  }, [active, query]);
+  }, [active, query, showRecent]);
 
   function selectEmoji(emoji) {
     onSelect(emoji);
@@ -201,9 +206,10 @@ export default function EmojiPicker({ onSelect }) {
         <nav className="emoji-category-rail" aria-label="Categorias de emoji">
           <button
             type="button"
-            className={!query ? "category-button recent" : "category-button"}
-            onClick={() => { setQuery(""); setActiveCategory("people"); }}
+            className={!query && showRecent ? "category-button recent selected" : "category-button recent"}
+            onClick={() => { setQuery(""); setShowRecent(true); }}
             aria-label="Recentes"
+            title="Recentes"
           >
             ◷
           </button>
@@ -211,8 +217,8 @@ export default function EmojiPicker({ onSelect }) {
             <button
               key={category.id}
               type="button"
-              className={!query && activeCategory === category.id ? "category-button selected" : "category-button"}
-              onClick={() => { setQuery(""); setActiveCategory(category.id); }}
+              className={!query && !showRecent && activeCategory === category.id ? "category-button selected" : "category-button"}
+              onClick={() => { setQuery(""); setShowRecent(false); setActiveCategory(category.id); }}
               aria-label={category.label}
               title={category.label}
             >
@@ -222,7 +228,7 @@ export default function EmojiPicker({ onSelect }) {
         </nav>
 
         <div className="emoji-grid-wrap">
-          <div className="emoji-category-title">{query ? "Resultados" : active.label}</div>
+          <div className="emoji-category-title">{query ? "Resultados" : showRecent ? "Recentes" : active.label}</div>
           <div className="emoji-grid">
             {filtered.map(([emoji, keywords], index) => (
               <button
