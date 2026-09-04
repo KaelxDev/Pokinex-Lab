@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { logout as logoutRequest, updateProfile, uploadAvatar } from "./services/auth";
+import { logout as logoutRequest } from "./services/auth";
 import AuthScreen from "./components/AuthScreen";
 import ChatHeader from "./components/ChatHeader";
 import ChatSidebar from "./components/ChatSidebar";
@@ -12,6 +12,7 @@ import { useChatActions } from "./hooks/useChatActions";
 import { useChatConnection } from "./hooks/useChatConnection";
 import { useChatHistory } from "./hooks/useChatHistory";
 import { useChatMessageEvents } from "./hooks/useChatMessageEvents";
+import { useProfileEditor } from "./hooks/useProfileEditor";
 import { useUserProfiles } from "./hooks/useUserProfiles";
 
 export default function AppEdit() {
@@ -31,23 +32,12 @@ export default function AppEdit() {
   const [users, setUsers] = useState([]);
   const [profilesById, setProfilesById] = useState({});
   const [messageInput, setMessageInput] = useState("");
-  const [profileOpen, setProfileOpen] = useState(false);
   const [profile, setProfile] = useState(null);
-  const [profileError, setProfileError] = useState("");
-  const [profileSaving, setProfileSaving] = useState(false);
-  const [selectedAvatarFile, setSelectedAvatarFile] = useState(null);
-  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState("");
   const [replyingTo, setReplyingTo] = useState(null);
   const connectionRef = useRef({ connected: false, socket: null });
 
   const isConnected = useCallback(() => connectionRef.current.connected, []);
   const getSocket = useCallback(() => connectionRef.current.socket, []);
-
-  useEffect(() => {
-    return () => {
-      if (avatarPreviewUrl) URL.revokeObjectURL(avatarPreviewUrl);
-    };
-  }, [avatarPreviewUrl]);
 
   const mergeUser = useCallback((incoming) => {
     if (!incoming?.id) return;
@@ -133,6 +123,17 @@ export default function AppEdit() {
     setMessages,
   });
 
+  const {
+    profileOpen,
+    profileError,
+    profileSaving,
+    avatarPreviewUrl,
+    openProfile,
+    saveProfile,
+    chooseAvatar,
+    closeProfile,
+  } = useProfileEditor({ user, profile, syncProfile });
+
   const handleWebSocketMessage = useChatMessageEvents({
     clearLocalHistory,
     contextMenu,
@@ -188,79 +189,13 @@ export default function AppEdit() {
       setMessages([]);
       setOfflineQueue([]);
       setProfile(null);
-      setProfileOpen(false);
-      setSelectedAvatarFile(null);
-      setAvatarPreviewUrl("");
+      setReplyingTo(null);
       setContextMenu(null);
       setReactionPickerMessageId(null);
-      setReplyingTo(null);
       setEditingId(null);
       setEditingText("");
       setEditError("");
     }
-  }
-
-  function openProfile() {
-    setProfileError("");
-    setProfileOpen(true);
-  }
-
-  async function saveProfile(event) {
-    event.preventDefault();
-    setProfileError("");
-    setProfileSaving(true);
-    const form = new FormData(event.currentTarget);
-    const oldUsername = user.username;
-
-    try {
-      let nextAvatar = profile?.avatar || user?.avatar || "";
-      if (selectedAvatarFile) {
-        nextAvatar = await uploadAvatar(selectedAvatarFile);
-      }
-
-      const updated = await updateProfile({
-        username: String(form.get("username") || oldUsername).trim(),
-        displayName: String(form.get("displayName") || oldUsername).trim() || oldUsername,
-        avatar: nextAvatar,
-        status: String(form.get("status") || "").trim(),
-      });
-
-      setSelectedAvatarFile(null);
-      setAvatarPreviewUrl("");
-      syncProfile(updated);
-      setProfileOpen(false);
-    } catch (error) {
-      setProfileError(error.message || "Não foi possível atualizar o perfil.");
-    } finally {
-      setProfileSaving(false);
-    }
-  }
-
-  function chooseAvatar(event) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      setProfileError("Escolha um arquivo de imagem válido.");
-      event.target.value = "";
-      return;
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      setProfileError("Escolha uma imagem de até 2 MB.");
-      event.target.value = "";
-      return;
-    }
-
-    setProfileError("");
-    setSelectedAvatarFile(file);
-    setAvatarPreviewUrl(URL.createObjectURL(file));
-    event.target.value = "";
-  }
-
-  function closeProfile() {
-    setSelectedAvatarFile(null);
-    setAvatarPreviewUrl("");
-    setProfileError("");
-    setProfileOpen(false);
   }
 
   if (!authChecked) {
