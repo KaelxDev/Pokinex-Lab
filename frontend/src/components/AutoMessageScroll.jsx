@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import "./AutoMessageScroll.css";
+import "../styles/components/AutoMessageScroll.css";
 
 const BOTTOM_THRESHOLD = 80;
 

@@ -1,4 +1,5 @@
-@import "../index.css";
+@import "./base.css";
+@import "./components/AutoMessageScroll.css";
 @import "../Avatar.css";
 @import "../App.css";
 @import "../Profile.css";
@@ -12,7 +13,6 @@
 @import "../MessageGeometry.css";
 @import "../MobileUX.css";
 @import "../ReplyScrollFix.css";
-@import "../AutoMessageScroll.css";
 @import "../Brand.css";
 @import "../DesignSystem.css";
 @import "../ChatPolish.css";
