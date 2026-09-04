@@ -31,6 +31,11 @@ def is_moderator(user) -> bool:
     )
 
 
+def has_moderator_access(user) -> bool:
+    """Return whether the user may execute moderator actions."""
+    return is_owner(user) or is_moderator(user)
+
+
 def get_user_role(user) -> str:
     if is_owner(user):
         return "owner"
