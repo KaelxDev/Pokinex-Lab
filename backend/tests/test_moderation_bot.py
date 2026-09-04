@@ -33,3 +33,29 @@ def test_flood_is_blocked_after_limit():
     assert all(result.allowed for result in results[:6])
     assert not results[6].allowed
     assert results[6].action == "flood"
+
+
+def test_short_term_memory_supports_follow_up_question():
+    bot = ModerationBot()
+    first = bot.conversational_response("@PokiBot como você está?", user_id=12)
+    assert first is not None
+
+    second = bot.conversational_response("@PokiBot e você?", user_id=12)
+    assert second is not None
+    assert "também" in second.lower() or "online" in second.lower()
+
+
+def test_memory_message_reports_recent_context():
+    bot = ModerationBot()
+    bot.conversational_response("@PokiBot oi", user_id=20)
+    bot.conversational_response("@PokiBot me ajuda", user_id=20)
+
+    response = bot.memory_message(user_id=20)
+    assert response is not None
+    assert "oi" in response.lower() or "me ajuda" in response.lower()
+
+
+def test_memory_is_isolated_per_user():
+    bot = ModerationBot()
+    bot.conversational_response("@PokiBot oi", user_id=1)
+    assert bot.memory_message(user_id=2) == "🧠 Ainda não tenho contexto suficiente desta conversa."
