@@ -123,7 +123,7 @@ def register(
 
     token = create_session(user["id"])
     set_session_cookie(response, request, token)
-    return {"token": token, "user": user}
+    return {"user": user}
 
 
 @router.post("/login")
@@ -141,7 +141,7 @@ def login(
 
     token = create_session(user["id"])
     set_session_cookie(response, request, token)
-    return {"token": token, "user": user}
+    return {"user": user}
 
 
 @router.get("/me")

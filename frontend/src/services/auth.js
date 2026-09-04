@@ -1,4 +1,4 @@
-import { API_URL, AUTH_TOKEN_KEY, messagesHistoryUrl } from "../config/runtime";
+import { API_URL, LEGACY_AUTH_TOKEN_KEY, messagesHistoryUrl } from "../config/runtime";
 
 function translateValidationMessage(item) {
   const message = typeof item === "string" ? item : item?.msg || item?.message || "";
@@ -63,7 +63,7 @@ async function request(path, options = {}) {
 
 export function clearLegacyToken() {
   try {
-    localStorage.removeItem(AUTH_TOKEN_KEY);
+    localStorage.removeItem(LEGACY_AUTH_TOKEN_KEY);
   } catch {
     // Ignore storage failures from old versions of the client.
   }

@@ -13,7 +13,8 @@ export const API_URL = import.meta.env.VITE_API_URL ||
 export const WS_URL = import.meta.env.VITE_WS_URL ||
   (isLocalhost ? LOCAL_WS_URL : DEFAULT_WS_URL);
 
-export const AUTH_TOKEN_KEY = "poknex_auth_token";
+// Kept only to clean credentials left by pre-cookie versions of the client.
+export const LEGACY_AUTH_TOKEN_KEY = "poknex_auth_token";
 
 export function messagesHistoryUrl() {
   return API_URL.replace(/\/api\/auth\/?$/, "/api/messages");
