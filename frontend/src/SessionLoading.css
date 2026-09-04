@@ -1,32 +1,25 @@
-/* Current Pokinex session-loading screen */
+/* Current Pokinex session-loading screen. The authentication logic remains unchanged. */
 
 .app > .login {
   position: relative;
-  width: min(460px, calc(100vw - 32px));
-  max-width: 460px;
-  min-height: 250px;
-  margin: 0;
-  padding: 34px 34px 30px;
+  width: min(440px, calc(100vw - 32px));
+  max-width: 440px;
+  min-height: 232px;
+  margin: auto;
+  padding: 30px;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   justify-content: center;
+  gap: 18px;
   overflow: hidden;
-  background: linear-gradient(180deg, rgba(21,24,33,.98), rgba(14,17,23,.98));
+  background:
+    radial-gradient(circle at 100% 0%, rgba(226,58,73,.10), transparent 34%),
+    linear-gradient(180deg, rgba(21,24,33,.99), rgba(14,17,23,.99));
   border: 1px solid rgba(255,255,255,.075);
   border-radius: 20px;
-  box-shadow: 0 28px 80px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.025);
-}
-
-.app > .login::before {
-  content: "";
-  position: absolute;
-  top: -90px;
-  right: -70px;
-  width: 190px;
-  height: 190px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(226,58,73,.14), transparent 68%);
-  pointer-events: none;
+  box-shadow: 0 28px 80px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.028);
+  text-align: left;
 }
 
 .app > .login::after {
@@ -43,47 +36,51 @@
 .app > .login h1 {
   position: relative;
   z-index: 1;
-  margin: 0 0 8px;
-  font-size: 28px;
-  line-height: 1.15;
-  letter-spacing: -.035em;
-  color: #f5f7fa;
+  margin: 0;
+  padding: 0 0 15px;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid rgba(255,255,255,.065);
+  font-size: 0 !important;
+  line-height: 1;
+  color: transparent !important;
 }
 
 .app > .login h1::before {
   content: "";
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  margin: 0 9px 2px 0;
-  border-radius: 50%;
-  background: #36d07f;
-  box-shadow: 0 0 0 5px rgba(54,208,127,.08), 0 0 18px rgba(54,208,127,.18);
-  vertical-align: middle;
-}
-
-.app > .login h1 {
-  font-size: 0;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  margin-right: 10px;
+  border-radius: 9px;
+  background: #1a1f27 url("/icone.png?v=2") center / 23px 23px no-repeat;
+  border: 1px solid rgba(255,255,255,.07);
+  box-shadow: 0 7px 18px rgba(0,0,0,.22);
 }
 
 .app > .login h1::after {
   content: "Pokinex";
-  font-size: 28px;
-  vertical-align: middle;
+  color: #f5f7fa;
+  font-size: 18px;
+  font-weight: 790;
+  line-height: 1;
+  letter-spacing: -.015em;
 }
 
 .app > .login .status.connecting {
   position: relative;
   z-index: 1;
+  min-height: 54px;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0 14px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin: 12px 0 0;
-  padding: 12px 13px;
+  gap: 11px;
   border: 1px solid rgba(255,255,255,.06);
-  border-radius: 11px;
+  border-radius: 12px;
   background: rgba(255,255,255,.025);
-  color: #959ca8;
+  color: transparent;
   font-size: 0;
   line-height: 1.4;
 }
@@ -95,35 +92,44 @@
   flex: 0 0 9px;
   border: 2px solid rgba(255,255,255,.12);
   border-top-color: #ff6674;
+  border-right-color: #e23a49;
   border-radius: 50%;
-  animation: session-loading-spin .8s linear infinite;
+  animation: pokinex-session-loading-spin .8s linear infinite;
 }
 
 .app > .login .status.connecting::after {
   content: "Preparando sua sessão...";
-  color: #a0a6b1;
+  color: #9fa6b1;
   font-size: 12px;
+  font-weight: 620;
 }
 
-@keyframes session-loading-spin {
+@keyframes pokinex-session-loading-spin {
   to { transform: rotate(360deg); }
 }
 
 @media (max-width: 520px) {
   .app > .login {
     width: calc(100vw - 24px);
-    min-height: 220px;
-    padding: 28px 22px 26px;
+    min-height: 210px;
+    padding: 25px 20px 23px;
     border-radius: 17px;
   }
 
+  .app > .login h1::before {
+    width: 30px;
+    height: 30px;
+    flex-basis: 30px;
+    background-size: 21px 21px;
+  }
+
   .app > .login h1::after {
-    font-size: 25px;
+    font-size: 17px;
   }
 
   .app > .login::after {
-    right: 17px;
-    bottom: 14px;
+    right: 16px;
+    bottom: 13px;
   }
 }
 
