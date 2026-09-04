@@ -13,9 +13,12 @@ function publishModerationLock(data) {
   if (!Number.isFinite(muteMinutes) || muteMinutes <= 0) return;
 
   const durationMs = Math.max(1000, Math.round(muteMinutes * 60 * 1000));
+  const startedAt = Date.now();
   const lock = {
-    until: Date.now() + durationMs,
+    until: startedAt + durationMs,
+    startedAt,
     durationMs,
+    muteRemainingSeconds: Math.ceil(durationMs / 1000),
     category: data?.category || "moderation",
     severity: data?.severity || "medium",
     message: data?.message || "Envio temporariamente bloqueado pela moderação.",
