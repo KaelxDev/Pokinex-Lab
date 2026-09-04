@@ -33,14 +33,21 @@ export default function MessageList({
 
   useEffect(() => {
     function handleModeration(event) {
-      const messageId = event.detail?.messageId;
-      if (!messageId) return;
+      const detail = event.detail || {};
+      const ids = [
+        detail.messageId,
+        ...(Array.isArray(detail.removeMessageIds) ? detail.removeMessageIds : []),
+      ].filter(Boolean);
+
+      if (ids.length === 0) return;
+
       setRejectedMessageIds((current) => {
         const next = new Set(current);
-        next.add(messageId);
-        if (next.size > 100) {
+        ids.forEach((id) => next.add(id));
+        while (next.size > 200) {
           const oldest = next.values().next().value;
-          if (oldest) next.delete(oldest);
+          if (!oldest) break;
+          next.delete(oldest);
         }
         return next;
       });
