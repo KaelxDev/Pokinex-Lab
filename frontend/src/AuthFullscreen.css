@@ -1,7 +1,27 @@
 /* Fullscreen authentication shell: login and register are centered in the viewport. */
+
+html:has(.auth-page),
+body:has(.auth-page) {
+  width: 100%;
+  min-width: 100%;
+  min-height: 100%;
+}
+
+#root:has(.auth-page) {
+  width: 100vw !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  min-height: 100dvh !important;
+  height: 100dvh !important;
+  margin: 0 !important;
+  border-inline: 0 !important;
+  box-sizing: border-box;
+}
+
 .auth-page {
   position: relative;
   width: 100vw !important;
+  max-width: none !important;
   height: 100dvh !important;
   min-height: 100dvh !important;
   min-width: 0;
