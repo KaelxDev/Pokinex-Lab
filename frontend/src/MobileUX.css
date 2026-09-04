@@ -1,6 +1,7 @@
 /* =========================================================
-   POKNEX — MOBILE UX
-   Touch-first refinements without changing app architecture.
+   POKINEX — RESPONSIVE LAYOUT
+   Mobile uses the same chat structure and visual hierarchy as desktop.
+   Only dimensions/spacing adapt to the viewport.
 ========================================================= */
 
 @media (max-width: 700px) {
@@ -14,13 +15,7 @@
     overflow: hidden;
   }
 
-  body {
-    overscroll-behavior: none;
-  }
-
-  #root {
-    border-inline: 0;
-  }
+  body { overscroll-behavior: none; }
 
   .app {
     width: 100%;
@@ -35,6 +30,41 @@
     min-height: 100dvh;
     border: 0;
     border-radius: 0;
+  }
+
+  /* Keep the desktop sidebar available on mobile instead of replacing it
+     with a separate mobile navigation. */
+  .sidebar {
+    display: flex !important;
+    width: clamp(170px, 31vw, 250px);
+    flex: 0 0 clamp(170px, 31vw, 250px);
+    padding: 14px;
+  }
+
+  .sidebar-main {
+    min-width: 0;
+  }
+
+  .sidebar-topbar strong,
+  .channel-entry-copy,
+  .user-info,
+  .profile-summary-copy,
+  .history-button span:last-child {
+    min-width: 0;
+  }
+
+  .sidebar-topbar strong,
+  .channel-entry-copy strong,
+  .channel-entry-copy small,
+  .user-info strong,
+  .user-info span,
+  .profile-summary-copy strong,
+  .profile-summary-copy span,
+  .history-button strong,
+  .history-button small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .chat-content {
@@ -73,23 +103,9 @@
     touch-action: pan-y;
   }
 
-  .message {
-    max-width: 94% !important;
-  }
-
-  .message-bubble {
-    max-width: 100% !important;
-  }
-
-  .message .message-row {
-    touch-action: pan-y;
-  }
-
-  /* Keep the context-menu target generous for short messages. */
-  .message .message-row::before {
-    inset: -15px -14px !important;
-    border-radius: 20px;
-  }
+  .message { max-width: 94% !important; }
+  .message-bubble { max-width: 100% !important; }
+  .message .message-row { touch-action: pan-y; }
 
   .message-context-menu {
     min-width: min(230px, calc(100vw - 24px));
@@ -123,9 +139,7 @@
     padding: 0 12px;
   }
 
-  .input-hint {
-    display: none;
-  }
+  .input-hint { display: none; }
 
   .reply-composer {
     margin: 0 8px 6px;
@@ -140,28 +154,12 @@
     flex: 0 0 40px;
   }
 
-  .message-edit-form {
-    width: min(100%, calc(100vw - 28px));
-  }
+  .message-edit-form { width: min(100%, calc(100vw - 28px)); }
+  .message-edit-form textarea { min-height: 80px; font-size: 16px; }
+  .message-edit-form > div { gap: 8px; }
+  .message-edit-form button { min-height: 40px; padding: 8px 12px; }
 
-  .message-edit-form textarea {
-    min-height: 80px;
-    font-size: 16px;
-  }
-
-  .message-edit-form > div {
-    gap: 8px;
-  }
-
-  .message-edit-form button {
-    min-height: 40px;
-    padding: 8px 12px;
-  }
-
-  .message-reaction {
-    min-height: 36px;
-    padding: 6px 9px;
-  }
+  .message-reaction { min-height: 36px; padding: 6px 9px; }
 
   .message-reaction-picker {
     bottom: max(74px, calc(64px + env(safe-area-inset-bottom))) !important;
@@ -176,10 +174,7 @@
     padding: 7px;
   }
 
-  .add-reaction {
-    min-height: 36px;
-    padding: 6px 9px;
-  }
+  .add-reaction { min-height: 36px; padding: 6px 9px; }
 
   .profile-overlay {
     padding: 0;
@@ -187,7 +182,7 @@
   }
 
   .profile-modal {
-    width: 100%;
+    width: min(100%, 520px);
     max-width: none;
     max-height: min(92dvh, 760px);
     padding: 20px 16px max(20px, env(safe-area-inset-bottom));
@@ -195,73 +190,102 @@
     overflow-y: auto;
   }
 
-  .profile-actions {
-    gap: 8px;
-  }
-
-  .profile-actions button,
-  .avatar-button {
-    min-height: 44px;
-  }
+  .profile-actions { gap: 8px; }
+  .profile-actions button, .avatar-button { min-height: 44px; }
 }
 
-@media (max-width: 380px) {
+@media (max-width: 520px) {
+  /* The same desktop sidebar remains present, but becomes a compact rail. */
+  .sidebar {
+    width: 180px !important;
+    flex-basis: 180px !important;
+    padding: 12px 10px;
+  }
+
+  .sidebar-rail {
+    display: none;
+  }
+
+  .sidebar-topbar {
+    padding-inline: 4px;
+  }
+
+  .sidebar-heading {
+    margin-top: 16px;
+  }
+
+  .channel-entry {
+    padding: 8px;
+  }
+
+  .channel-entry-copy small,
+  .user-info span,
+  .history-button small {
+    font-size: 10px;
+  }
+
+  .user {
+    padding: 7px 6px;
+    gap: 7px;
+  }
+
+  .profile-summary {
+    padding: 8px 6px;
+  }
+
+  .history-button {
+    padding: 8px 6px;
+  }
+
   .chat-header {
+    min-height: 56px;
     padding-inline: 9px;
+  }
+
+  .chat-header h1 {
+    font-size: 15px;
+  }
+
+  .connection {
+    display: none;
   }
 
   .messages {
+    padding: 12px 9px;
+  }
+
+  .message { max-width: 96% !important; }
+}
+
+@media (max-width: 380px) {
+  .sidebar {
+    width: 155px !important;
+    flex-basis: 155px !important;
     padding-inline: 7px;
   }
 
-  .message {
-    max-width: 96% !important;
+  .sidebar-heading-count,
+  .workspace-dot,
+  .channel-entry-live,
+  .profile-arrow,
+  .history-button-icon {
+    display: none;
   }
 
-  .message-bubble {
-    font-size: 15px !important;
+  .sidebar-topbar strong {
+    font-size: 14px;
   }
 
-  .message-form {
-    padding-inline: 7px;
+  .sidebar-heading {
+    font-size: 10px;
   }
 
-  .message-form button {
-    min-width: 44px;
-    padding-inline: 9px;
-  }
-}
-
-/* =========================================================
-   REPLY SCROLL FIX — PC + MOBILE
-   Keep the conversation list as the shrinking/scrolling flex area
-   whenever the reply composer is visible.
-========================================================= */
-
-.chat-content {
-  min-height: 0 !important;
-  overflow: hidden !important;
-}
-
-.messages {
-  min-height: 0 !important;
-  flex: 1 1 auto !important;
-  overflow-y: auto !important;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-}
-
-.reply-composer {
-  flex: 0 0 auto !important;
-}
-
-.message-form {
-  flex: 0 0 auto !important;
+  .messages { padding-inline: 7px; }
+  .message-bubble { font-size: 15px !important; }
+  .message-form { padding-inline: 7px; }
+  .message-form button { min-width: 44px; padding-inline: 9px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .message,
-  .message-context-menu {
-    animation: none !important;
-  }
+  .message, .message-context-menu { animation: none !important; }
 }

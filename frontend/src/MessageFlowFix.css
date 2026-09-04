@@ -1,0 +1,213 @@
+/* POKINEX — single authority for message flow */
+
+.message {
+  display: grid !important;
+  width: min(100%, 940px) !important;
+  max-width: 940px !important;
+  margin: 0 auto !important;
+  padding: 8px 10px !important;
+  align-self: stretch !important;
+  align-items: start !important;
+  min-width: 0 !important;
+}
+
+/* Incoming: avatar | content */
+.message.other {
+  grid-template-columns: 36px minmax(0, 1fr) !important;
+  column-gap: 10px !important;
+}
+
+.message.other .message-avatar,
+.message.other .message-avatar-spacer {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+}
+
+.message.other .message-main {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+}
+
+/* Own messages: content | avatar */
+.message.mine {
+  grid-template-columns: minmax(0, 1fr) 36px !important;
+  column-gap: 10px !important;
+}
+
+.message.mine .message-main {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  justify-self: stretch !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-end !important;
+}
+
+.message.mine .message-avatar,
+.message.mine .message-avatar-spacer {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  justify-self: end !important;
+}
+
+/* Important: the inner row fills the content column. */
+.message .message-row,
+.message.mine .message-row,
+.message.other .message-row {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  padding-bottom: 0 !important;
+}
+
+.message.other .message-row {
+  align-items: flex-start !important;
+}
+
+.message.mine .message-row {
+  align-items: flex-end !important;
+}
+
+/* Never use fit-content for the wrapper: it can collapse around a breakable URL.
+   The bubble itself sizes naturally and is capped by the wrapper. */
+.message .message-bubble-wrap,
+.message.mine .message-bubble-wrap,
+.message.other .message-bubble-wrap {
+  display: block !important;
+  width: max-content !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  flex: 0 1 auto !important;
+}
+
+.message .message-bubble {
+  display: block !important;
+  box-sizing: border-box !important;
+  width: auto !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+  text-align: left !important;
+}
+
+.message.mine .message-bubble-wrap {
+  margin-left: auto !important;
+  margin-right: 0 !important;
+}
+
+.message.other .message-bubble-wrap {
+  margin-left: 0 !important;
+  margin-right: auto !important;
+}
+
+.message .message-user {
+  align-self: flex-start !important;
+  margin-left: 2px !important;
+}
+
+.message.mine .message-user {
+  align-self: flex-end !important;
+  margin-left: 0 !important;
+  margin-right: 2px !important;
+  text-align: right !important;
+}
+
+.message .message-reaction-area {
+  align-self: flex-start !important;
+  width: fit-content !important;
+  max-width: 100% !important;
+  margin-top: 1px !important;
+}
+
+.message.mine .message-reaction-area {
+  align-self: flex-end !important;
+}
+
+.message .message-meta {
+  align-self: flex-start !important;
+}
+
+.message.mine .message-meta {
+  align-self: flex-end !important;
+  text-align: right !important;
+}
+
+.message.grouped {
+  margin-top: -4px !important;
+}
+
+.message.grouped .message-user {
+  display: none !important;
+}
+
+.message.grouped .message-avatar,
+.message.grouped .message-avatar-spacer {
+  visibility: hidden !important;
+}
+
+/* Remove legacy pseudo-elements from older geometry fixes. */
+.message .message-row::before,
+.message .message-row::after,
+.message .message-bubble::before,
+.message .message-bubble::after {
+  content: none !important;
+  display: none !important;
+}
+
+@media (max-width: 700px) {
+  .message {
+    width: 100% !important;
+    grid-template-columns: 32px minmax(0, 1fr) !important;
+    padding-inline: 5px !important;
+  }
+
+  .message.mine {
+    grid-template-columns: minmax(0, 1fr) 32px !important;
+  }
+
+  .message .message-avatar,
+  .message .message-avatar-spacer {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    min-height: 32px !important;
+  }
+
+  .message .message-bubble-wrap {
+    max-width: min(90vw, 760px) !important;
+  }
+}
+
+@media (max-width: 520px) {
+  .message {
+    grid-template-columns: 30px minmax(0, 1fr) !important;
+  }
+
+  .message.mine {
+    grid-template-columns: minmax(0, 1fr) 30px !important;
+  }
+
+  .message .message-avatar,
+  .message .message-avatar-spacer {
+    width: 30px !important;
+    height: 30px !important;
+    min-width: 30px !important;
+    min-height: 30px !important;
+  }
+
+  .message .message-bubble-wrap {
+    max-width: 92vw !important;
+  }
+}

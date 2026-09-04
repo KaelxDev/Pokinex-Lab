@@ -1,0 +1,254 @@
+/* Final message presentation layer: clean Discord-like chat geometry. */
+.message {
+  width: min(100%, 940px) !important;
+  max-width: 940px !important;
+  display: grid !important;
+  grid-template-columns: 36px minmax(0, 1fr) !important;
+  column-gap: 10px !important;
+  align-items: start !important;
+  align-self: stretch !important;
+  margin: 0 auto !important;
+  padding: 8px 10px !important;
+  border-radius: 10px !important;
+}
+
+.message.other,
+.message.mine {
+  align-self: stretch !important;
+  grid-template-columns: 36px minmax(0, 1fr) !important;
+}
+
+.message .message-avatar,
+.message .message-avatar-spacer {
+  grid-column: 1 !important;
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  min-height: 36px !important;
+  margin-top: 18px !important;
+}
+
+.message .message-main {
+  grid-column: 2 !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+}
+
+.message.mine .message-main {
+  align-items: flex-end !important;
+}
+
+.message .message-user {
+  display: block !important;
+  align-self: flex-start !important;
+  margin: 0 0 5px 2px !important;
+  color: #f2f3f5 !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  line-height: 1.25 !important;
+}
+
+.message.mine .message-user {
+  align-self: flex-end !important;
+  margin-right: 2px !important;
+}
+
+.message .message-row,
+.message.group-end .message-row {
+  width: fit-content !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 6px !important;
+  position: relative !important;
+  padding-bottom: 0 !important;
+  isolation: isolate;
+}
+
+.message.mine .message-row {
+  align-items: flex-end !important;
+}
+
+.message .message-row::before {
+  inset: -8px -10px !important;
+}
+
+.message .message-bubble-wrap {
+  width: fit-content !important;
+  max-width: min(100%, 760px) !important;
+  min-width: 0 !important;
+}
+
+.message .message-bubble {
+  display: block !important;
+  width: fit-content !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  padding: 9px 12px !important;
+  border-radius: 12px !important;
+  font-size: 15px !important;
+  line-height: 1.45 !important;
+  text-align: left !important;
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+
+.message.other .message-bubble {
+  background: #20242b !important;
+  border: 1px solid rgba(255,255,255,.045) !important;
+  color: #e8eaee !important;
+}
+
+.message.mine .message-bubble {
+  background: var(--px-red, #e23a49) !important;
+  border: 1px solid rgba(255,255,255,.045) !important;
+  color: #fff !important;
+}
+
+.message .message-reaction-area {
+  width: fit-content !important;
+  max-width: 100% !important;
+  margin: 1px 0 0 !important;
+  padding: 0 !important;
+  align-self: flex-start !important;
+  position: relative !important;
+  z-index: 2;
+}
+
+.message.mine .message-reaction-area {
+  align-self: flex-end !important;
+}
+
+.message .message-reactions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  flex-wrap: wrap !important;
+  gap: 4px !important;
+}
+
+.message.mine .message-reactions {
+  justify-content: flex-end !important;
+}
+
+.message .message-reaction,
+.message .add-reaction {
+  min-height: 26px !important;
+  padding: 4px 8px !important;
+  border-radius: 7px !important;
+  font-size: 11px !important;
+  line-height: 1 !important;
+}
+
+.message .message-reaction {
+  border: 1px solid rgba(255,255,255,.08) !important;
+  background: #1b1e24 !important;
+  color: #c5c8cf !important;
+}
+
+.message .add-reaction {
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  color: #626872 !important;
+  opacity: 0;
+  transform: translateY(2px);
+  transition: opacity .15s ease, color .15s ease, background .15s ease;
+}
+
+.message:hover .add-reaction,
+.message:focus-within .add-reaction {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.message .add-reaction:hover {
+  background: rgba(226,58,73,.10) !important;
+  color: #ff7a87 !important;
+}
+
+.message .message-meta {
+  align-self: flex-start !important;
+  margin-top: 4px !important;
+  padding: 0 2px !important;
+  font-size: 9px !important;
+  line-height: 1.25 !important;
+}
+
+.message.mine .message-meta {
+  align-self: flex-end !important;
+}
+
+.message.grouped {
+  margin-top: -4px !important;
+}
+
+.message.grouped .message-user {
+  display: none !important;
+}
+
+.message.grouped .message-avatar,
+.message.grouped .message-avatar-spacer {
+  visibility: hidden !important;
+}
+
+.message.grouped .message-main {
+  padding-top: 0 !important;
+}
+
+/* One clean channel marker: # + geral, with no legacy pseudo-element. */
+.chat-header .channel-title-row h1::before,
+.chat-header .channel-title-row h1::after,
+.chat-header .channel-copy::before,
+.chat-header .channel-copy::after {
+  content: none !important;
+  display: none !important;
+}
+
+.chat-header .channel-title-row h1 {
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+}
+
+.chat-header .channel-hash {
+  display: inline-block !important;
+  color: #858a95 !important;
+  font-weight: 800 !important;
+}
+
+@media (max-width: 700px) {
+  .message {
+    grid-template-columns: 32px minmax(0, 1fr) !important;
+    width: 100% !important;
+    padding-inline: 5px !important;
+  }
+
+  .message.other,
+  .message.mine {
+    grid-template-columns: 32px minmax(0, 1fr) !important;
+  }
+
+  .message .message-avatar,
+  .message .message-avatar-spacer {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    min-height: 32px !important;
+  }
+
+  .message .message-bubble {
+    max-width: min(100%, 86vw) !important;
+    font-size: 14px !important;
+  }
+
+  .message .add-reaction {
+    opacity: 1 !important;
+  }
+}

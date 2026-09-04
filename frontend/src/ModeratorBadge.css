@@ -1,0 +1,47 @@
+.user-dm-trigger {
+  min-width: 0;
+}
+
+.user-role-badge,
+.profile-role-badge,
+.message-role-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 2px 5px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1;
+}
+
+.user-role-badge.bot,
+.message-role-badge.bot {
+  color: #ff5b61;
+  border-color: rgba(255, 91, 97, 0.32);
+  background: rgba(255, 91, 97, 0.08);
+}
+
+.user-role-badge.moderator,
+.profile-role-badge {
+  color: #f0b6bd;
+  border-color: rgba(240, 182, 189, 0.28);
+  background: rgba(240, 182, 189, 0.08);
+}
+
+.profile-role-badge {
+  margin-left: auto;
+  min-width: 30px;
+}
+
+.message-role-badge {
+  margin-left: 7px;
+  transform: translateY(-1px);
+}
+
+.bot-avatar img {
+  object-fit: cover;
+}

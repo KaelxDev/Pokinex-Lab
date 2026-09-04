@@ -82,8 +82,6 @@ export default function AutoMessageScroll({ children }) {
 
     attachToMessages();
 
-    // The chat .messages element is created only after authentication restores the session.
-    // Watch the document until it exists, then observe the actual scrolling element.
     bodyObserver = new MutationObserver(attachToMessages);
     bodyObserver.observe(document.body, { childList: true, subtree: true });
 

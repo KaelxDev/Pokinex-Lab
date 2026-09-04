@@ -1,0 +1,147 @@
+/* Final mobile drawer layer. Loaded after all legacy responsive CSS. */
+.mobile-sidebar-header {
+  display: none;
+}
+
+.mobile-sidebar-backdrop {
+  display: none;
+}
+
+@media (max-width: 700px) {
+  .sidebar {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: auto !important;
+    bottom: 0 !important;
+    z-index: 1000 !important;
+    display: flex !important;
+    flex-direction: row !important;
+    width: min(86vw, 320px) !important;
+    max-width: 320px !important;
+    min-width: 0 !important;
+    height: 100dvh !important;
+    margin: 0 !important;
+    padding: max(14px, env(safe-area-inset-top)) 12px max(14px, env(safe-area-inset-bottom)) !important;
+    overflow: hidden !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transform: translate3d(-105%, 0, 0) !important;
+    background: #111318 !important;
+    border-right: 1px solid rgba(255,255,255,.09) !important;
+    box-shadow: 20px 0 55px rgba(0,0,0,.42) !important;
+    transition: transform 180ms ease, opacity 140ms ease, visibility 0s linear 180ms !important;
+    isolation: isolate !important;
+  }
+
+  .sidebar.mobile-open {
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    transform: translate3d(0, 0, 0) !important;
+    transition-delay: 0s !important;
+  }
+
+  .sidebar > .sidebar-rail {
+    display: none !important;
+  }
+
+  .sidebar > .sidebar-main {
+    display: flex !important;
+    flex: 1 1 auto !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: 100% !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .sidebar .sidebar-topbar {
+    flex: 0 0 auto !important;
+  }
+
+  .sidebar .mobile-sidebar-header {
+    display: flex !important;
+    flex: 0 0 42px !important;
+    width: 100% !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    margin: 0 0 2px !important;
+    padding: 0 4px !important;
+    color: #f5f7fa !important;
+    font-size: 12px !important;
+    font-weight: 800 !important;
+    letter-spacing: .06em !important;
+    text-transform: uppercase !important;
+  }
+
+  .sidebar .mobile-sidebar-header button {
+    display: grid !important;
+    place-items: center !important;
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+    padding: 0 !important;
+    border: 1px solid rgba(255,255,255,.08) !important;
+    border-radius: 10px !important;
+    background: rgba(255,255,255,.05) !important;
+    color: #f5f7fa !important;
+  }
+
+  .sidebar .users {
+    min-height: 0 !important;
+    flex: 1 1 auto !important;
+    overflow-y: auto !important;
+  }
+
+  .sidebar .sidebar-footer {
+    flex: 0 0 auto !important;
+  }
+
+  .mobile-sidebar-backdrop {
+    display: block !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    z-index: 999 !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: rgba(3,4,7,.72) !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+  }
+
+  .chat-menu-toggle {
+    position: relative !important;
+    z-index: 31 !important;
+    flex: 0 0 40px !important;
+    width: 40px !important;
+    min-width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .sidebar {
+    width: min(88vw, 300px) !important;
+    max-width: 300px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar {
+    transition: none !important;
+  }
+}

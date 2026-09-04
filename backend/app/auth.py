@@ -2,9 +2,12 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 import hmac
 import secrets
-import sqlite3
 
-from app.database import get_connection
+from app.database import (
+    _persistent_avatar_reference,
+    get_connection,
+    using_postgres,
+)
 
 SESSION_DAYS = 30
 PASSWORD_ITERATIONS = 600_000
@@ -60,21 +63,40 @@ def create_user(username: str, password: str) -> dict:
 
     password_hash, password_salt = hash_password(password)
     created_at = now_utc().isoformat()
-
     connection = get_connection()
     try:
-        cursor = connection.execute(
-            """
-            INSERT INTO users (username, password_hash, password_salt, display_name, created_at)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (username, password_hash, password_salt, username, created_at),
-        )
+        if using_postgres():
+            cursor = connection.execute(
+                """
+                INSERT INTO users (username, password_hash, password_salt, display_name, created_at)
+                VALUES (%s, %s, %s, %s, %s)
+                RETURNING id
+                """,
+                (username, password_hash, password_salt, username, created_at),
+            )
+            user_id = cursor.fetchone()["id"]
+        else:
+            cursor = connection.execute(
+                """
+                INSERT INTO users (username, password_hash, password_salt, display_name, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (username, password_hash, password_salt, username, created_at),
+            )
+            user_id = cursor.lastrowid
         connection.commit()
-        user_id = cursor.lastrowid
         return get_user_by_id(user_id, connection=connection)
-    except sqlite3.IntegrityError as exc:
-        raise ValueError("Username já está em uso.") from exc
+    except Exception as exc:
+        connection.rollback()
+        if using_postgres():
+            import psycopg
+            if isinstance(exc, psycopg.errors.UniqueViolation):
+                raise ValueError("Username já está em uso.") from exc
+        else:
+            import sqlite3
+            if isinstance(exc, sqlite3.IntegrityError):
+                raise ValueError("Username já está em uso.") from exc
+        raise
     finally:
         connection.close()
 
@@ -83,17 +105,27 @@ def get_user_by_id(user_id: int, connection=None) -> dict | None:
     owns_connection = connection is None
     connection = connection or get_connection()
     try:
-        user = connection.execute(
-            "SELECT id, username, display_name, avatar, status FROM users WHERE id = ?",
-            (user_id,),
-        ).fetchone()
+        query = """
+            SELECT id, username, display_name, avatar, status
+            FROM users
+            WHERE id = %s
+        """ if using_postgres() else """
+            SELECT id, username, display_name, avatar, status
+            FROM users
+            WHERE id = ?
+        """
+        user = connection.execute(query, (user_id,)).fetchone()
         if not user:
             return None
         return {
             "id": user["id"],
             "username": user["username"],
             "displayName": user["display_name"],
-            "avatar": user["avatar"],
+            "avatar": _persistent_avatar_reference(
+                connection,
+                user["id"],
+                user["avatar"],
+            ),
             "status": user["status"],
         }
     finally:
@@ -104,23 +136,36 @@ def get_user_by_id(user_id: int, connection=None) -> dict | None:
 def authenticate(username: str, password: str) -> dict | None:
     connection = get_connection()
     try:
-        user = connection.execute(
-            "SELECT id, username, password_hash, password_salt, display_name, avatar, status FROM users WHERE username = ? COLLATE NOCASE",
-            (username.strip(),),
-        ).fetchone()
+        query = """
+            SELECT id, username, password_hash, password_salt, display_name, avatar, status
+            FROM users
+            WHERE LOWER(username) = LOWER(%s)
+        """ if using_postgres() else """
+            SELECT id, username, password_hash, password_salt, display_name, avatar, status
+            FROM users
+            WHERE username = ? COLLATE NOCASE
+        """
+        user = connection.execute(query, (username.strip(),)).fetchone()
+        if not user or not verify_password(
+            password,
+            user["password_hash"],
+            user["password_salt"],
+        ):
+            return None
+
+        return {
+            "id": user["id"],
+            "username": user["username"],
+            "displayName": user["display_name"],
+            "avatar": _persistent_avatar_reference(
+                connection,
+                user["id"],
+                user["avatar"],
+            ),
+            "status": user["status"],
+        }
     finally:
         connection.close()
-
-    if not user or not verify_password(password, user["password_hash"], user["password_salt"]):
-        return None
-
-    return {
-        "id": user["id"],
-        "username": user["username"],
-        "displayName": user["display_name"],
-        "avatar": user["avatar"],
-        "status": user["status"],
-    }
 
 
 def create_session(user_id: int) -> str:
@@ -128,51 +173,67 @@ def create_session(user_id: int) -> str:
     token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
     created_at = now_utc()
     expires_at = created_at + timedelta(days=SESSION_DAYS)
-
     connection = get_connection()
     try:
+        query = """
+            INSERT INTO sessions (token_hash, user_id, expires_at, created_at)
+            VALUES (%s, %s, %s, %s)
+        """ if using_postgres() else """
+            INSERT INTO sessions (token_hash, user_id, expires_at, created_at)
+            VALUES (?, ?, ?, ?)
+        """
         connection.execute(
-            "INSERT INTO sessions (token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)",
+            query,
             (token_hash, user_id, expires_at.isoformat(), created_at.isoformat()),
         )
         connection.commit()
     finally:
         connection.close()
-
     return raw_token
 
 
 def get_user_from_token(token: str | None) -> dict | None:
     if not token:
         return None
-
     token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
     connection = get_connection()
     try:
-        row = connection.execute(
-            """
+        query = """
+            SELECT u.id, u.username, u.display_name, u.avatar, u.status, s.expires_at
+            FROM sessions s
+            JOIN users u ON u.id = s.user_id
+            WHERE s.token_hash = %s
+        """ if using_postgres() else """
             SELECT u.id, u.username, u.display_name, u.avatar, u.status, s.expires_at
             FROM sessions s
             JOIN users u ON u.id = s.user_id
             WHERE s.token_hash = ?
-            """,
-            (token_hash,),
-        ).fetchone()
+        """
+        row = connection.execute(query, (token_hash,)).fetchone()
         if not row:
             return None
         try:
             expires_at = datetime.fromisoformat(row["expires_at"])
-        except ValueError:
+        except (ValueError, TypeError):
             return None
         if expires_at <= now_utc():
-            connection.execute("DELETE FROM sessions WHERE token_hash = ?", (token_hash,))
+            delete_query = (
+                "DELETE FROM sessions WHERE token_hash = %s"
+                if using_postgres()
+                else "DELETE FROM sessions WHERE token_hash = ?"
+            )
+            connection.execute(delete_query, (token_hash,))
             connection.commit()
             return None
         return {
             "id": row["id"],
             "username": row["username"],
             "displayName": row["display_name"],
-            "avatar": row["avatar"],
+            "avatar": _persistent_avatar_reference(
+                connection,
+                row["id"],
+                row["avatar"],
+            ),
             "status": row["status"],
         }
     finally:
@@ -185,17 +246,27 @@ def delete_session(token: str | None) -> None:
     token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
     connection = get_connection()
     try:
-        connection.execute("DELETE FROM sessions WHERE token_hash = ?", (token_hash,))
+        query = (
+            "DELETE FROM sessions WHERE token_hash = %s"
+            if using_postgres()
+            else "DELETE FROM sessions WHERE token_hash = ?"
+        )
+        connection.execute(query, (token_hash,))
         connection.commit()
     finally:
         connection.close()
 
 
-def update_profile(user_id: int, username: str, display_name: str, avatar: str, status: str) -> dict | None:
+def update_profile(
+    user_id: int,
+    username: str,
+    display_name: str,
+    avatar: str,
+    status: str,
+) -> dict | None:
     username, error = validate_username(username)
     if error:
         raise ValueError(error)
-
     display_name = display_name.strip()[:30]
     status = status.strip()[:60]
     avatar = avatar.strip()
@@ -204,13 +275,28 @@ def update_profile(user_id: int, username: str, display_name: str, avatar: str, 
 
     connection = get_connection()
     try:
-        connection.execute(
-            "UPDATE users SET username = ?, display_name = ?, avatar = ?, status = ? WHERE id = ?",
-            (username, display_name, avatar, status, user_id),
-        )
+        query = """
+            UPDATE users
+            SET username = %s, display_name = %s, avatar = %s, status = %s
+            WHERE id = %s
+        """ if using_postgres() else """
+            UPDATE users
+            SET username = ?, display_name = ?, avatar = ?, status = ?
+            WHERE id = ?
+        """
+        connection.execute(query, (username, display_name, avatar, status, user_id))
         connection.commit()
         return get_user_by_id(user_id, connection=connection)
-    except sqlite3.IntegrityError as exc:
-        raise ValueError("Username já está em uso.") from exc
+    except Exception as exc:
+        connection.rollback()
+        if using_postgres():
+            import psycopg
+            if isinstance(exc, psycopg.errors.UniqueViolation):
+                raise ValueError("Username já está em uso.") from exc
+        else:
+            import sqlite3
+            if isinstance(exc, sqlite3.IntegrityError):
+                raise ValueError("Username já está em uso.") from exc
+        raise
     finally:
         connection.close()

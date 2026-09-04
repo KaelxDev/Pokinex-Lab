@@ -1,0 +1,80 @@
+/* Pokinex — final message avatar positioning.
+   Keep incoming messages avatar-left and own messages avatar-right. */
+
+.message {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 34px !important;
+  column-gap: 10px !important;
+  align-items: start !important;
+}
+
+.message.other {
+  grid-template-columns: 34px minmax(0, 1fr) !important;
+}
+
+.message .message-avatar,
+.message .message-avatar-spacer {
+  grid-row: 1 !important;
+  margin-top: 18px !important;
+}
+
+.message.other .message-avatar,
+.message.other .message-avatar-spacer {
+  grid-column: 1 !important;
+}
+
+.message.other .message-main {
+  grid-column: 2 !important;
+}
+
+.message.mine .message-main {
+  grid-column: 1 !important;
+  justify-self: end !important;
+  width: min(100%, 760px) !important;
+}
+
+.message.mine .message-avatar,
+.message.mine .message-avatar-spacer {
+  grid-column: 2 !important;
+}
+
+.message.mine .message-main,
+.message.mine .message-row {
+  text-align: right !important;
+}
+
+.message.mine .message-user {
+  display: block !important;
+  text-align: right !important;
+  margin-right: 2px !important;
+  margin-left: 0 !important;
+}
+
+.message.mine .message-row {
+  display: block !important;
+}
+
+.message.mine .message-bubble-wrap {
+  margin-left: auto !important;
+  margin-right: 0 !important;
+}
+
+.message.mine .message-meta {
+  text-align: right !important;
+}
+
+@media (max-width: 520px) {
+  .message {
+    grid-template-columns: minmax(0, 1fr) 30px !important;
+    column-gap: 8px !important;
+  }
+
+  .message.other {
+    grid-template-columns: 30px minmax(0, 1fr) !important;
+  }
+
+  .message .message-avatar,
+  .message .message-avatar-spacer {
+    margin-top: 19px !important;
+  }
+}

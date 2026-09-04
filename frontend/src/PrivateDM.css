@@ -1,0 +1,373 @@
+/* Pokinex private direct messages */
+.user-dm-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.user-dm-trigger:hover:not(:disabled) {
+  background: rgba(255,255,255,.04);
+}
+
+.user-dm-trigger.self {
+  cursor: default;
+}
+
+.user-dm-trigger .user-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.user-dm-trigger .user-dm-hint {
+  opacity: 0;
+  color: #ff6a76;
+  font-size: 13px;
+  transition: opacity .15s ease, transform .15s ease;
+  transform: translateX(2px);
+}
+
+.user-dm-trigger:hover .user-dm-hint {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.private-dm-overlay {
+  position: fixed;
+  inset: 0 0 0 454px;
+  z-index: 1200;
+  display: flex;
+  flex-direction: column;
+  background: #090a0c;
+  color: #f4f5f7;
+  border-left: 1px solid rgba(255,255,255,.06);
+  box-shadow: -20px 0 60px rgba(0,0,0,.28);
+}
+
+.private-dm-header {
+  flex: 0 0 72px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 0 22px;
+  background: #15171b;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+}
+
+.private-dm-person,
+.private-dm-status {
+  display: flex;
+  align-items: center;
+}
+
+.private-dm-person {
+  gap: 12px;
+  min-width: 0;
+}
+
+.private-dm-person > div:last-child {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.private-dm-person strong {
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.private-dm-person > div:last-child span {
+  margin-top: 3px;
+  color: #777d89;
+  font-size: 11px;
+}
+
+.private-dm-back {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 9px;
+  background: rgba(255,255,255,.04);
+  color: #aeb3bd;
+  font-size: 19px;
+  cursor: pointer;
+}
+
+.private-dm-back:hover {
+  background: rgba(226,58,73,.12);
+  color: #fff;
+}
+
+.private-dm-avatar {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border-radius: 50%;
+  overflow: visible;
+  background: #1c2026;
+}
+
+.private-dm-avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.private-dm-avatar > span {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 11px;
+  height: 11px;
+  border: 2px solid #15171b;
+  border-radius: 50%;
+  background: #555b66;
+}
+
+.private-dm-avatar > span.online {
+  background: #36d07f;
+}
+
+.private-dm-status {
+  gap: 8px;
+  padding: 8px 11px;
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 999px;
+  background: rgba(255,255,255,.025);
+  color: #7f8590;
+  font-size: 10px;
+  letter-spacing: .03em;
+}
+
+.private-dm-status > span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #e23a49;
+}
+
+.private-dm-status > span.connected {
+  background: #36d07f;
+}
+
+.private-dm-messages {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 26px 5vw 18px;
+  scroll-behavior: smooth;
+}
+
+.private-dm-empty,
+.private-dm-loading {
+  margin: auto;
+  text-align: center;
+  max-width: 440px;
+}
+
+.private-dm-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.private-dm-lock {
+  width: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 14px;
+  border: 1px solid rgba(226,58,73,.24);
+  border-radius: 16px;
+  background: rgba(226,58,73,.08);
+  color: #ff6472;
+  font-size: 24px;
+}
+
+.private-dm-empty > span {
+  color: #7b818c;
+  font-size: 10px;
+  letter-spacing: .16em;
+}
+
+.private-dm-empty h2 {
+  margin: 10px 0 7px;
+  font-size: 25px;
+  letter-spacing: -.03em;
+}
+
+.private-dm-empty p {
+  margin: 0;
+  color: #747b87;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.private-dm-loading {
+  color: #737985;
+  font-size: 13px;
+}
+
+.private-dm-message {
+  display: flex;
+  flex-direction: column;
+  max-width: min(760px, 82%);
+}
+
+.private-dm-message.mine {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.private-dm-message.other {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+
+.private-dm-bubble {
+  padding: 10px 13px;
+  border-radius: 13px;
+  color: #e9ebef;
+  background: #1c2026;
+  border: 1px solid rgba(255,255,255,.045);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+  font-size: 14px;
+}
+
+.private-dm-message.mine .private-dm-bubble {
+  color: #fff;
+  background: #e23a49;
+}
+
+.private-dm-message time {
+  margin-top: 4px;
+  color: #5f6570;
+  font-size: 9px;
+}
+
+.private-dm-composer {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 12px 22px 5px;
+  background: #101216;
+  border-top: 1px solid rgba(255,255,255,.05);
+}
+
+.private-dm-composer textarea {
+  flex: 1;
+  min-height: 46px;
+  max-height: 150px;
+  resize: none;
+  padding: 12px 14px;
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 12px;
+  outline: none;
+  background: #21252b;
+  color: #f4f5f7;
+  font: inherit;
+  font-size: 14px;
+}
+
+.private-dm-composer textarea:focus {
+  border-color: rgba(226,58,73,.42);
+}
+
+.private-dm-composer textarea::placeholder {
+  color: #747a86;
+}
+
+.private-dm-composer button {
+  width: 46px;
+  height: 46px;
+  border: 0;
+  border-radius: 12px;
+  background: #9c2734;
+  color: #fff;
+  font-size: 21px;
+  cursor: pointer;
+}
+
+.private-dm-composer button:not(:disabled):hover {
+  background: #e23a49;
+  transform: translateY(-1px);
+}
+
+.private-dm-composer button:disabled {
+  opacity: .38;
+  cursor: not-allowed;
+}
+
+.private-dm-hint {
+  flex: 0 0 auto;
+  padding: 0 22px 11px;
+  background: #101216;
+  color: #555b66;
+  font-size: 9px;
+}
+
+.private-dm-error {
+  padding: 8px 22px;
+  color: #ff7581;
+  background: rgba(226,58,73,.08);
+  border-top: 1px solid rgba(226,58,73,.15);
+  font-size: 11px;
+}
+
+@media (max-width: 900px) {
+  .private-dm-overlay {
+    inset: 0;
+  }
+
+  .private-dm-header {
+    padding-inline: 14px;
+  }
+
+  .private-dm-messages {
+    padding-inline: 14px;
+  }
+
+  .private-dm-message {
+    max-width: 88%;
+  }
+}
+
+@media (max-width: 520px) {
+  .private-dm-header {
+    flex-basis: 64px;
+  }
+
+  .private-dm-status {
+    display: none;
+  }
+
+  .private-dm-composer {
+    padding-inline: 12px;
+  }
+
+  .private-dm-hint,
+  .private-dm-error {
+    padding-inline: 12px;
+  }
+
+  .private-dm-message {
+    max-width: 92%;
+  }
+}

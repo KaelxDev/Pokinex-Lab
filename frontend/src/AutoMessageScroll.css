@@ -1,41 +1,67 @@
 .auto-message-scroll-shell {
+  position: relative;
   width: 100%;
   min-height: 100dvh;
 }
 
 .auto-message-scroll-content {
+  position: relative;
+  z-index: 1;
   width: 100%;
   min-height: 100dvh;
 }
 
+/* Floating jump-to-latest control.
+   Keep it in the conversation area, above the composer, rather than over
+   the input itself. */
 .new-message-indicator {
   position: fixed;
-  left: 50%;
-  bottom: 74px;
+  right: 24px;
+  bottom: 102px;
   z-index: 900;
-  min-height: 40px;
-  padding: 9px 14px;
-  border: 1px solid rgba(88, 101, 242, 0.4);
-  border-radius: 999px;
-  background: rgba(21, 24, 33, 0.96);
-  color: #f5f7fa;
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 13px;
+  border: 1px solid rgba(226, 58, 73, 0.30);
+  border-radius: 10px;
+  background: rgba(18, 20, 25, 0.96);
+  color: #eceef2;
   font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.34);
-  transform: translateX(-50%);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.34);
+  transform: translateY(0);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
 }
 
 .new-message-indicator:hover {
-  transform: translateX(-50%) translateY(-1px);
+  background: rgba(32, 24, 27, 0.98);
+  border-color: rgba(255, 76, 91, 0.52);
+  color: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.42);
 }
 
-@media (max-width: 520px) {
+@media (max-width: 900px) {
   .new-message-indicator {
-    bottom: max(72px, calc(64px + env(safe-area-inset-bottom)));
-    min-height: 44px;
-    padding: 10px 15px;
+    right: 18px;
+    bottom: 98px;
+  }
+}
+
+@media (max-width: 700px) {
+  .new-message-indicator {
+    right: 14px;
+    bottom: calc(86px + env(safe-area-inset-bottom));
+    min-height: 40px;
+    padding: 9px 12px;
+    font-size: 11px;
   }
 }

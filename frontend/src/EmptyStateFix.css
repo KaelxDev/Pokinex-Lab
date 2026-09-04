@@ -1,0 +1,135 @@
+/* POKINEX — definitive empty conversation positioning */
+
+/* The empty state is positioned against the message viewport itself.
+   This intentionally avoids depending on flex/grid alignment rules from
+   the legacy stylesheet stack. */
+.messages.messages-empty {
+  position: relative !important;
+  min-height: 0 !important;
+  height: auto !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  display: block !important;
+}
+
+.messages.messages-empty::before,
+.messages.messages-empty::after {
+  display: none !important;
+  content: none !important;
+}
+
+.messages.messages-empty > .chat-empty-state {
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  width: min(100% - 48px, 560px) !important;
+  max-width: 560px !important;
+  margin: 0 !important;
+  padding: 28px 24px !important;
+  transform: translate(-50%, -50%) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  box-sizing: border-box !important;
+  z-index: 2 !important;
+  animation: px-empty-in 220ms ease-out;
+}
+
+.messages.messages-empty > .chat-empty-state .chat-empty-icon {
+  position: relative !important;
+  flex: 0 0 auto !important;
+  width: 72px !important;
+  height: 72px !important;
+  margin: 0 0 18px !important;
+}
+
+.messages.messages-empty > .chat-empty-state .chat-empty-icon img {
+  display: block !important;
+  width: 56px !important;
+  height: 56px !important;
+  margin: 8px auto 0 !important;
+  object-fit: cover !important;
+  border-radius: 16px !important;
+}
+
+.messages.messages-empty > .chat-empty-state .chat-empty-kicker {
+  margin: 0 0 7px !important;
+  color: #777c86 !important;
+  font-size: 8px !important;
+  font-weight: 800 !important;
+  letter-spacing: .14em !important;
+  text-transform: uppercase !important;
+}
+
+.messages.messages-empty > .chat-empty-state h2 {
+  margin: 0 !important;
+  color: #f4f5f7 !important;
+  font-size: 22px !important;
+  line-height: 1.15 !important;
+  text-align: center !important;
+}
+
+.messages.messages-empty > .chat-empty-state h2::after {
+  content: "" !important;
+  display: block !important;
+  width: 28px !important;
+  height: 2px !important;
+  margin: 12px auto 13px !important;
+  border-radius: 999px !important;
+  background: var(--px-red) !important;
+}
+
+.messages.messages-empty > .chat-empty-state p {
+  width: min(100%, 420px) !important;
+  margin: 0 !important;
+  color: #747983 !important;
+  font-size: 11px !important;
+  line-height: 1.65 !important;
+  text-align: center !important;
+}
+
+.messages.messages-empty > .chat-empty-state .chat-empty-hint,
+.messages.messages-empty > .chat-empty-state .chat-empty-status {
+  margin-top: 16px !important;
+}
+
+.messages.messages-empty > .history-loading {
+  position: absolute !important;
+  inset: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  color: #6c717a !important;
+  font-size: 11px !important;
+}
+
+@media (max-width: 700px) {
+  .messages.messages-empty > .chat-empty-state {
+    width: min(100% - 28px, 430px) !important;
+    padding: 22px 14px !important;
+  }
+
+  .messages.messages-empty > .chat-empty-state .chat-empty-icon {
+    width: 62px !important;
+    height: 62px !important;
+    margin-bottom: 14px !important;
+  }
+
+  .messages.messages-empty > .chat-empty-state .chat-empty-icon img {
+    width: 50px !important;
+    height: 50px !important;
+    border-radius: 14px !important;
+  }
+
+  .messages.messages-empty > .chat-empty-state h2 {
+    font-size: 19px !important;
+  }
+}
+
+@keyframes px-empty-in {
+  from { opacity: 0; transform: translate(-50%, calc(-50% + 8px)); }
+  to { opacity: 1; transform: translate(-50%, -50%); }
+}

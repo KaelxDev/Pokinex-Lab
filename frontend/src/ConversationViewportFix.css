@@ -1,0 +1,185 @@
+/* POKINEX — conversation viewport + final header polish */
+
+.auto-message-scroll-shell,
+.auto-message-scroll-content {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+}
+
+.app {
+  width: 100% !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  padding: 0 !important;
+  align-items: stretch !important;
+}
+
+.chat {
+  width: 100% !important;
+  height: 100dvh !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  align-self: stretch !important;
+}
+
+.chat-content {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.chat-header {
+  flex: 0 0 auto !important;
+}
+
+.chat-header-main {
+  min-width: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.chat-header .channel-copy {
+  min-width: 0 !important;
+}
+
+.chat-header .channel-title-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.chat-header .channel-title-row h1 {
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  color: #f7f7f8 !important;
+  font-size: 18px !important;
+  line-height: 1.1 !important;
+  font-weight: 780 !important;
+  letter-spacing: -.025em !important;
+}
+
+.chat-header .channel-hash {
+  color: #a4a7ae !important;
+  font-weight: 650 !important;
+}
+
+.chat-header .channel-topic {
+  margin: 4px 0 0 !important;
+  color: #656a74 !important;
+}
+
+/* Remove the old standalone channel symbol spacing left by previous themes. */
+.chat-header .channel-symbol {
+  display: none !important;
+}
+
+/* Cleaner secondary action for signing out. */
+.chat-header .logout {
+  min-width: 76px !important;
+  min-height: 38px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  padding: 0 13px !important;
+  border: 1px solid rgba(255,255,255,.085) !important;
+  border-radius: 10px !important;
+  background: rgba(255,255,255,.025) !important;
+  color: #b8bbc2 !important;
+  font-size: 12px !important;
+  font-weight: 650 !important;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease, transform 150ms ease !important;
+}
+
+.chat-header .logout:hover {
+  background: rgba(226,58,73,.10) !important;
+  border-color: rgba(226,58,73,.30) !important;
+  color: #fff !important;
+  transform: translateY(-1px) !important;
+}
+
+.chat-header .logout:active {
+  transform: translateY(0) !important;
+}
+
+.chat-header .logout-icon {
+  display: inline-grid !important;
+  place-items: center !important;
+  width: 18px !important;
+  height: 18px !important;
+  color: #d6d8dd !important;
+  font-size: 18px !important;
+  line-height: 1 !important;
+  transform: rotate(180deg);
+}
+
+.chat-header .logout:hover .logout-icon {
+  color: #ff6a76 !important;
+}
+
+.messages {
+  flex: 1 1 0 !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  align-self: stretch !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+.messages.messages-empty {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  align-content: center !important;
+  gap: 0 !important;
+  padding: 24px !important;
+}
+
+.messages.messages-empty > .chat-empty-state {
+  position: static !important;
+  inset: auto !important;
+  width: min(100%, 520px) !important;
+  margin: 0 !important;
+  padding: 30px 24px !important;
+  flex: 0 0 auto !important;
+  transform: none !important;
+}
+
+/* The status pill below the empty-state copy is no longer needed. */
+.chat-empty-state .chat-empty-status {
+  display: none !important;
+}
+
+.composer-zone {
+  flex: 0 0 auto !important;
+}
+
+@media (max-width: 700px) {
+  .messages.messages-empty {
+    padding: 16px !important;
+  }
+
+  .messages.messages-empty > .chat-empty-state {
+    width: min(100%, 420px) !important;
+    padding: 24px 14px !important;
+  }
+
+  .chat-header .logout {
+    min-width: 44px !important;
+    width: 44px !important;
+    padding: 0 !important;
+  }
+
+  .chat-header .logout > span:last-child {
+    display: none !important;
+  }
+}

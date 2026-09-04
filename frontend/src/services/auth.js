@@ -1,5 +1,6 @@
-const API_HOST = window.location.hostname || "localhost";
-const API_URL = `http://${API_HOST}:8000/api/auth`;
+const DEFAULT_API_URL = "https://nexchat-backend-2cyf.onrender.com/api/auth";
+const LOCAL_API_URL = `http://${window.location.hostname}:8000/api/auth`;
+const API_URL = import.meta.env.VITE_API_URL || (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" ? LOCAL_API_URL : DEFAULT_API_URL);
 const TOKEN_KEY = "poknex_auth_token";
 
 function formatApiError(detail, fallback = "Erro na autenticação.") {
@@ -16,19 +17,32 @@ function formatApiError(detail, fallback = "Erro na autenticação.") {
   return fallback;
 }
 
+async function readResponseData(response) {
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
 async function request(path, options = {}) {
   const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
+
   let response;
   try {
-    response = await fetch(`${API_URL}${path}`, { ...options, headers });
+    response = await fetch(`${API_URL}${path}`, {
+      ...options,
+      headers,
+      credentials: "include",
+    });
   } catch (error) {
     console.error("Falha de conexão com a API:", error);
-    throw new Error("Não foi possível conectar ao backend. Verifique se o servidor está rodando na porta 8000.");
+    throw new Error("Não foi possível conectar ao backend.");
   }
-  let data = null;
-  try { data = await response.json(); } catch {}
+
+  const data = await readResponseData(response);
   if (!response.ok) throw new Error(formatApiError(data?.detail));
   return data;
 }
@@ -40,34 +54,104 @@ export function hasToken() { return !!getToken(); }
 
 export async function register(username, password) {
   const data = await request("/register", { method: "POST", body: JSON.stringify({ username, password }) });
-  saveToken(data.token); return data.user;
+  clearToken();
+  return data.user;
 }
+
 export async function login(username, password) {
   const data = await request("/login", { method: "POST", body: JSON.stringify({ username, password }) });
-  saveToken(data.token); return data.user;
+  clearToken();
+  return data.user;
 }
-export async function me() { return (await request("/me")).user; }
-export async function getPublicProfile(userId) { return (await request(`/users/${encodeURIComponent(userId)}`)).user; }
 
-export async function uploadAvatar(file) {
-  const formData = new FormData();
-  formData.append("file", file);
+export async function me() {
+  const hasLegacyToken = !!getToken();
+  const user = (await request("/me")).user;
+  if (hasLegacyToken) clearToken();
+  return user;
+}
+
+export async function getPublicProfile(userId) {
+  return (await request(`/users/${encodeURIComponent(userId)}`)).user;
+}
+
+export async function getMessageHistory(limit = 50, before = null) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (before) params.set("before", before);
+  const historyUrl = API_URL.replace(/\/api\/auth\/?$/, "/api/messages");
   const token = getToken();
   const headers = token ? { Authorization: `Bearer ${token}` } : {};
   let response;
   try {
-    response = await fetch(`${API_URL}/avatar`, { method: "POST", headers, body: formData });
+    response = await fetch(`${historyUrl}?${params.toString()}`, {
+      headers,
+      credentials: "include",
+    });
+  } catch (error) {
+    console.error("Falha ao carregar histórico:", error);
+    throw new Error("Não foi possível carregar o histórico.");
+  }
+
+  const data = await readResponseData(response);
+  if (!response.ok) throw new Error(formatApiError(data?.detail, "Não foi possível carregar o histórico."));
+  return data;
+}
+
+export async function uploadAvatar(file) {
+  if (!(file instanceof File)) {
+    throw new Error("Selecione uma imagem válida.");
+  }
+
+  const formData = new FormData();
+  formData.append("file", file, file.name || "avatar");
+  const token = getToken();
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+  let response;
+  try {
+    response = await fetch(`${API_URL}/avatar`, {
+      method: "POST",
+      headers,
+      body: formData,
+      credentials: "include",
+    });
   } catch (error) {
     console.error("Falha ao enviar avatar:", error);
-    throw new Error("Não foi possível enviar a imagem ao backend.");
+    throw new Error("Não foi possível conectar ao backend para enviar a imagem.");
   }
-  let data = null;
-  try { data = await response.json(); } catch {}
-  if (!response.ok) throw new Error(formatApiError(data?.detail, "Não foi possível enviar a imagem."));
+
+  const data = await readResponseData(response);
+  if (!response.ok) {
+    const message = formatApiError(
+      data?.detail,
+      `Não foi possível enviar a imagem (HTTP ${response.status}).`,
+    );
+    throw new Error(message);
+  }
+
+  if (!data?.avatar) {
+    throw new Error("O backend não retornou o endereço do avatar.");
+  }
+
   return data.avatar;
 }
 
 export async function updateProfile(profile) {
-  return (await request("/profile", { method: "PATCH", body: JSON.stringify({ username: profile.username, displayName: profile.displayName, avatar: profile.avatar || "", status: profile.status || "" }) })).user;
+  return (await request("/profile", {
+    method: "PATCH",
+    body: JSON.stringify({
+      username: profile.username,
+      displayName: profile.displayName,
+      avatar: profile.avatar || "",
+      status: profile.status || "",
+    }),
+  })).user;
 }
-export async function logout() { try { await request("/logout", { method: "POST" }); } finally { clearToken(); } }
+
+export async function logout() {
+  try {
+    await request("/logout", { method: "POST" });
+  } finally {
+    clearToken();
+  }
+}
