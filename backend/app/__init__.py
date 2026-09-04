@@ -8,6 +8,7 @@ from fastapi import WebSocket
 
 from .auth import get_user_from_token
 from .moderation_bot import ModerationBot, ModerationResult, moderation_bot
+from .roles import get_user_role, is_owner
 from .websocket.chat import manager
 from .websocket.schemas import ChatMessageEvent
 
@@ -16,6 +17,40 @@ _LAUGHTER_RUN = re.compile(r"([kha])\1{8,}", re.IGNORECASE)
 _current_message_id = ContextVar("pokinex_current_message_id", default=None)
 _pending_cleanup_ids = ContextVar("pokinex_pending_cleanup_ids", default=None)
 _original_moderate = ModerationBot.moderate
+
+
+def _owner_aware_is_moderator(user) -> bool:
+    return is_owner(user) or (
+        str(user.get("role", "")).casefold() in {"moderator", "staff", "owner"}
+        if user.get("role")
+        else _configured_moderator(user)
+    )
+
+
+def _configured_moderator(user) -> bool:
+    import os
+
+    ids = {
+        item.strip()
+        for item in os.getenv("POKINEX_MODERATOR_IDS", "").split(",")
+        if item.strip()
+    }
+    usernames = {
+        item.strip().casefold()
+        for item in os.getenv("POKINEX_MODERATOR_USERNAMES", "").split(",")
+        if item.strip()
+    }
+    user_id = str(user.get("id", "")).strip()
+    username = str(user.get("username", "")).strip().casefold()
+    return (bool(user_id) and user_id in ids) or (
+        bool(username) and username in usernames
+    )
+
+
+# main.py imports this symbol after the package initializer has executed.
+import sys
+_moderation_module = sys.modules["app.moderation_bot"]
+_moderation_module.is_moderator = _owner_aware_is_moderator
 
 
 def _moderate_with_pokinex_rules(self, message, user_id=None):
@@ -148,7 +183,37 @@ async def _purge_repeated_messages(websocket: WebSocket, user, message_ids: list
 _original_send_json = WebSocket.send_json
 
 
+def _with_role(data):
+    if not isinstance(data, dict):
+        return data
+
+    if data.get("type") == "users" and isinstance(data.get("users"), list):
+        users = []
+        for user in data["users"]:
+            current = dict(user)
+            if is_owner(current):
+                current["role"] = "owner"
+            elif current.get("role") not in {"bot", "moderator", "member"}:
+                current["role"] = "moderator" if _configured_moderator(current) else "member"
+            users.append(current)
+        return {**data, "users": users}
+
+    if data.get("type") in {"message", "message_edited"}:
+        if is_owner({"id": data.get("userId"), "username": data.get("username", "")}):
+            return {**data, "role": "owner"}
+        if data.get("userId") != "moderation-bot" and not data.get("role"):
+            return {**data, "role": "member"}
+
+    if data.get("type") == "profile_updated" and isinstance(data.get("user"), dict):
+        profile = dict(data["user"])
+        profile["role"] = get_user_role(profile)
+        return {**data, "user": profile}
+
+    return data
+
+
 async def _send_json_with_moderation_countdown(self, data, *args, **kwargs):
+    data = _with_role(data)
     cleanup_ids = []
     if isinstance(data, dict) and data.get("type") == "moderation":
         action = data.get("action")
