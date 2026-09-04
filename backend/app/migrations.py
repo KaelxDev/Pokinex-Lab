@@ -71,8 +71,7 @@ def _migration_001_baseline(connection, postgres: bool) -> None:
             reaction TEXT NOT NULL,
             created_at TEXT NOT NULL,
             PRIMARY KEY (message_id, user_id, reaction),
-            FOREIGN KEY (message_id) REFERENCES messages(message_id) ON DELETE CASCADE,
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            FOREIGN KEY (message_id) REFERENCES messages(message_id) ON DELETE CASCADE
         );
         CREATE INDEX IF NOT EXISTS idx_reactions_message_id ON message_reactions(message_id);
         """
@@ -129,7 +128,6 @@ def _migration_005_direct_messages(connection, postgres: bool) -> None:
 
 
 def _migration_006_direct_message_features(connection, postgres: bool) -> None:
-    placeholder = "%s" if postgres else "?"
     if postgres:
         connection.execute("ALTER TABLE direct_messages ADD COLUMN IF NOT EXISTS reply_to_message_id TEXT")
         connection.execute("CREATE INDEX IF NOT EXISTS idx_direct_messages_reply_to ON direct_messages(reply_to_message_id)")
