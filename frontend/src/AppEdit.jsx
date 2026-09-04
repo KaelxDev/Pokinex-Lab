@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { logout as logoutRequest, updateProfile, uploadAvatar } from "./services/auth";
 import AuthScreen from "./components/AuthScreen";
 import ChatHeader from "./components/ChatHeader";
@@ -8,10 +8,10 @@ import MessageContextMenu from "./components/MessageContextMenu";
 import MessageList from "./components/MessageList";
 import ProfileModal from "./components/ProfileModal";
 import { useAuthSession } from "./hooks/useAuthSession";
+import { useChatActions } from "./hooks/useChatActions";
 import { useChatConnection } from "./hooks/useChatConnection";
 import { useChatHistory } from "./hooks/useChatHistory";
 import { useUserProfiles } from "./hooks/useUserProfiles";
-import { copyText } from "./utils/chat";
 
 export default function AppEdit() {
   const { authChecked, user, userRef, syncUser, logout } = useAuthSession();
@@ -36,15 +36,55 @@ export default function AppEdit() {
   const [profileSaving, setProfileSaving] = useState(false);
   const [selectedAvatarFile, setSelectedAvatarFile] = useState(null);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState("");
-  const [contextMenu, setContextMenu] = useState(null);
-  const [editingId, setEditingId] = useState(null);
-  const [editingText, setEditingText] = useState("");
-  const [editSaving, setEditSaving] = useState(false);
-  const [editError, setEditError] = useState("");
   const [replyingTo, setReplyingTo] = useState(null);
-  const [reactionPickerMessageId, setReactionPickerMessageId] = useState(null);
-  const longPressRef = useRef(null);
-  const mergeUserRef = useRef(null);
+
+  function isConnected() {
+    return connected;
+  }
+
+  function getSocket() {
+    return socketRef.current;
+  }
+
+  const {
+    contextMenu,
+    setContextMenu,
+    editingId,
+    setEditingId,
+    editingText,
+    setEditingText,
+    editSaving,
+    setEditSaving,
+    editError,
+    setEditError,
+    reactionPickerMessageId,
+    setReactionPickerMessageId,
+    sendMessage,
+    beginEdit,
+    cancelEdit,
+    saveEdit,
+    confirmDelete,
+    beginReply,
+    handleReaction,
+    toggleReactionPicker,
+    openContextMenu,
+    startLongPress,
+    endLongPress,
+    copyMessage,
+    flushQueue,
+  } = useChatActions({
+    user,
+    userRef,
+    isConnected,
+    getSocket,
+    messageInput,
+    setMessageInput,
+    replyingTo,
+    setReplyingTo,
+    offlineQueue,
+    setOfflineQueue,
+    setMessages,
+  });
 
   useEffect(() => {
     return () => {
@@ -288,7 +328,7 @@ export default function AppEdit() {
         { ...data, timestamp: data.timestamp || Date.now() },
       ]);
     }
-  }, [clearLocalHistory, contextMenu?.message?.messageId, editingId, mergeUser, reactionPickerMessageId, replyingTo?.messageId, setMessages, setOfflineQueue, syncProfile, userRef]);
+  }, [clearLocalHistory, contextMenu?.message?.messageId, editingId, mergeUser, reactionPickerMessageId, replyingTo?.messageId, setEditError, setEditSaving, setEditingId, setEditingText, setMessages, setOfflineQueue, setReactionPickerMessageId, setReplyingTo, setContextMenu, syncProfile, userRef]);
 
   const handleConnectionOpen = useCallback(({ reconnected } = {}) => {
     if (reconnected) void loadMessageHistory();
@@ -307,243 +347,8 @@ export default function AppEdit() {
   });
 
   useEffect(() => {
-    mergeUserRef.current = mergeUser;
-  }, [mergeUser]);
-
-  function flushQueue() {
-    const socket = socketRef.current;
-    if (!socket || offlineQueue.length === 0) return;
-
-    for (const item of offlineQueue) {
-      setMessages((current) =>
-        current.map((message) =>
-          message.messageId === item.id
-            ? { ...message, offline: false, deliveryStatus: "sending" }
-            : message,
-        ),
-      );
-      socket.sendMessage(item.message, item.id);
-    }
-  }
-
-  useEffect(() => {
     if (connected) flushQueue();
-  }, [connected]);
-
-  useEffect(() => {
-    function closeOverlays() {
-      setContextMenu(null);
-      setReactionPickerMessageId(null);
-    }
-
-    window.addEventListener("click", closeOverlays);
-    return () => window.removeEventListener("click", closeOverlays);
-  }, []);
-
-  useEffect(() => () => clearTimeout(longPressRef.current), []);
-
-  function sendMessage(event) {
-    event.preventDefault();
-    const text = messageInput.trim();
-    if (!text) return;
-
-    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const sender = userRef.current;
-    const role = String(sender?.role || "").toLowerCase();
-    const isStaff = ["owner", "admin", "moderator", "staff"].includes(role);
-    const isClearAllCommand =
-      connected &&
-      isStaff &&
-      /^(?:!clear|!purge)\s+all$/i.test(text);
-
-    const optimistic = {
-      type: "message",
-      messageId: id,
-      userId: sender?.id,
-      username: sender?.username,
-      displayName: sender?.displayName,
-      avatar: sender?.avatar || "",
-      status: sender?.status || "",
-      role: sender?.role || "member",
-      message: text,
-      timestamp: Date.now(),
-      offline: !connected,
-      deliveryStatus: connected ? "sending" : "pending",
-      reactions: {},
-      ...(isClearAllCommand ? { ephemeral: true, moderationCommand: true } : {}),
-      ...(replyingTo
-        ? {
-            replyTo: {
-              messageId: replyingTo.messageId,
-              userId: replyingTo.userId,
-              username: replyingTo.username,
-              displayName: replyingTo.displayName,
-              message: replyingTo.message,
-              deleted: replyingTo.deleted,
-            },
-          }
-        : {}),
-    };
-
-    setMessages((current) => [...current, optimistic]);
-
-    const sent = connected &&
-      (replyingTo
-        ? socketRef.current?.sendReplyMessage(text, id, replyingTo.messageId)
-        : socketRef.current?.sendMessage(text, id));
-
-    if (!sent) {
-      setOfflineQueue((current) => [
-        ...current,
-        {
-          id,
-          message: text,
-          createdAt: Date.now(),
-          userId: sender?.id,
-          username: sender?.username,
-          displayName: sender?.displayName,
-          avatar: sender?.avatar || "",
-          ...(replyingTo ? { replyTo: { messageId: replyingTo.messageId } } : {}),
-        },
-      ]);
-    }
-
-    setMessageInput("");
-    setReplyingTo(null);
-  }
-
-  function beginEdit(message) {
-    setContextMenu(null);
-    setReactionPickerMessageId(null);
-    setEditError("");
-    setEditingId(message.messageId);
-    setEditingText(message.message);
-    setReplyingTo(null);
-  }
-
-  function cancelEdit() {
-    if (editSaving) return;
-    setEditingId(null);
-    setEditingText("");
-    setEditError("");
-  }
-
-  function saveEdit(event) {
-    event.preventDefault();
-    const text = editingText.trim();
-    if (!editingId || !text) {
-      setEditError("A mensagem não pode ficar vazia.");
-      return;
-    }
-    if (!connected || !socketRef.current?.sendEditMessage(editingId, text)) {
-      setEditError("Aguardando conexão para editar.");
-      return;
-    }
-
-    setEditSaving(true);
-    setMessages((current) =>
-      current.map((message) =>
-        message.messageId === editingId
-          ? { ...message, message: text, edited: true, editPending: true }
-          : message,
-      ),
-    );
-    setEditingId(null);
-    setEditingText("");
-  }
-
-  function deleteMessage(message) {
-    setContextMenu(null);
-    setReactionPickerMessageId(null);
-    if (!connected || !socketRef.current?.sendDeleteMessage(message.messageId)) return;
-
-    setMessages((current) =>
-      current.map((item) =>
-        item.messageId === message.messageId
-          ? {
-              ...item,
-              message: "Esta mensagem foi excluída",
-              deleted: true,
-              deletePending: true,
-            }
-          : item,
-      ),
-    );
-  }
-
-  function confirmDelete(message) {
-    if (window.confirm("Excluir esta mensagem?")) deleteMessage(message);
-    else setContextMenu(null);
-  }
-
-  function beginReply(message) {
-    setContextMenu(null);
-    setReactionPickerMessageId(null);
-    setEditingId(null);
-    setEditError("");
-    setReplyingTo(message);
-  }
-
-  function handleReaction(messageId, reaction) {
-    if (!connected || !socketRef.current?.sendReaction(messageId, reaction)) return;
-    setReactionPickerMessageId(null);
-  }
-
-  function toggleReactionPicker(event, messageId) {
-    event.preventDefault();
-    event.stopPropagation();
-    setContextMenu(null);
-    setReactionPickerMessageId((current) => (current === messageId ? null : messageId));
-  }
-
-  function openContextMenu(event, message) {
-    event.preventDefault();
-    event.stopPropagation();
-    setReactionPickerMessageId(null);
-    const isMine =
-      message.userId != null
-        ? String(message.userId) === String(user?.id)
-        : String(message.username || "") === String(user?.username || "");
-
-    setContextMenu({
-      x: Math.max(8, Math.min(event.clientX, window.innerWidth - 190)),
-      y: Math.max(8, Math.min(event.clientY, window.innerHeight - 210)),
-      message,
-      isMine,
-    });
-  }
-
-  function startLongPress(event, message) {
-    if (event.touches.length !== 1) return;
-    clearTimeout(longPressRef.current);
-    longPressRef.current = setTimeout(() => {
-      const touch = event.touches[0];
-      openContextMenu(
-        {
-          preventDefault() {},
-          stopPropagation() {},
-          clientX: touch.clientX,
-          clientY: touch.clientY,
-        },
-        message,
-      );
-      navigator.vibrate?.(20);
-    }, 550);
-  }
-
-  function endLongPress() {
-    clearTimeout(longPressRef.current);
-  }
-
-  async function copyMessage(message) {
-    if (message.deleted) return;
-    try {
-      await copyText(message.message);
-      setContextMenu(null);
-    } catch (error) {
-      console.error("Não foi possível copiar:", error);
-    }
-  }
+  }, [connected, flushQueue]);
 
   async function handleLogout() {
     try {
