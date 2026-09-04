@@ -1,5 +1,6 @@
 """Package-level compatibility hooks for the Pokinex moderation engine."""
 
+from contextvars import ContextVar
 import re
 import time
 
@@ -11,17 +12,17 @@ from .websocket.chat import manager
 from .websocket.schemas import ChatMessageEvent
 
 
-# Laughter such as "kkkkkkkk" is normal chat behavior. Other repeated
-# characters keep the stricter moderation behavior.
 _LAUGHTER_RUN = re.compile(r"([kha])\1{8,}", re.IGNORECASE)
+_current_message_id = ContextVar("pokinex_current_message_id", default=None)
+_pending_cleanup_ids = ContextVar("pokinex_pending_cleanup_ids", default=None)
 _original_moderate = ModerationBot.moderate
 
 
 def _moderate_with_pokinex_rules(self, message, user_id=None):
     safe_message = _LAUGHTER_RUN.sub(lambda match: match.group(1) * 4, message)
+    current_message_id = _current_message_id.get()
+    _pending_cleanup_ids.set([])
 
-    current_message_id = getattr(self, "_current_message_id", None)
-    self._pending_cleanup_ids = []
     history = getattr(self, "_duplicate_burst_history", None)
     if history is None:
         history = {}
@@ -43,14 +44,14 @@ def _moderate_with_pokinex_rules(self, message, user_id=None):
         if entries:
             count = len(entries) + 1
             if count >= threshold:
-                self._pending_cleanup_ids = [
+                cleanup_ids = [
                     entry[2] for entry in entries[-4:] if entry[2]
                 ]
+                _pending_cleanup_ids.set(cleanup_ids)
                 entries.clear()
                 return ModerationResult(
                     False,
-                    "A mesma mensagem foi enviada 5 vezes seguidas."
-                    " Uma ocorrência foi registrada.",
+                    "A mesma mensagem foi enviada 5 vezes seguidas. Uma ocorrência foi registrada.",
                     "🔁 Ocorrência registrada por repetição excessiva. As 4 mensagens anteriores foram removidas e esta tentativa foi bloqueada.",
                     "duplicate_burst",
                     "duplicate_burst",
@@ -58,9 +59,6 @@ def _moderate_with_pokinex_rules(self, message, user_id=None):
                     0,
                 )
 
-            # The base engine has a single-duplicate rule. During the first
-            # four copies of a burst, give that internal check a unique marker;
-            # the actual message shown/stored by the chat remains unchanged.
             internal_message = (
                 f"{safe_message} [pokinex-duplicate-check-"
                 f"{count}-{current_message_id or now}]"
@@ -111,14 +109,14 @@ async def _send_json_with_moderation_countdown(self, data, *args, **kwargs):
         action = data.get("action")
 
         if action == "duplicate_burst":
-            cleanup_ids = list(getattr(moderation_bot, "_pending_cleanup_ids", []))
+            cleanup_ids = list(_pending_cleanup_ids.get() or [])
             if cleanup_ids:
                 data = {
                     **data,
                     "removeMessageIds": cleanup_ids,
                     "cleanupCount": len(cleanup_ids),
                 }
-            moderation_bot._pending_cleanup_ids = []
+            _pending_cleanup_ids.set([])
 
         if action in {"blocked", "duplicate", "flood", "muted", "duplicate_burst"}:
             token = self.cookies.get("session")
@@ -140,16 +138,16 @@ async def _send_json_with_moderation_countdown(self, data, *args, **kwargs):
 WebSocket.send_json = _send_json_with_moderation_countdown
 
 
-# main.py receives the public messageId only through ChatMessageEvent. Capture
-# it at validation time so the moderation engine can associate the five-copy
-# burst with the four persisted messages that must be removed.
 _original_chat_event_validate = ChatMessageEvent.model_validate
 
 
 @classmethod
 def _chat_event_model_validate(cls, obj, *args, **kwargs):
-    moderation_bot._current_message_id = obj.get("messageId") if isinstance(obj, dict) else None
-    return _original_chat_event_validate(obj, *args, **kwargs)
+    token = _current_message_id.set(
+        obj.get("messageId") if isinstance(obj, dict) else None
+    )
+    result = _original_chat_event_validate(obj, *args, **kwargs)
+    return result
 
 
 ChatMessageEvent.model_validate = _chat_event_model_validate
