@@ -103,56 +103,94 @@ const EXTRA_CATEGORIES = [
 export default function EmojiPickerExtra({ onSelect }) {
   const [extraOpen, setExtraOpen] = useState(false);
   const [activeExtra, setActiveExtra] = useState(EXTRA_CATEGORIES[0].id);
+  const [query, setQuery] = useState("");
   const active = EXTRA_CATEGORIES.find((category) => category.id === activeExtra) || EXTRA_CATEGORIES[0];
 
-  const extraEmojis = useMemo(() => active.emojis, [active]);
+  const filtered = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) return active.emojis;
+    return EXTRA_CATEGORIES.flatMap((category) => category.emojis).filter(([, keywords]) => keywords.includes(normalized));
+  }, [active, query]);
+
+  function closeExtra() {
+    setQuery("");
+    setExtraOpen(false);
+  }
 
   return (
     <div className="emoji-picker-extra-shell">
-      <EmojiPicker onSelect={onSelect} />
-      <button
-        type="button"
-        className={`emoji-more-toggle${extraOpen ? " active" : ""}`}
-        onClick={() => setExtraOpen((current) => !current)}
-        aria-expanded={extraOpen}
-      >
-        <span>✨</span>
-        <span>{extraOpen ? "Menos emojis" : "Mais emojis"}</span>
-        <span className="emoji-more-chevron">{extraOpen ? "⌃" : "⌄"}</span>
-      </button>
-      {extraOpen && (
-        <div className="emoji-extra-panel">
-          <div className="emoji-extra-tabs">
-            {EXTRA_CATEGORIES.map((category) => (
-              <button
-                key={category.id}
-                type="button"
-                className={activeExtra === category.id ? "active" : ""}
-                onClick={() => setActiveExtra(category.id)}
-                title={category.label}
-                aria-label={category.label}
-              >
-                {category.icon}
+      <div className="emoji-picker-base">
+        <EmojiPicker onSelect={onSelect} />
+        <button
+          type="button"
+          className={`emoji-main-new-toggle${extraOpen ? " active" : ""}`}
+          onClick={() => setExtraOpen((current) => !current)}
+          aria-expanded={extraOpen}
+          aria-label={extraOpen ? "Voltar aos emojis principais" : "Abrir novos emojis"}
+          title={extraOpen ? "Voltar" : "Novos emojis"}
+        >
+          ✨
+        </button>
+
+        {extraOpen && (
+          <section className="emoji-new-overlay" role="dialog" aria-label="Novos emojis">
+            <header className="emoji-new-header">
+              <button type="button" className="emoji-new-back" onClick={closeExtra} aria-label="Voltar aos emojis principais">
+                ←
               </button>
-            ))}
-          </div>
-          <div className="emoji-extra-title">{active.label}</div>
-          <div className="emoji-extra-grid">
-            {extraEmojis.map(([emoji, keywords], index) => (
-              <button
-                key={`${emoji}-${index}`}
-                type="button"
-                className="emoji-extra-cell"
-                onClick={() => onSelect(emoji)}
-                title={keywords}
-                aria-label={keywords}
-              >
-                {emoji}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+              <div className="emoji-new-heading">
+                <strong>Novos emojis</strong>
+                <span>Mais opções para suas mensagens</span>
+              </div>
+            </header>
+
+            <div className="emoji-new-category-rail" aria-label="Categorias dos novos emojis">
+              {EXTRA_CATEGORIES.map((category) => (
+                <button
+                  key={category.id}
+                  type="button"
+                  className={activeExtra === category.id && !query ? "active" : ""}
+                  onClick={() => { setQuery(""); setActiveExtra(category.id); }}
+                  title={category.label}
+                  aria-label={category.label}
+                >
+                  <span>{category.icon}</span>
+                  <small>{category.label}</small>
+                </button>
+              ))}
+            </div>
+
+            <div className="emoji-new-content">
+              <div className="emoji-new-search">
+                <span aria-hidden="true">⌕</span>
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Pesquisar nos novos emojis..."
+                  aria-label="Pesquisar nos novos emojis"
+                />
+              </div>
+
+              <div className="emoji-new-title">{query ? "Resultados" : active.label}</div>
+              <div className="emoji-new-grid">
+                {filtered.map(([emoji, keywords], index) => (
+                  <button
+                    key={`${emoji}-${index}`}
+                    type="button"
+                    className="emoji-new-cell"
+                    onClick={() => onSelect(emoji)}
+                    title={keywords}
+                    aria-label={keywords}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+                {!filtered.length && <div className="emoji-new-empty">Nenhum emoji encontrado.</div>}
+              </div>
+            </div>
+          </section>
+        )}
+      </div>
     </div>
   );
 }
