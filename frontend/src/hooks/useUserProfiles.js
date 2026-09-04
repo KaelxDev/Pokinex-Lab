@@ -33,21 +33,44 @@ export function useUserProfiles(messages, users, profilesById, setProfilesById, 
 
       getPublicProfile(id)
         .then((remote) => {
-          setProfilesById((current) => ({
-            ...current,
-            [remote.id]: remote,
-          }));
+          setProfilesById((current) => {
+            const existing = current[remote.id] || {};
+            return {
+              ...current,
+              [remote.id]: {
+                ...existing,
+                ...remote,
+                ...(remote?.role == null && existing?.role
+                  ? { role: existing.role }
+                  : {}),
+              },
+            };
+          });
+
           setUsers((current) =>
             current.map((item) =>
               String(item.id) === String(remote.id)
-                ? { ...item, ...remote }
+                ? {
+                    ...item,
+                    ...remote,
+                    ...(remote?.role == null && item?.role
+                      ? { role: item.role }
+                      : {}),
+                  }
                 : item,
             ),
           );
+
           setMessages((current) =>
             current.map((item) =>
               String(item.userId) === String(remote.id)
-                ? { ...item, ...remote }
+                ? {
+                    ...item,
+                    ...remote,
+                    ...(remote?.role == null && item?.role
+                      ? { role: item.role }
+                      : {}),
+                  }
                 : item,
             ),
           );
