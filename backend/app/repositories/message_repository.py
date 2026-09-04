@@ -1,40 +1,7 @@
 """Persistence operations for public chat messages and reactions."""
 
 from app.infrastructure.database import get_connection, postgres_or_sqlite, using_postgres
-
-
-def _persistent_avatar_reference(connection, user_id, fallback=""):
-    query = postgres_or_sqlite(
-        "SELECT updated_at FROM user_avatars WHERE user_id = %s",
-        "SELECT updated_at FROM user_avatars WHERE user_id = ?",
-    )
-    row = connection.execute(query, (user_id,)).fetchone()
-    if row:
-        version = str(row["updated_at"] or "")
-        return (
-            f"/api/auth/avatar/{user_id}?v={version}"
-            if version
-            else f"/api/auth/avatar/{user_id}"
-        )
-
-    fallback_value = str(fallback or "").strip()
-    if fallback_value.startswith("/api/auth/avatar/") or fallback_value.startswith("/media/"):
-        return ""
-    return fallback_value
-
-
-def _profile_from_row(connection, row):
-    if not row:
-        return None
-    user = {
-        "id": row["id"],
-        "username": row["username"],
-        "displayName": row["display_name"],
-        "avatar": row["avatar"] or "",
-        "status": row["status"],
-    }
-    user["avatar"] = _persistent_avatar_reference(connection, user["id"], user["avatar"])
-    return user
+from app.repositories.user_repository import persistent_avatar_reference
 
 
 def save_message(message_id, user_id, message, created_at, reply_to_message_id=None):
@@ -97,7 +64,11 @@ def get_message(message_id):
         if not row:
             return None
         result = dict(row)
-        result["avatar"] = _persistent_avatar_reference(connection, result["user_id"], result["avatar"])
+        result["avatar"] = persistent_avatar_reference(
+            connection,
+            result["user_id"],
+            result["avatar"],
+        )
         return result
     finally:
         connection.close()
