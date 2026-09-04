@@ -77,8 +77,7 @@ def clear_all_messages() -> list[str]:
     message_ids = clear_recent_messages(limit=None)
     if message_ids:
         message_ids[0] = f"{CLEAR_ALL_MARKER}{message_ids[0]}"
-        return message_ids
-    return [CLEAR_ALL_MARKER]
+    return message_ids
 
 
 def delete_single_message(message_id: str) -> bool:
