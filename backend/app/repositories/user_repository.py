@@ -1,6 +1,6 @@
 """Persistence helpers for user-facing profile data."""
 
-from app.infrastructure.database import get_connection, postgres_or_sqlite
+from app.infrastructure.database import postgres_or_sqlite
 
 
 def persistent_avatar_reference(connection, user_id, fallback=""):
