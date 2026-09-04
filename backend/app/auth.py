@@ -3,11 +3,8 @@ import hashlib
 import hmac
 import secrets
 
-from app.database import (
-    _persistent_avatar_reference,
-    get_connection,
-    using_postgres,
-)
+from app.infrastructure.database import get_connection, using_postgres
+from app.repositories.user_repository import persistent_avatar_reference
 from app.roles import get_user_role
 
 SESSION_DAYS = 30
@@ -67,7 +64,7 @@ def _user_payload(row, connection) -> dict:
         "id": row["id"],
         "username": row["username"],
         "displayName": row["display_name"],
-        "avatar": _persistent_avatar_reference(
+        "avatar": persistent_avatar_reference(
             connection,
             row["id"],
             row["avatar"],
