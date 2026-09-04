@@ -1,6 +1,7 @@
 from app.database import get_connection, using_postgres
 
 DELETE_BATCH_SIZE = 500
+CLEAR_ALL_MARKER = "__pokinex_clear_all__::"
 
 
 def _placeholders(size: int) -> str:
@@ -73,7 +74,11 @@ def clear_user_messages(user_id: int, limit: int | None = None) -> list[str]:
 
 
 def clear_all_messages() -> list[str]:
-    return clear_recent_messages(limit=None)
+    message_ids = clear_recent_messages(limit=None)
+    if message_ids:
+        message_ids[0] = f"{CLEAR_ALL_MARKER}{message_ids[0]}"
+        return message_ids
+    return [CLEAR_ALL_MARKER]
 
 
 def delete_single_message(message_id: str) -> bool:
