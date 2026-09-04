@@ -1,6 +1,10 @@
-"""Persistence helpers for user-facing profile data."""
+"""Persistence operations for users and public profile data."""
 
-from app.infrastructure.database import postgres_or_sqlite
+from app.infrastructure.database import get_connection, postgres_or_sqlite
+
+
+class UserAlreadyExistsError(ValueError):
+    """Raised when a username violates the users table uniqueness rule."""
 
 
 def persistent_avatar_reference(connection, user_id, fallback=""):
@@ -35,9 +39,109 @@ def profile_from_row(connection, row):
         "avatar": row["avatar"] or "",
         "status": row["status"],
     }
-    user["avatar"] = persistent_avatar_reference(
-        connection,
-        user["id"],
-        user["avatar"],
-    )
+    user["avatar"] = persistent_avatar_reference(connection, user["id"], user["avatar"])
     return user
+
+
+def create_user(connection, username, password_hash, password_salt, created_at):
+    """Insert a user and return its generated id."""
+    try:
+        if _using_postgres(connection):
+            cursor = connection.execute(
+                """
+                INSERT INTO users (username, password_hash, password_salt, display_name, created_at)
+                VALUES (%s, %s, %s, %s, %s)
+                RETURNING id
+                """,
+                (username, password_hash, password_salt, username, created_at),
+            )
+            return cursor.fetchone()["id"]
+
+        cursor = connection.execute(
+            """
+            INSERT INTO users (username, password_hash, password_salt, display_name, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (username, password_hash, password_salt, username, created_at),
+        )
+        return cursor.lastrowid
+    except Exception as exc:
+        if _is_integrity_error(exc):
+            raise UserAlreadyExistsError("Username já está em uso.") from exc
+        raise
+
+
+def get_user_row_by_id(connection, user_id):
+    query = postgres_or_sqlite(
+        """
+        SELECT id, username, display_name, avatar, status
+        FROM users
+        WHERE id = %s
+        """,
+        """
+        SELECT id, username, display_name, avatar, status
+        FROM users
+        WHERE id = ?
+        """,
+    )
+    return connection.execute(query, (user_id,)).fetchone()
+
+
+def get_user_credentials_by_username(connection, username):
+    query = postgres_or_sqlite(
+        """
+        SELECT id, username, password_hash, password_salt, display_name, avatar, status
+        FROM users
+        WHERE LOWER(username) = LOWER(%s)
+        """,
+        """
+        SELECT id, username, password_hash, password_salt, display_name, avatar, status
+        FROM users
+        WHERE username = ? COLLATE NOCASE
+        """,
+    )
+    return connection.execute(query, (username,)).fetchone()
+
+
+def update_user(connection, user_id, username, display_name, avatar, status):
+    query = postgres_or_sqlite(
+        """
+        UPDATE users
+        SET username = %s, display_name = %s, avatar = %s, status = %s
+        WHERE id = %s
+        """,
+        """
+        UPDATE users
+        SET username = ?, display_name = ?, avatar = ?, status = ?
+        WHERE id = ?
+        """,
+    )
+    try:
+        connection.execute(query, (username, display_name, avatar, status, user_id))
+    except Exception as exc:
+        if _is_integrity_error(exc):
+            raise UserAlreadyExistsError("Username já está em uso.") from exc
+        raise
+
+
+def _using_postgres(connection):
+    module = connection.__class__.__module__
+    return module.startswith("psycopg")
+
+
+def _is_integrity_error(exc):
+    try:
+        import psycopg
+        if isinstance(exc, psycopg.errors.UniqueViolation):
+            return True
+    except ImportError:
+        pass
+
+    try:
+        import sqlite3
+        if isinstance(exc, sqlite3.IntegrityError):
+            return True
+    except ImportError:
+        pass
+
+    return False
