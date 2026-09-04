@@ -3,14 +3,35 @@ const LOCAL_API_URL = `http://${window.location.hostname}:8000/api/auth`;
 const API_URL = import.meta.env.VITE_API_URL || (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" ? LOCAL_API_URL : DEFAULT_API_URL);
 const TOKEN_KEY = "poknex_auth_token";
 
+function translateValidationMessage(item) {
+  const message = typeof item === "string" ? item : item?.msg || item?.message || "";
+  const field = Array.isArray(item?.loc) ? item.loc[item.loc.length - 1] : "";
+
+  if (/String should have at least 8 characters/i.test(message) && field === "password") {
+    return "A senha deve conter no mínimo 8 caracteres.";
+  }
+
+  if (/String should have at most 128 characters/i.test(message) && field === "password") {
+    return "A senha deve conter no máximo 128 caracteres.";
+  }
+
+  if (/String should have at least 3 characters/i.test(message) && field === "username") {
+    return "O nome de usuário deve conter no mínimo 3 caracteres.";
+  }
+
+  if (/String should have at most 20 characters/i.test(message) && field === "username") {
+    return "O nome de usuário deve conter no máximo 20 caracteres.";
+  }
+
+  return message;
+}
+
 function formatApiError(detail, fallback = "Erro na autenticação.") {
   if (typeof detail === "string" && detail.trim()) return detail;
   if (Array.isArray(detail)) {
-    const messages = detail.map((item) => {
-      if (typeof item === "string") return item;
-      if (item && typeof item === "object") return item.msg || item.message || null;
-      return null;
-    }).filter(Boolean);
+    const messages = detail
+      .map(translateValidationMessage)
+      .filter(Boolean);
     if (messages.length) return messages.join(" ");
   }
   if (detail && typeof detail === "object") return detail.message || detail.msg || fallback;
