@@ -156,6 +156,10 @@ def _find_online_user(username: str):
     return None
 
 
+def _online_user_count() -> int:
+    return len({str(user.get("id")) for user in manager.active_connections.values() if user.get("id") != BOT_USER["id"]})
+
+
 def _command_args(message: str):
     return message.strip().split()
 
@@ -165,7 +169,10 @@ async def _moderation_command(websocket: WebSocket, user, message: str) -> bool:
         return False
 
     command = moderation_bot.command_name(message)
-    public_response = moderation_bot.public_command(message)
+    public_response = moderation_bot.public_command(
+        message,
+        online_count=_online_user_count(),
+    )
     if public_response:
         await _send_bot_message(public_response)
         return True
@@ -280,11 +287,9 @@ async def _handle_public_message(websocket: WebSocket, user, event: ChatMessageE
     if not message:
         return True
 
-    # Commands keep their existing behavior and bypass normal flood checks.
     if await _moderation_command(websocket, user, message):
         return True
 
-    # Mutes are enforced before the message can be broadcast.
     if not is_moderator(user) and moderation_bot.is_muted(user["id"]):
         await websocket.send_json({
             "type": "moderation",
@@ -293,7 +298,6 @@ async def _handle_public_message(websocket: WebSocket, user, event: ChatMessageE
         })
         return True
 
-    # Every normal public message is tracked for spam, duplicate messages and flood.
     moderation = moderation_bot.moderate(message, user["id"])
     if not moderation.allowed:
         await websocket.send_json({
@@ -307,11 +311,13 @@ async def _handle_public_message(websocket: WebSocket, user, event: ChatMessageE
             await websocket.send_json({"type": "ack", "messageId": event.messageId})
         return True
 
-    # The original public message is delivered first.
     await manager.send_message(user, message, event.messageId, websocket, event.replyTo)
 
-    # Conversational replies are opt-in through @PokiBot (or a direct PokiBot phrase).
-    bot_reply = moderation_bot.conversational_response(message, user["id"])
+    bot_reply = moderation_bot.conversational_response(
+        message,
+        user["id"],
+        online_count=_online_user_count(),
+    )
     if bot_reply:
         await _send_bot_message(bot_reply)
     return True
