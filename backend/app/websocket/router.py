@@ -25,6 +25,8 @@ from app.websocket.schemas import (
     ReactionEvent,
 )
 
+MAX_WEBSOCKET_PAYLOAD = 16 * 1024
+
 _VALIDATION_MESSAGES = {
     "string_too_long": "Um dos campos excedeu o limite permitido.",
     "string_too_short": "Um dos campos é muito curto.",
