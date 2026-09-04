@@ -1,5 +1,7 @@
 """Central role definitions for Pokinex accounts."""
 
+import os
+
 OWNER_ID = "1"
 OWNER_USERNAME = "kael1nk"
 
@@ -10,15 +12,8 @@ def is_owner(user) -> bool:
     return user_id == OWNER_ID or username == OWNER_USERNAME
 
 
-def get_user_role(user) -> str:
-    if is_owner(user):
-        return "owner"
-    return "moderator" if _is_configured_moderator(user) else "member"
-
-
-def _configured_moderator(user) -> bool:
-    import os
-
+def is_moderator(user) -> bool:
+    """Return whether the user is configured as a moderator."""
     ids = {
         item.strip()
         for item in os.getenv("POKINEX_MODERATOR_IDS", "").split(",")
@@ -34,3 +29,9 @@ def _configured_moderator(user) -> bool:
     return (bool(user_id) and user_id in ids) or (
         bool(username) and username in usernames
     )
+
+
+def get_user_role(user) -> str:
+    if is_owner(user):
+        return "owner"
+    return "moderator" if is_moderator(user) else "member"
