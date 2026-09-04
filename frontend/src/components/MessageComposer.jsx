@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import EmojiPicker from "./EmojiPicker";
-import "../ModerationLock.css";
+import "../styles/ui/ModerationLock.css";
 
 function formatRemaining(totalSeconds) {
   const seconds = Math.max(0, Number(totalSeconds) || 0);
