@@ -326,6 +326,13 @@ export default function AppEdit() {
 
     const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const sender = userRef.current;
+    const role = String(sender?.role || "").toLowerCase();
+    const isStaff = ["owner", "admin", "moderator", "staff"].includes(role);
+    const isClearAllCommand =
+      connected &&
+      isStaff &&
+      /^(?:!clear|!purge)\s+all$/i.test(text);
+
     const optimistic = {
       type: "message",
       messageId: id,
@@ -334,11 +341,13 @@ export default function AppEdit() {
       displayName: sender?.displayName,
       avatar: sender?.avatar || "",
       status: sender?.status || "",
+      role: sender?.role || "member",
       message: text,
       timestamp: Date.now(),
       offline: !connected,
       deliveryStatus: connected ? "sending" : "pending",
       reactions: {},
+      ...(isClearAllCommand ? { ephemeral: true, moderationCommand: true } : {}),
       ...(replyingTo
         ? {
             replyTo: {
@@ -353,12 +362,12 @@ export default function AppEdit() {
         : {}),
     };
 
+    setMessages((current) => [...current, optimistic]);
+
     const sent = connected &&
       (replyingTo
         ? socketRef.current?.sendReplyMessage(text, id, replyingTo.messageId)
         : socketRef.current?.sendMessage(text, id));
-
-    setMessages((current) => [...current, optimistic]);
 
     if (!sent) {
       setOfflineQueue((current) => [
