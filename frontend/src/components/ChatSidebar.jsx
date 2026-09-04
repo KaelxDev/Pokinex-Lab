@@ -9,7 +9,10 @@ export default function ChatSidebar({ user, profile, users, onOpenProfile, onCle
   const [unreadByUser, setUnreadByUser] = useState({});
 
   const isModerator = useMemo(
-    () => users.some((item) => String(item.id) === String(user?.id) && item.role === "moderator"),
+    () => users.some(
+      (item) => String(item.id) === String(user?.id) &&
+        ["moderator", "staff", "admin", "owner"].includes(String(item.role || "").toLowerCase()),
+    ),
     [users, user?.id],
   );
 
@@ -99,6 +102,14 @@ export default function ChatSidebar({ user, profile, users, onOpenProfile, onCle
     closeSidebar();
   }
 
+  function roleLabel(role) {
+    const normalized = String(role || "").toLowerCase();
+    if (normalized === "owner") return "OWNER";
+    if (normalized === "admin") return "ADMIN";
+    if (["moderator", "staff"].includes(normalized)) return "STAFF";
+    return null;
+  }
+
   return (
     <>
       {sidebarOpen && window.innerWidth <= 700 && (
@@ -165,7 +176,7 @@ export default function ChatSidebar({ user, profile, users, onOpenProfile, onCle
               const name = onlineUser.displayName || onlineUser.username || "Usuário";
               const isSelf = String(onlineUser.id) === String(user?.id);
               const isBot = onlineUser.role === "bot" || String(onlineUser.id) === "moderation-bot";
-              const isOnlineModerator = onlineUser.role === "moderator";
+              const role = roleLabel(onlineUser.role);
               const canDM = !isSelf && !isBot && Number.isFinite(Number(onlineUser.id));
               const unread = Number(unreadByUser[onlineUser.id] || 0);
 
@@ -201,7 +212,7 @@ export default function ChatSidebar({ user, profile, users, onOpenProfile, onCle
                       <span>{isBot ? "Moderação automática" : onlineUser.username ? `@${onlineUser.username}` : "Sistema"}</span>
                     </div>
                     {isBot && <span className="user-role-badge bot">BOT</span>}
-                    {!isBot && isOnlineModerator && <span className="user-role-badge moderator">MOD</span>}
+                    {!isBot && role && <span className={`user-role-badge ${role.toLowerCase()}`}>{role}</span>}
                     {canDM && (
                       <span className="user-dm-meta" aria-hidden="true">
                         {unread > 0 ? <b className="dm-unread-badge">{unread > 99 ? "99+" : unread}</b> : <span className="user-dm-hint">✉</span>}
@@ -223,7 +234,7 @@ export default function ChatSidebar({ user, profile, users, onOpenProfile, onCle
                 <strong>{displayName}</strong>
                 <span>@{user.username}</span>
               </div>
-              {isModerator && <span className="profile-role-badge">MOD</span>}
+              {isModerator && <span className="profile-role-badge">STAFF</span>}
               <span className="profile-arrow" aria-hidden="true">↗</span>
             </button>
 
