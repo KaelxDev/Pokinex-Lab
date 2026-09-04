@@ -16,17 +16,26 @@ export default function ChatSidebar({ user, profile, users, onOpenProfile, onCle
   useEffect(() => {
     const toggle = () => setMobileOpen((current) => !current);
     const close = () => setMobileOpen(false);
+    const handleResize = () => setMobileOpen(false);
 
     window.addEventListener("pokinex:mobile-sidebar-toggle", toggle);
     window.addEventListener("pokinex:mobile-sidebar-close", close);
-    window.addEventListener("resize", close);
+    window.addEventListener("resize", handleResize);
 
     return () => {
       window.removeEventListener("pokinex:mobile-sidebar-toggle", toggle);
       window.removeEventListener("pokinex:mobile-sidebar-close", close);
-      window.removeEventListener("resize", close);
+      window.removeEventListener("resize", handleResize);
     };
   }, []);
+
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent("pokinex:mobile-sidebar-state", {
+        detail: { open: mobileOpen },
+      }),
+    );
+  }, [mobileOpen]);
 
   useEffect(() => {
     const offIncoming = onDirectMessage((message) => {
@@ -59,6 +68,7 @@ export default function ChatSidebar({ user, profile, users, onOpenProfile, onCle
   );
 
   function closeMobileSidebar() {
+    setMobileOpen(false);
     window.dispatchEvent(new CustomEvent("pokinex:mobile-sidebar-close"));
   }
 
@@ -84,7 +94,7 @@ export default function ChatSidebar({ user, profile, users, onOpenProfile, onCle
         />
       )}
 
-      <aside className={`sidebar${mobileOpen ? " mobile-open" : ""}`}>
+      <aside id="pokinex-mobile-sidebar" className={`sidebar${mobileOpen ? " mobile-open" : ""}`}>
         <div className="sidebar-rail" aria-hidden="true">
           <div className="rail-brand">
             <img src="/icone.png?v=2" alt="" />
