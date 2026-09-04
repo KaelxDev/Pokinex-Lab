@@ -1,6 +1,14 @@
 import { useEffect, useState } from "react";
 import { canGroup, formatTime, normalizeAvatarUrl, REACTION_OPTIONS, userInitial } from "../utils/chat";
 
+function getRoleLabel(role) {
+  const normalized = String(role || "").toLowerCase();
+  if (normalized === "owner") return "OWNER";
+  if (normalized === "admin") return "ADMIN";
+  if (["moderator", "staff"].includes(normalized)) return "STAFF";
+  return null;
+}
+
 export default function MessageList({
   messages,
   user,
@@ -29,7 +37,6 @@ export default function MessageList({
   onLongPressEnd,
 }) {
   const [rejectedMessageIds, setRejectedMessageIds] = useState(() => new Set());
-  const showEmptyState = !historyLoading && messages.length === 0;
 
   useEffect(() => {
     function handleModeration(event) {
@@ -109,7 +116,8 @@ export default function MessageList({
             ? String(message.userId) === String(user.id)
             : String(message.username || "") === String(user.username || "");
         const isBot = String(message.userId) === "moderation-bot" || message.role === "bot";
-        const messageProfile = isMine ? profile || user : profilesById[message.userId] || message;
+        const messageProfile = profilesById[message.userId] || (isMine ? profile || user : message);
+        const messageRole = getRoleLabel(message.role || messageProfile?.role);
         const messageAvatar = normalizeAvatarUrl(
           messageProfile?.avatar || message.avatar,
           messageProfile?.id || message.userId,
@@ -122,7 +130,7 @@ export default function MessageList({
 
         return (
           <div
-            className={`message ${isMine ? "mine" : "other"} ${grouped ? "grouped" : "group-start"} ${groupEnd ? "group-end" : "group-middle"} ${isBot ? "bot-message" : ""} ${message.deleted ? "deleted" : ""}`}
+            className={`message ${isMine ? "mine" : "other"} ${grouped ? "grouped" : "group-start"} ${groupEnd ? "group-end" : "group-middle"} ${isBot ? "bot-message" : ""} ${messageRole ? `role-${messageRole.toLowerCase()}` : ""} ${message.deleted ? "deleted" : ""}`}
             key={message.messageId || index}
           >
             {!grouped ? (
@@ -138,6 +146,11 @@ export default function MessageList({
                 <span className="message-user">
                   {messageProfile?.displayName || message.displayName || message.username}
                   {isBot && <small className="message-role-badge bot">BOT</small>}
+                  {!isBot && messageRole && (
+                    <small className={`message-role-badge ${messageRole.toLowerCase()}`}>
+                      {messageRole}
+                    </small>
+                  )}
                 </span>
               )}
 
