@@ -1,13 +1,11 @@
 """Route validated WebSocket events to the public/DM handlers."""
 
-import json
 from collections.abc import Awaitable, Callable
+from typing import Any
 
 from fastapi import WebSocket
 from pydantic import BaseModel, ValidationError
 
-from app.auth import get_user_from_token
-from app.moderation_bot import is_moderator
 from app.services.moderation import handle_public_message
 from app.websocket.chat import manager
 from app.websocket.direct_message_features import (
@@ -27,8 +25,6 @@ from app.websocket.schemas import (
     ReactionEvent,
 )
 
-MAX_WEBSOCKET_PAYLOAD = 16 * 1024
-
 _VALIDATION_MESSAGES = {
     "string_too_long": "Um dos campos excedeu o limite permitido.",
     "string_too_short": "Um dos campos é muito curto.",
@@ -38,19 +34,7 @@ _VALIDATION_MESSAGES = {
     "greater_than": "Identificador inválido.",
 }
 
-EventHandler = Callable[[WebSocket, dict, object], Awaitable[None]]
-
-
-def websocket_token(websocket: WebSocket) -> str | None:
-    return websocket.cookies.get("session")
-
-
-async def validate_websocket_origin(websocket: WebSocket, is_allowed_origin) -> bool:
-    origin = websocket.headers.get("origin")
-    if is_allowed_origin(origin):
-        return True
-    await websocket.close(code=1008, reason="Origin not allowed")
-    return False
+EventHandler = Callable[[WebSocket, BaseModel, Any], Awaitable[None]]
 
 
 async def send_validation_error(
@@ -71,17 +55,19 @@ async def send_validation_error(
     )
 
 
-def validate_event(model: type[BaseModel], data: dict) -> BaseModel | None:
-    return model.model_validate(data)
-
-
-async def handle_message(websocket: WebSocket, data: dict, user) -> None:
-    event = validate_event(ChatMessageEvent, data)
+async def handle_message(
+    websocket: WebSocket,
+    event: ChatMessageEvent,
+    user: Any,
+) -> None:
     await handle_public_message(websocket, user, event)
 
 
-async def handle_direct_message_event(websocket: WebSocket, data: dict, user) -> None:
-    event = validate_event(DirectMessageEvent, data)
+async def handle_direct_message_event(
+    websocket: WebSocket,
+    event: DirectMessageEvent,
+    user: Any,
+) -> None:
     message = event.message.strip()
     if message:
         await send_direct_message(
@@ -95,25 +81,37 @@ async def handle_direct_message_event(websocket: WebSocket, data: dict, user) ->
         )
 
 
-async def handle_direct_message_edit(websocket: WebSocket, data: dict, user) -> None:
-    event = validate_event(DirectMessageEditEvent, data)
+async def handle_direct_message_edit(
+    websocket: WebSocket,
+    event: DirectMessageEditEvent,
+    user: Any,
+) -> None:
     message = event.message.strip()
     if message:
         await edit_direct(manager, user, event.messageId, message, websocket)
 
 
-async def handle_direct_message_delete(websocket: WebSocket, data: dict, user) -> None:
-    event = validate_event(DirectMessageDeleteEvent, data)
+async def handle_direct_message_delete(
+    websocket: WebSocket,
+    event: DirectMessageDeleteEvent,
+    user: Any,
+) -> None:
     await delete_direct(manager, user, event.messageId, websocket)
 
 
-async def handle_direct_message_reaction(websocket: WebSocket, data: dict, user) -> None:
-    event = validate_event(DirectMessageReactionEvent, data)
+async def handle_direct_message_reaction(
+    websocket: WebSocket,
+    event: DirectMessageReactionEvent,
+    user: Any,
+) -> None:
     await react_direct(manager, user, event.messageId, event.reaction, websocket)
 
 
-async def handle_edit_message(websocket: WebSocket, data: dict, user) -> None:
-    event = validate_event(EditMessageEvent, data)
+async def handle_edit_message(
+    websocket: WebSocket,
+    event: EditMessageEvent,
+    user: Any,
+) -> None:
     message = event.message.strip()
     if not message:
         await websocket.send_json(
@@ -128,13 +126,19 @@ async def handle_edit_message(websocket: WebSocket, data: dict, user) -> None:
     await manager.edit_message(user, event.messageId, message, websocket)
 
 
-async def handle_delete_message(websocket: WebSocket, data: dict, user) -> None:
-    event = validate_event(DeleteMessageEvent, data)
+async def handle_delete_message(
+    websocket: WebSocket,
+    event: DeleteMessageEvent,
+    user: Any,
+) -> None:
     await manager.delete_message(user, event.messageId, websocket)
 
 
-async def handle_reaction(websocket: WebSocket, data: dict, user) -> None:
-    event = validate_event(ReactionEvent, data)
+async def handle_reaction(
+    websocket: WebSocket,
+    event: ReactionEvent,
+    user: Any,
+) -> None:
     await manager.toggle_reaction(user, event.messageId, event.reaction, websocket)
 
 
@@ -150,7 +154,7 @@ _HANDLERS: dict[str, tuple[type[BaseModel], EventHandler]] = {
 }
 
 
-async def dispatch_event(websocket: WebSocket, data: dict, user) -> bool:
+async def dispatch_event(websocket: WebSocket, data: dict, user: Any) -> bool:
     event_type = data.get("type", "message")
     handler_definition = _HANDLERS.get(event_type)
     if handler_definition is None:
@@ -170,8 +174,5 @@ async def dispatch_event(websocket: WebSocket, data: dict, user) -> bool:
         await send_validation_error(websocket, event_type, error)
         return False
 
-    if event_type == "message":
-        await handler(websocket, data, user)
-    else:
-        await handler(websocket, data, user)
+    await handler(websocket, validated, user)
     return True
