@@ -1,5 +1,7 @@
 from app.database import get_connection, using_postgres
 
+DELETE_BATCH_SIZE = 500
+
 
 def _placeholders(size: int) -> str:
     return ",".join(["%s"] * size) if using_postgres() else ",".join(["?"] * size)
@@ -29,19 +31,25 @@ def delete_message_ids(message_ids: list[str]) -> list[str]:
         return []
 
     connection = get_connection()
+    deleted_ids: list[str] = []
     try:
-        placeholders = _placeholders(len(ids))
-        values = tuple(ids)
-        connection.execute(
-            f"DELETE FROM message_reactions WHERE message_id IN ({placeholders})",
-            values,
-        )
-        cursor = connection.execute(
-            f"DELETE FROM messages WHERE message_id IN ({placeholders})",
-            values,
-        )
+        for start in range(0, len(ids), DELETE_BATCH_SIZE):
+            batch = ids[start : start + DELETE_BATCH_SIZE]
+            placeholders = _placeholders(len(batch))
+            values = tuple(batch)
+
+            connection.execute(
+                f"DELETE FROM message_reactions WHERE message_id IN ({placeholders})",
+                values,
+            )
+            connection.execute(
+                f"DELETE FROM messages WHERE message_id IN ({placeholders})",
+                values,
+            )
+            deleted_ids.extend(batch)
+
         connection.commit()
-        return ids if cursor.rowcount is None else ids[: cursor.rowcount]
+        return deleted_ids
     except Exception:
         connection.rollback()
         raise
