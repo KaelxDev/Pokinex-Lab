@@ -1,0 +1,121 @@
+/* Fullscreen authentication shell: login and register are centered in the viewport. */
+.auth-page {
+  position: relative;
+  width: 100vw !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  min-width: 0;
+  margin: 0 !important;
+  padding: 24px !important;
+  box-sizing: border-box;
+  display: grid !important;
+  place-items: center !important;
+  overflow: auto;
+  background:
+    radial-gradient(circle at 50% 24%, rgba(226,58,73,.09), transparent 31%),
+    radial-gradient(circle at 50% 100%, rgba(88,101,242,.055), transparent 38%),
+    #0b0e13 !important;
+}
+
+.auth-page .auth-layout {
+  width: min(100%, 500px);
+  min-width: 0;
+  margin: 0 auto;
+  display: block !important;
+}
+
+.auth-page .auth-visual {
+  display: none !important;
+}
+
+.auth-page .login {
+  width: 100%;
+  max-width: 500px;
+  min-width: 0;
+  margin: 0 auto;
+  padding: 34px 34px 30px;
+  box-sizing: border-box;
+  border-radius: 20px;
+}
+
+.auth-page .auth-form-head,
+.auth-page .login-form,
+.auth-page .auth-live-row,
+.auth-page .auth-divider,
+.auth-page .auth-switch,
+.auth-page .status {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.auth-page .auth-form-head {
+  text-align: left;
+}
+
+.auth-page .auth-form-head p {
+  max-width: none;
+}
+
+.auth-page .auth-live-row {
+  margin-top: 20px;
+}
+
+.auth-page .login-form {
+  gap: 14px;
+}
+
+.auth-page .auth-field {
+  display: grid;
+  gap: 7px;
+}
+
+.auth-page .auth-submit {
+  width: 100%;
+}
+
+.auth-page .auth-divider {
+  margin-top: 22px;
+}
+
+.auth-page .auth-switch {
+  margin-top: 10px;
+}
+
+@media (max-height: 680px) {
+  .auth-page {
+    align-items: start !important;
+    padding-top: 18px !important;
+    padding-bottom: 18px !important;
+  }
+
+  .auth-page .login {
+    padding: 26px 28px 24px;
+  }
+
+  .auth-page .auth-live-row {
+    margin-top: 14px;
+  }
+}
+
+@media (max-width: 520px) {
+  .auth-page {
+    padding: 12px !important;
+  }
+
+  .auth-page .auth-layout,
+  .auth-page .login {
+    width: 100%;
+    max-width: none;
+  }
+
+  .auth-page .login {
+    padding: 28px 22px 24px;
+    border-radius: 17px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-page * {
+    scroll-behavior: auto !important;
+  }
+}
