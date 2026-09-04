@@ -15,6 +15,33 @@ export function createWebSocket(
   let reconnectTimer = null;
   let reconnectAttempt = 0;
   let manuallyClosed = false;
+  const pendingMessageIds = [];
+
+  function rememberOutgoingMessage(messageId) {
+    if (!messageId) return;
+    pendingMessageIds.push(messageId);
+    if (pendingMessageIds.length > 100) pendingMessageIds.shift();
+  }
+
+  function forgetOutgoingMessage(messageId) {
+    const index = pendingMessageIds.indexOf(messageId);
+    if (index >= 0) pendingMessageIds.splice(index, 1);
+  }
+
+  function rejectOldestOutgoingMessage() {
+    return pendingMessageIds.shift() || null;
+  }
+
+  function emitModerationEvent(data) {
+    const messageId = data.messageId || rejectOldestOutgoingMessage();
+    const enriched = messageId ? { ...data, messageId } : data;
+
+    window.dispatchEvent(
+      new CustomEvent("pokinex:moderation", {
+        detail: enriched,
+      }),
+    );
+  }
 
   function connect() {
     if (manuallyClosed) return;
@@ -34,6 +61,12 @@ export function createWebSocket(
             userId: Number(data.senderId ?? data.userId),
             displayName: data.displayName || data.username || "Usuário",
           });
+        }
+        if (data?.type === "ack" && data.messageId) {
+          forgetOutgoingMessage(data.messageId);
+        }
+        if (data?.type === "moderation") {
+          emitModerationEvent(data);
         }
         onMessage?.(data);
       } catch (error) {
@@ -72,6 +105,7 @@ export function createWebSocket(
 
   function send(payload) {
     if (!socket || socket.readyState !== WebSocket.OPEN) return false;
+    if (payload?.type === "message") rememberOutgoingMessage(payload.messageId);
     socket.send(JSON.stringify(payload));
     return true;
   }
@@ -111,6 +145,7 @@ export function createWebSocket(
     },
     close() {
       manuallyClosed = true;
+      pendingMessageIds.length = 0;
       if (reconnectTimer) {
         clearTimeout(reconnectTimer);
         reconnectTimer = null;
