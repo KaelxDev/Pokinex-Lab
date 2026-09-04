@@ -6,11 +6,13 @@ export default function AuthScreen({ onAuthenticated }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function submit(event) {
     event.preventDefault();
     setError("");
+    setNotice("");
     setLoading(true);
     try {
       const currentUser = mode === "login" ? await login(username, password) : await register(username, password);
@@ -25,6 +27,12 @@ export default function AuthScreen({ onAuthenticated }) {
   function switchMode() {
     setMode((current) => (current === "login" ? "register" : "login"));
     setError("");
+    setNotice("");
+  }
+
+  function showPrivateMessagesNotice() {
+    setError("");
+    setNotice("Mensagens privadas estão disponíveis depois que você entrar na sua conta.");
   }
 
   return (
@@ -38,7 +46,7 @@ export default function AuthScreen({ onAuthenticated }) {
           <div className="auth-visual-copy">
             <span className="auth-kicker">CHAT • COMMUNITY • DIVERSÃO</span>
             <h1>Converse em tempo real.</h1>
-            <p>Um espaço simples para conversar, compartilhar ideias e se conectar com outras pessoas.</p>
+            <p>Um espaço simples para conversar em público, trocar ideias e enviar mensagens privadas.</p>
           </div>
           <div className="auth-visual-foot">
             <span className="auth-visual-line" />
@@ -50,7 +58,7 @@ export default function AuthScreen({ onAuthenticated }) {
           <div className="auth-form-head">
             <span className="auth-form-label">{mode === "login" ? "BEM-VINDO DE VOLTA" : "NOVO POR AQUI"}</span>
             <h2>{mode === "login" ? "Entrar no Pokinex" : "Criar sua conta"}</h2>
-            <p>{mode === "login" ? "Acesse suas conversas e continue de onde parou." : "Crie uma identidade e entre na conversa."}</p>
+            <p>{mode === "login" ? "Entre na sua conta para conversar em tempo real." : "Crie sua conta para começar a usar o Pokinex."}</p>
           </div>
 
           <div className="auth-live-row">
@@ -59,6 +67,7 @@ export default function AuthScreen({ onAuthenticated }) {
           </div>
 
           {error && <div className="status disconnected">{error}</div>}
+          {notice && <div className="auth-notice">{notice}</div>}
 
           <form className="login-form" onSubmit={submit}>
             <label className="auth-field">
@@ -74,6 +83,24 @@ export default function AuthScreen({ onAuthenticated }) {
               <span aria-hidden="true">→</span>
             </button>
           </form>
+
+          <div className="auth-capabilities" aria-label="Recursos do Pokinex">
+            <div className="auth-capability">
+              <span className="auth-capability-icon" aria-hidden="true">💬</span>
+              <span>
+                <strong>Chat público</strong>
+                <small>Converse em tempo real</small>
+              </span>
+            </div>
+            <button className="auth-capability auth-capability-button" type="button" onClick={showPrivateMessagesNotice}>
+              <span className="auth-capability-icon" aria-hidden="true">✉</span>
+              <span>
+                <strong>Mensagens privadas</strong>
+                <small>Converse diretamente</small>
+              </span>
+              <span className="auth-capability-arrow" aria-hidden="true">›</span>
+            </button>
+          </div>
 
           <div className="auth-divider"><span /><small>{mode === "login" ? "Ainda não tem conta?" : "Já possui uma conta?"}</small><span /></div>
           <button className="auth-switch" type="button" onClick={switchMode}>{mode === "login" ? "Criar conta" : "Voltar para entrar"}</button>
