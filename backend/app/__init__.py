@@ -49,14 +49,17 @@ def _moderate_with_pokinex_rules(self, message, user_id=None):
                 ]
                 _pending_cleanup_ids.set(cleanup_ids)
                 entries.clear()
+
+                strike, escalation = self._register_violation(user_id)
+                mute_minutes = escalation
                 return ModerationResult(
                     False,
-                    "A mesma mensagem foi enviada 5 vezes seguidas. Uma ocorrência foi registrada.",
-                    "🔁 Ocorrência registrada por repetição excessiva. As 4 mensagens anteriores foram removidas e esta tentativa foi bloqueada.",
+                    f"A mesma mensagem foi enviada 5 vezes seguidas. Uma ocorrência foi registrada (ocorrência {strike}).",
+                    f"🔁 Ocorrência {strike} registrada por repetição excessiva. As 4 mensagens anteriores foram removidas e esta tentativa foi bloqueada.",
                     "duplicate_burst",
                     "duplicate_burst",
                     "medium",
-                    0,
+                    mute_minutes,
                 )
 
             internal_message = (
@@ -143,11 +146,10 @@ _original_chat_event_validate = ChatMessageEvent.model_validate
 
 @classmethod
 def _chat_event_model_validate(cls, obj, *args, **kwargs):
-    token = _current_message_id.set(
+    _current_message_id.set(
         obj.get("messageId") if isinstance(obj, dict) else None
     )
-    result = _original_chat_event_validate(obj, *args, **kwargs)
-    return result
+    return _original_chat_event_validate(obj, *args, **kwargs)
 
 
 ChatMessageEvent.model_validate = _chat_event_model_validate
