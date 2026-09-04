@@ -275,6 +275,48 @@ async def _moderation_command(websocket: WebSocket, user, message: str) -> bool:
     return True
 
 
+async def _handle_public_message(websocket: WebSocket, user, event: ChatMessageEvent) -> bool:
+    message = event.message.strip()
+    if not message:
+        return True
+
+    # Commands keep their existing behavior and bypass normal flood checks.
+    if await _moderation_command(websocket, user, message):
+        return True
+
+    # Mutes are enforced before the message can be broadcast.
+    if not is_moderator(user) and moderation_bot.is_muted(user["id"]):
+        await websocket.send_json({
+            "type": "moderation",
+            "action": "muted",
+            "message": "Você está silenciado no #geral no momento.",
+        })
+        return True
+
+    # Every normal public message is tracked for spam, duplicate messages and flood.
+    moderation = moderation_bot.moderate(message, user["id"])
+    if not moderation.allowed:
+        await websocket.send_json({
+            "type": "moderation",
+            "action": moderation.action or "blocked",
+            "message": moderation.reason,
+        })
+        if moderation.bot_message:
+            await _send_bot_message(moderation.bot_message)
+        if event.messageId:
+            await websocket.send_json({"type": "ack", "messageId": event.messageId})
+        return True
+
+    # The original public message is delivered first.
+    await manager.send_message(user, message, event.messageId, websocket, event.replyTo)
+
+    # Conversational replies are opt-in through @PokiBot (or a direct PokiBot phrase).
+    bot_reply = moderation_bot.conversational_response(message, user["id"])
+    if bot_reply:
+        await _send_bot_message(bot_reply)
+    return True
+
+
 manager.send_users = _send_users_with_bot
 
 
@@ -312,31 +354,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 except ValidationError as error:
                     await _send_validation_error(websocket, "message", error)
                     continue
-                message = event.message.strip()
-                if message:
-                    if await _moderation_command(websocket, user, message):
-                        continue
-                    if not is_moderator(user) and moderation_bot.is_muted(user["id"]):
-                        await websocket.send_json({
-                            "type": "moderation",
-                            "action": "muted",
-                            "message": "Você está silenciado no #geral no momento.",
-                        })
-                        continue
-                    moderation = moderation_bot.moderate(message)
-                    if not moderation.allowed:
-                        await websocket.send_json({
-                            "type": "moderation",
-                            "action": "blocked",
-                            "message": moderation.reason,
-                        })
-                        if moderation.bot_message:
-                            await _send_bot_message(moderation.bot_message)
-                        if event.messageId:
-                            await websocket.send_json({"type": "ack", "messageId": event.messageId})
-                        continue
-
-                    await manager.send_message(user, message, event.messageId, websocket, event.replyTo)
+                await _handle_public_message(websocket, user, event)
                 continue
 
             if event_type == "direct_message":
