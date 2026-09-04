@@ -119,6 +119,28 @@ export default function AppEdit() {
       return;
     }
 
+    if (data?.type === "chat_reset") {
+      const command = data.commandMessage;
+      if (!command?.messageId) return;
+
+      clearLocalHistory();
+      setOfflineQueue([]);
+      setMessages([{
+        ...command,
+        ephemeral: true,
+        offline: false,
+        deliveryStatus: "sent",
+      }]);
+      setContextMenu(null);
+      setReactionPickerMessageId(null);
+      setReplyingTo(null);
+      setEditingId(null);
+      setEditingText("");
+      setEditSaving(false);
+      setEditError("");
+      return;
+    }
+
     if (data?.type === "messages_cleared") {
       const messageIds = new Set(
         Array.isArray(data.messageIds) ? data.messageIds.map((id) => String(id)) : [],
@@ -240,6 +262,7 @@ export default function AppEdit() {
         avatar: data.avatar || "",
         status: data.status || "",
         online: true,
+        ...(data.role ? { role: data.role } : {}),
       });
       setMessages((current) => {
         const index = current.findIndex((item) => item.messageId === data.messageId);
@@ -265,7 +288,7 @@ export default function AppEdit() {
         { ...data, timestamp: data.timestamp || Date.now() },
       ]);
     }
-  }, [contextMenu?.message?.messageId, editingId, mergeUser, reactionPickerMessageId, replyingTo?.messageId, setMessages, setOfflineQueue, syncProfile, userRef]);
+  }, [clearLocalHistory, contextMenu?.message?.messageId, editingId, mergeUser, reactionPickerMessageId, replyingTo?.messageId, setMessages, setOfflineQueue, syncProfile, userRef]);
 
   const handleConnectionOpen = useCallback(({ reconnected } = {}) => {
     if (reconnected) void loadMessageHistory();
