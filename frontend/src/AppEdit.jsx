@@ -119,6 +119,34 @@ export default function AppEdit() {
       return;
     }
 
+    if (data?.type === "messages_cleared") {
+      const messageIds = new Set(
+        Array.isArray(data.messageIds) ? data.messageIds.map((id) => String(id)) : [],
+      );
+      if (messageIds.size === 0) return;
+
+      setMessages((current) =>
+        current.filter((item) => !messageIds.has(String(item.messageId))),
+      );
+
+      if (contextMenu?.message?.messageId && messageIds.has(String(contextMenu.message.messageId))) {
+        setContextMenu(null);
+      }
+      if (editingId && messageIds.has(String(editingId))) {
+        setEditingId(null);
+        setEditingText("");
+        setEditSaving(false);
+        setEditError("");
+      }
+      if (replyingTo?.messageId && messageIds.has(String(replyingTo.messageId))) {
+        setReplyingTo(null);
+      }
+      if (reactionPickerMessageId && messageIds.has(String(reactionPickerMessageId))) {
+        setReactionPickerMessageId(null);
+      }
+      return;
+    }
+
     if (data?.type === "ack") {
       setOfflineQueue((current) =>
         current.filter((item) => item.id !== data.messageId),
@@ -237,7 +265,7 @@ export default function AppEdit() {
         { ...data, timestamp: data.timestamp || Date.now() },
       ]);
     }
-  }, [mergeUser, setMessages, setOfflineQueue, syncProfile, userRef]);
+  }, [contextMenu?.message?.messageId, editingId, mergeUser, reactionPickerMessageId, replyingTo?.messageId, setMessages, setOfflineQueue, syncProfile, userRef]);
 
   const handleConnectionOpen = useCallback(({ reconnected } = {}) => {
     if (reconnected) void loadMessageHistory();
