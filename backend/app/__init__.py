@@ -55,7 +55,7 @@ def _moderate_with_pokinex_rules(self, message, user_id=None):
                 return ModerationResult(
                     False,
                     f"A mesma mensagem foi enviada 5 vezes seguidas. Uma ocorrência foi registrada (ocorrência {strike}).",
-                    f"🔁 Ocorrência {strike} registrada por repetição excessiva. As 4 mensagens anteriores foram removidas e esta tentativa foi bloqueada.",
+                    f"Ocorrência {strike} registrada por repetição excessiva. As 4 mensagens anteriores foram removidas e esta tentativa foi bloqueada.",
                     "duplicate_burst",
                     "duplicate_burst",
                     "medium",
@@ -80,6 +80,48 @@ def _moderate_with_pokinex_rules(self, message, user_id=None):
 
 
 ModerationBot.moderate = _moderate_with_pokinex_rules
+
+
+# Moderation notices should read like system actions, not emoji-heavy chat replies.
+_ROBOTIC_MODERATION_MESSAGES = {
+    "length": "Mensagem bloqueada. O conteúdo excede o limite permitido.",
+    "scam": "Mensagem bloqueada. Possível tentativa de golpe ou phishing detectada.",
+    "suspicious_link": "Mensagem bloqueada. O link foi classificado como potencialmente suspeito.",
+    "threat": "Mensagem bloqueada. O conteúdo foi identificado como ameaça.",
+    "harassment": "Mensagem bloqueada. Conteúdo de assédio ou abuso não é permitido.",
+    "link_spam": "Mensagem bloqueada. Excesso de links em uma única mensagem.",
+    "mention_spam": "Mensagem bloqueada. Excesso de menções em uma única mensagem.",
+    "caps": "Mensagem bloqueada. Evite escrever mensagens inteiras em caixa alta.",
+    "repeated_chars": "Mensagem bloqueada. Repetição excessiva de caracteres não é permitida.",
+    "duplicate": "Mensagem bloqueada. A mesma mensagem foi enviada repetidamente.",
+    "flood": "Mensagem bloqueada. Você está enviando mensagens rápido demais.",
+    "duplicate_burst": "Ocorrência registrada por repetição excessiva. As 4 mensagens anteriores foram removidas e esta tentativa foi bloqueada.",
+}
+
+_pokinex_moderate = ModerationBot.moderate
+
+
+def _moderate_with_robotic_notices(self, message, user_id=None):
+    result = _pokinex_moderate(self, message, user_id)
+    if result.allowed or not result.category:
+        return result
+
+    bot_message = _ROBOTIC_MODERATION_MESSAGES.get(result.category, result.bot_message)
+    if bot_message == result.bot_message:
+        return result
+
+    return ModerationResult(
+        result.allowed,
+        result.reason,
+        bot_message,
+        result.action,
+        result.category,
+        result.severity,
+        result.mute_minutes,
+    )
+
+
+ModerationBot.moderate = _moderate_with_robotic_notices
 
 
 def _remaining_mute_seconds(self, user_id) -> int:
