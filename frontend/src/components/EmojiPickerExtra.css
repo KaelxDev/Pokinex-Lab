@@ -1,1 +1,339 @@
-.emoji-picker-extra-shell{position:relative;display:flex;flex-direction:column;gap:8px;width:100%;}.emoji-more-toggle{height:34px;display:flex;align-items:center;justify-content:center;gap:7px;border:1px solid rgba(255,255,255,.08);border-radius:9px;background:rgba(255,255,255,.035);color:inherit;font:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:background .16s ease,border-color .16s ease}.emoji-more-toggle:hover,.emoji-more-toggle.active{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.14)}.emoji-more-chevron{opacity:.6;font-size:13px}.emoji-extra-panel{border:1px solid rgba(255,255,255,.08);border-radius:11px;background:inherit;overflow:hidden;padding:8px}.emoji-extra-tabs{display:flex;gap:4px;overflow-x:auto;padding-bottom:7px;scrollbar-width:none}.emoji-extra-tabs::-webkit-scrollbar{display:none}.emoji-extra-tabs button{width:34px;height:34px;flex:0 0 34px;border:0;border-radius:8px;background:transparent;cursor:pointer;font-size:19px;display:grid;place-items:center}.emoji-extra-tabs button:hover,.emoji-extra-tabs button.active{background:rgba(255,255,255,.08)}.emoji-extra-title{font-size:11px;font-weight:700;opacity:.65;padding:3px 4px 7px}.emoji-extra-grid{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:3px;max-height:170px;overflow-y:auto;padding:1px}.emoji-extra-cell{width:100%;height:40px;border:0;border-radius:8px;background:transparent;display:grid;place-items:center;font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;font-size:24px;line-height:1;cursor:pointer;transition:transform .12s ease,background .12s ease}.emoji-extra-cell:hover{background:rgba(255,255,255,.08);transform:scale(1.08)}@media(max-width:520px){.emoji-extra-grid{grid-template-columns:repeat(7,minmax(0,1fr));max-height:150px}.emoji-extra-cell{height:38px;font-size:22px}}@media(max-width:380px){.emoji-extra-grid{grid-template-columns:repeat(6,minmax(0,1fr))}.emoji-extra-cell{height:36px;font-size:21px}}
+.emoji-picker-extra-shell {
+  width: 100%;
+}
+
+.emoji-picker-base {
+  position: relative;
+  width: 100%;
+}
+
+.emoji-main-new-toggle {
+  position: absolute;
+  top: 9px;
+  right: 10px;
+  z-index: 125;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 9px;
+  background: rgba(29,31,36,.82);
+  color: #e7e9ee;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: background .14s ease, border-color .14s ease, transform .14s ease;
+}
+
+.emoji-main-new-toggle:hover,
+.emoji-main-new-toggle.active {
+  background: rgba(88,101,242,.2);
+  border-color: rgba(88,101,242,.45);
+}
+
+.emoji-main-new-toggle:active {
+  transform: scale(.94);
+}
+
+.emoji-new-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #1d1f24;
+  border: 1px solid #343740;
+  border-radius: 12px;
+  box-shadow: 0 18px 55px rgba(0,0,0,.5);
+  animation: emoji-new-in .14s ease-out;
+}
+
+.emoji-new-header {
+  flex: 0 0 52px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-bottom: 1px solid #30333b;
+  background: #1d1f24;
+}
+
+.emoji-new-back {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #dfe2e8;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.emoji-new-back:hover {
+  background: #30333b;
+}
+
+.emoji-new-heading {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.emoji-new-heading strong {
+  color: #f3f4f7;
+  font-size: 14px;
+}
+
+.emoji-new-heading span {
+  color: #8f949f;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.emoji-new-category-rail {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 4px;
+  padding: 7px 9px 6px;
+  overflow-x: auto;
+  border-bottom: 1px solid #30333b;
+  background: #191b20;
+  scrollbar-width: none;
+}
+
+.emoji-new-category-rail::-webkit-scrollbar {
+  display: none;
+}
+
+.emoji-new-category-rail button {
+  min-width: 60px;
+  height: 46px;
+  flex: 0 0 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #aeb2bc;
+  cursor: pointer;
+}
+
+.emoji-new-category-rail button:hover,
+.emoji-new-category-rail button.active {
+  background: #30333b;
+  color: #fff;
+}
+
+.emoji-new-category-rail button.active {
+  box-shadow: inset 0 -2px 0 #5865f2;
+}
+
+.emoji-new-category-rail button span {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.emoji-new-category-rail button small {
+  max-width: 58px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 8px;
+}
+
+.emoji-new-content {
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.emoji-new-search {
+  flex: 0 0 40px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 9px 10px 6px;
+  padding: 0 10px;
+  border: 1px solid #343740;
+  border-radius: 9px;
+  background: #181a1f;
+}
+
+.emoji-new-search span {
+  flex: 0 0 auto;
+  color: #b8bcc6;
+  font-size: 21px;
+}
+
+.emoji-new-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #f4f5f7;
+  font-size: 14px;
+}
+
+.emoji-new-search input::placeholder {
+  color: #777c87;
+}
+
+.emoji-new-search:focus-within {
+  border-color: #4b4f5b;
+  box-shadow: 0 0 0 2px rgba(88,101,242,.12);
+}
+
+.emoji-new-title {
+  flex: 0 0 28px;
+  display: flex;
+  align-items: center;
+  padding: 3px 10px 2px;
+  color: #aeb2bc;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.emoji-new-grid {
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(40px,1fr));
+  align-content: start;
+  gap: 2px;
+  padding: 2px 8px 10px;
+  scrollbar-width: thin;
+  scrollbar-color: #414550 transparent;
+}
+
+.emoji-new-grid::-webkit-scrollbar {
+  width: 7px;
+}
+
+.emoji-new-grid::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.emoji-new-grid::-webkit-scrollbar-thumb {
+  background: #414550;
+  border-radius: 999px;
+}
+
+.emoji-new-cell {
+  width: 100%;
+  height: 44px;
+  min-width: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  display: grid;
+  place-items: center;
+  font-family: "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background .1s ease, transform .1s ease;
+}
+
+.emoji-new-cell:hover {
+  background: #30333b;
+  transform: scale(1.06);
+}
+
+.emoji-new-cell:active {
+  transform: scale(.93);
+}
+
+.emoji-new-empty {
+  grid-column: 1 / -1;
+  padding: 40px 16px;
+  color: #858a96;
+  text-align: center;
+  font-size: 13px;
+}
+
+@keyframes emoji-new-in {
+  from { opacity: 0; transform: scale(.99); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@media (max-width: 700px) {
+  .emoji-main-new-toggle {
+    right: 8px;
+  }
+
+  .emoji-new-grid {
+    grid-template-columns: repeat(7, minmax(40px, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .emoji-new-header {
+    flex-basis: 48px;
+    padding-inline: 7px;
+  }
+
+  .emoji-new-category-rail button {
+    min-width: 58px;
+    flex-basis: 58px;
+  }
+
+  .emoji-new-grid {
+    grid-template-columns: repeat(6, minmax(40px, 1fr));
+    padding-inline: 6px;
+  }
+
+  .emoji-new-cell {
+    height: 42px;
+    font-size: 24px;
+  }
+}
+
+@media (max-width: 380px) {
+  .emoji-main-new-toggle {
+    width: 34px;
+    height: 34px;
+  }
+
+  .emoji-new-category-rail button {
+    min-width: 54px;
+    flex-basis: 54px;
+  }
+
+  .emoji-new-grid {
+    grid-template-columns: repeat(5, minmax(40px, 1fr));
+  }
+
+  .emoji-new-cell {
+    height: 40px;
+    font-size: 22px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .emoji-main-new-toggle,
+  .emoji-new-overlay,
+  .emoji-new-cell {
+    animation: none;
+    transition: none;
+  }
+}
