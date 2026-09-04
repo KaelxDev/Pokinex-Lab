@@ -56,8 +56,9 @@ class ModerationBot:
         "!ping": "🏓 Pong. PokiBot está online.",
     }
     MOD_HELP = (
-        "🛡️ Moderador: !mod, !clear [n], !warn @usuário [motivo], "
-        "!mute @usuário [min], !unmute @usuário, !kick @usuário"
+        "🛡️ Staff: !mod, !clear [n|all], !clear @usuário [n|all], "
+        "!delete <message_id>, !warn @usuário [motivo], !mute @usuário [min], "
+        "!unmute @usuário, !kick @usuário"
     )
 
     SCAM_PATTERNS = (
@@ -172,7 +173,6 @@ class ModerationBot:
         normalized = unicodedata.normalize("NFKC", message)
         normalized = normalized.translate(cls.LEET_TRANSLATION)
         normalized = re.sub(r"[\u200b-\u200f\u202a-\u202e\u2060\ufeff]", "", normalized)
-        # Do not collapse repeated characters here: a separate detector needs the original run length.
         normalized = re.sub(r"\s+", " ", normalized).strip()
         return normalized
 
@@ -292,151 +292,76 @@ class ModerationBot:
                 self._total_blocked += 1
                 self._categories["duplicate"] += 1
                 strike, escalation = self._register_violation(user_id)
-                return ModerationResult(False, "Mensagem repetida detectada.", f"⚠️ Evite enviar a mesma mensagem repetidamente. (ocorrência {strike})", "duplicate", "duplicate", "medium", escalation)
+                return ModerationResult(False, "Mensagem duplicada detectada.", f"🔁 Evite repetir a mesma mensagem. (ocorrência {strike})", "blocked", "duplicate", "low", escalation)
             if flood:
                 self._total_blocked += 1
                 self._categories["flood"] += 1
                 strike, escalation = self._register_violation(user_id)
-                return ModerationResult(False, "Flood detectado.", f"🐌 Calma aí. Você está enviando mensagens rápido demais. (ocorrência {strike})", "flood", "flood", "medium", escalation)
+                return ModerationResult(False, "Flood detectado.", f"⏱️ Você está enviando mensagens rápido demais. (ocorrência {strike})", "blocked", "flood", "medium", escalation)
 
         return ModerationResult(True)
 
-    def _can_reply(self, user_id: int | None, *, is_follow_up: bool = False) -> bool:
-        if user_id is None or is_follow_up:
-            return True
-        now = time.time()
-        key = str(user_id)
-        return now - self._last_bot_reply_at.get(key, 0.0) >= self.BOT_REPLY_COOLDOWN_SECONDS
-
-    def _pick(self, values: list[str]) -> str:
-        return self._rng.choice(values)
-
-    def _addressed_to_bot(self, text: str) -> tuple[bool, str]:
-        cleaned = text
-        addressed = False
-        for pattern in self.ADDRESS_PATTERNS:
-            if pattern.search(cleaned):
-                addressed = True
-                cleaned = pattern.sub(" ", cleaned)
-        cleaned = re.sub(r"\s+", " ", cleaned).strip(" ,.!?:;-\t")
-        return addressed, cleaned
-
-    def _remember_turn(self, user_id: int | None, role: str, text: str) -> None:
-        if user_id is None or not text:
-            return
-        self._conversation_memory[str(user_id)].append((role, text))
-
-    def conversational_response(self, message: str, user_id: int | None = None, *, online_count: int | None = None) -> str | None:
-        text = " ".join(message.strip().split())
-        if not text:
-            return None
-        addressed, cleaned = self._addressed_to_bot(text)
-        lowered = cleaned.casefold()
-        direct = addressed or lowered.startswith(("pokibot", "poki bot"))
-        follow_up = lowered in {"e você", "e voce", "e vc", "e tu", "e contigo"}
-        if not direct:
-            return None
-        if not self._can_reply(user_id, is_follow_up=follow_up):
-            return None
-        self._remember_turn(user_id, "user", cleaned)
-        response: str
-        if lowered in self.GREETINGS:
-            response = self._pick(self.GREETINGS[lowered])
-        elif not lowered:
-            response = "🤖 Estou aqui. Use `!help` ou me faça uma pergunta."
-        elif any(term in lowered for term in ("como você está", "como voce esta", "tudo bem", "como ta", "como está")):
-            response = self._pick([
-                "🤖 Operacional e de olho no #geral. Obrigado por perguntar.",
-                "🤖 Tudo certo por aqui. Estou online e atento ao canal.",
-            ])
-        elif follow_up:
-            response = "😎 Eu também estou de boa. Continuo online e prestando atenção por aqui."
-        elif any(term in lowered for term in ("regras", "qual a regra", "quais as regras")):
-            response = self.PUBLIC_COMMANDS["!rules"]
-        elif any(term in lowered for term in ("o que você faz", "o que voce faz", "quem é você", "quem voce e")):
-            response = self.PUBLIC_COMMANDS["!bot"]
-        elif any(term in lowered for term in ("me ajuda", "preciso de ajuda", "comandos", "o que posso fazer")):
-            response = "🧭 Posso moderar o canal, detectar spam/flood, bloquear links suspeitos e responder perguntas simples. Use `!help` para ver minhas funções."
-        elif any(term in lowered for term in ("quem está online", "quem esta online", "tem alguém online", "tem alguem online", "quantas pessoas")):
-            response = self.online_message(online_count)
-        elif any(term in lowered for term in ("que horas", "qual a hora", "horas agora", "hora agora")):
-            response = self.time_message()
-        elif any(term in lowered for term in self.THANKS):
-            response = self._pick(["😎 Tamo junto.", "🤖 Sempre à disposição.", "🫡 É nóis."])
-        elif any(term in lowered for term in ("lembra", "memória", "memoria", "o que eu falei", "o que eu disse")):
-            response = self.memory_message(user_id=user_id)
-        else:
-            response = self._pick([
-                "🤖 Entendi sua mensagem. Ainda estou aprendendo, mas posso ajudar com `!help`, `!rules`, `!online`, `!time`, `!memory` e `!status`.",
-                "🤖 Recebi. Minha especialidade atual é moderar o #geral e responder perguntas simples quando você me chama.",
-                "🤖 Estou acompanhando. Tente uma pergunta mais direta ou use `!help` para ver minhas funções.",
-            ])
-        self._remember_turn(user_id, "bot", response)
-        if user_id is not None:
-            self._last_bot_reply_at[str(user_id)] = time.time()
-        return response
-
-    def memory_message(self, user_id: int | None = None) -> str:
-        if user_id is None:
-            return "🧠 Minha memória curta está disponível durante esta sessão."
-        turns = list(self._conversation_memory.get(str(user_id), ()))
-        user_turns = [text for role, text in turns if role == "user"]
-        if not user_turns:
-            return "🧠 Ainda não tenho contexto suficiente desta conversa."
-        recent = user_turns[-3:]
-        if len(recent) == 1:
-            return f"🧠 Lembro que você falou sobre: “{recent[0]}”."
-        return "🧠 Das últimas mensagens, lembro de: " + "; ".join(f"“{item}”" for item in recent) + "."
-
-    def online_message(self, online_count: int | None) -> str:
-        if online_count is None:
-            return "👥 Não consegui consultar a lista de usuários agora."
-        if online_count <= 0:
-            return "👥 No momento, não há usuários conectados."
-        if online_count == 1:
-            return "👥 Tem 1 usuário online no Pokinex agora."
-        return f"👥 Tem {online_count} usuários online no Pokinex agora."
-
-    def time_message(self) -> str:
-        now = datetime.now().astimezone()
-        return f"🕒 Agora são {now.strftime('%H:%M:%S')} ({now.strftime('%d/%m/%Y')})."
-
-    def status_message(self) -> str:
-        uptime = max(0, int(time.time() - self._started_at))
-        hours, remainder = divmod(uptime, 3600)
-        minutes, seconds = divmod(remainder, 60)
-        top_categories = sorted(self._categories.items(), key=lambda item: item[1], reverse=True)[:4]
-        categories = ", ".join(f"{name}:{count}" for name, count in top_categories) or "nenhuma"
-        return (
-            f"📊 PokiBot status • online • uptime {hours:02d}:{minutes:02d}:{seconds:02d} "
-            f"• analisadas: {self._total_checked} • bloqueadas: {self._total_blocked} "
-            f"• categorias: {categories}"
-        )
-
-    def parse_target(self, message: str):
-        parts = message.strip().split(maxsplit=2)
-        if len(parts) < 2:
-            return None, "Informe um usuário no formato @username."
-        target = parts[1].lstrip("@").strip()
-        if not re.fullmatch(r"[A-Za-z0-9_.-]{3,30}", target):
-            return None, "Usuário inválido."
-        return target.casefold(), parts[2].strip() if len(parts) > 2 else ""
-
     def mute(self, user_id: int, minutes: int) -> None:
-        self._muted_until[str(user_id)] = time.time() + (minutes * 60)
+        self._muted_until[str(user_id)] = time.time() + minutes * 60
 
     def unmute(self, user_id: int) -> None:
         self._muted_until.pop(str(user_id), None)
 
     def is_muted(self, user_id: int) -> bool:
-        key = str(user_id)
-        expires = self._muted_until.get(key)
+        return self.remaining_mute_seconds(user_id) > 0
+
+    def remaining_mute_seconds(self, user_id: int) -> int:
+        expires = self._muted_until.get(str(user_id))
         if expires is None:
-            return False
-        if time.time() >= expires:
-            self._muted_until.pop(key, None)
-            return False
-        return True
+            return 0
+        remaining = max(0, int(expires - time.time() + 0.999))
+        if remaining == 0:
+            self._muted_until.pop(str(user_id), None)
+        return remaining
 
+    def status_message(self) -> str:
+        uptime = int(max(0, time.time() - self._started_at))
+        minutes, seconds = divmod(uptime, 60)
+        return (
+            f"🤖 PokiBot online • uptime {minutes}m {seconds}s • "
+            f"verificadas {self._total_checked} • bloqueadas {self._total_blocked}"
+        )
 
-moderation_bot = ModerationBot()
+    @staticmethod
+    def online_message(online_count: int | None) -> str:
+        if online_count is None:
+            return "👥 Contagem de usuários online indisponível no momento."
+        return f"👥 Usuários online: {online_count}."
+
+    @staticmethod
+    def time_message() -> str:
+        return f"🕒 Horário do servidor: {datetime.now().astimezone().strftime('%d/%m/%Y %H:%M:%S %z')}"
+
+    def memory_message(self, user_id: int | None = None) -> str:
+        if user_id is None:
+            return "🧠 Memória curta indisponível sem uma sessão de usuário."
+        memory = self._conversation_memory.get(str(user_id))
+        turns = len(memory or ())
+        return f"🧠 Memória curta ativa: {turns}/{self.MEMORY_MAX_TURNS} turno(s)."
+
+    def conversational_response(self, message: str, user_id: int, *, online_count: int | None = None) -> str | None:
+        normalized = self.normalize_for_moderation(message).casefold()
+        now = time.time()
+        key = str(user_id)
+        if now - self._last_bot_reply_at.get(key, 0) < self.BOT_REPLY_COOLDOWN_SECONDS:
+            return None
+
+        response = None
+        if normalized in self.GREETINGS:
+            response = self._rng.choice(self.GREETINGS[normalized])
+        elif normalized in self.THANKS:
+            response = self._rng.choice(["🤝 Tamo junto!", "😎 Disponha.", "🤖 Sempre que precisar."])
+        elif normalized.startswith("quantos") and "online" in normalized:
+            response = self.online_message(online_count)
+        elif any(pattern.search(message) for pattern in self.ADDRESS_PATTERNS):
+            response = "🤖 Estou ouvindo. Manda a pergunta."
+
+        if response:
+            self._last_bot_reply_at[key] = now
+            return response
+        return None
