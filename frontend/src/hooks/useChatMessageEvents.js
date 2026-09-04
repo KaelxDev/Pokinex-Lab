@@ -16,13 +16,14 @@ export function useChatMessageEvents({
   setOfflineQueue,
   setReactionPickerMessageId,
   setReplyingTo,
+  setUsers,
   syncProfile,
   userRef,
 }) {
   return useCallback((data) => {
     if (data?.type === "users") {
       const list = Array.isArray(data.users) ? data.users : [];
-      mergeUser.__setUsers?.(list);
+      setUsers(list);
       list.forEach(mergeUser);
       return;
     }
@@ -211,5 +212,5 @@ export function useChatMessageEvents({
         { ...data, timestamp: data.timestamp || Date.now() },
       ]);
     }
-  }, [clearLocalHistory, contextMenu?.message?.messageId, editingId, mergeUser, reactionPickerMessageId, replyingTo?.messageId, setContextMenu, setEditError, setEditSaving, setEditingId, setEditingText, setMessages, setOfflineQueue, setReactionPickerMessageId, setReplyingTo, syncProfile, userRef]);
+  }, [clearLocalHistory, contextMenu?.message?.messageId, editingId, mergeUser, reactionPickerMessageId, replyingTo?.messageId, setContextMenu, setEditError, setEditSaving, setEditingId, setEditingText, setMessages, setOfflineQueue, setReactionPickerMessageId, setReplyingTo, setUsers, syncProfile, userRef]);
 }
