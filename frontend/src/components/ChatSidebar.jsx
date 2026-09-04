@@ -5,7 +5,7 @@ import { onDirectMessage, onDirectMessageRead, markDirectMessageRead } from "../
 export default function ChatSidebar({ user, profile, users, onOpenProfile, onClearHistory }) {
   const displayName = profile?.displayName || user?.displayName || user?.username || "Usuário";
   const avatar = normalizeAvatarUrl(profile?.avatar || user?.avatar, user?.id);
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 700);
   const [unreadByUser, setUnreadByUser] = useState({});
 
   const isModerator = useMemo(
@@ -14,28 +14,45 @@ export default function ChatSidebar({ user, profile, users, onOpenProfile, onCle
   );
 
   useEffect(() => {
-    const toggle = () => setMobileOpen((current) => !current);
-    const close = () => setMobileOpen(false);
-    const handleResize = () => setMobileOpen(false);
+    const toggle = () => {
+      setSidebarOpen((current) => {
+        const next = !current;
+        window.dispatchEvent(
+          new CustomEvent("pokinex:sidebar-state", { detail: { open: next } }),
+        );
+        return next;
+      });
+    };
 
-    window.addEventListener("pokinex:mobile-sidebar-toggle", toggle);
-    window.addEventListener("pokinex:mobile-sidebar-close", close);
-    window.addEventListener("resize", handleResize);
+    const close = () => {
+      setSidebarOpen((current) => {
+        if (current) {
+          window.dispatchEvent(
+            new CustomEvent("pokinex:sidebar-state", { detail: { open: false } }),
+          );
+        }
+        return false;
+      });
+    };
+
+    window.addEventListener("pokinex:sidebar-toggle", toggle);
+    window.addEventListener("pokinex:sidebar-close", close);
+    window.addEventListener("resize", close);
 
     return () => {
-      window.removeEventListener("pokinex:mobile-sidebar-toggle", toggle);
-      window.removeEventListener("pokinex:mobile-sidebar-close", close);
-      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("pokinex:sidebar-toggle", toggle);
+      window.removeEventListener("pokinex:sidebar-close", close);
+      window.removeEventListener("resize", close);
     };
   }, []);
 
   useEffect(() => {
     window.dispatchEvent(
-      new CustomEvent("pokinex:mobile-sidebar-state", {
-        detail: { open: mobileOpen },
+      new CustomEvent("pokinex:sidebar-state", {
+        detail: { open: sidebarOpen },
       }),
     );
-  }, [mobileOpen]);
+  }, [sidebarOpen]);
 
   useEffect(() => {
     const offIncoming = onDirectMessage((message) => {
@@ -67,34 +84,36 @@ export default function ChatSidebar({ user, profile, users, onOpenProfile, onCle
     [unreadByUser],
   );
 
-  function closeMobileSidebar() {
-    setMobileOpen(false);
-    window.dispatchEvent(new CustomEvent("pokinex:mobile-sidebar-close"));
+  function closeSidebar() {
+    window.dispatchEvent(new CustomEvent("pokinex:sidebar-close"));
   }
 
   function handleOpenProfile() {
-    closeMobileSidebar();
+    if (window.innerWidth <= 700) closeSidebar();
     onOpenProfile();
   }
 
   function handleDMClick(event) {
     const userId = Number(event.currentTarget.dataset.dmUserId);
     if (Number.isFinite(userId)) markDirectMessageRead(userId);
-    closeMobileSidebar();
+    closeSidebar();
   }
 
   return (
     <>
-      {mobileOpen && (
+      {sidebarOpen && window.innerWidth <= 700 && (
         <button
           className="mobile-sidebar-backdrop"
           type="button"
           aria-label="Fechar navegação"
-          onClick={closeMobileSidebar}
+          onClick={closeSidebar}
         />
       )}
 
-      <aside id="pokinex-mobile-sidebar" className={`sidebar${mobileOpen ? " mobile-open" : ""}`}>
+      <aside
+        id="pokinex-sidebar"
+        className={`sidebar${sidebarOpen ? " mobile-open" : " sidebar-collapsed"}`}
+      >
         <div className="sidebar-rail" aria-hidden="true">
           <div className="rail-brand">
             <img src="/icone.png?v=2" alt="" />
@@ -118,7 +137,7 @@ export default function ChatSidebar({ user, profile, users, onOpenProfile, onCle
 
           <div className="mobile-sidebar-header">
             <span>Navegação</span>
-            <button type="button" onClick={closeMobileSidebar} aria-label="Fechar navegação">✕</button>
+            <button type="button" onClick={closeSidebar} aria-label="Fechar navegação">✕</button>
           </div>
 
           <div className="sidebar-heading">
@@ -126,7 +145,7 @@ export default function ChatSidebar({ user, profile, users, onOpenProfile, onCle
             <span className="sidebar-heading-count">{1 + unreadTotal}</span>
           </div>
 
-          <button className="channel-entry active" type="button" onClick={closeMobileSidebar}>
+          <button className="channel-entry active" type="button" onClick={() => window.innerWidth <= 700 && closeSidebar()}>
             <span className="channel-entry-icon">#</span>
             <span className="channel-entry-copy">
               <strong>geral</strong>
