@@ -13,7 +13,7 @@ import { useChatConnection } from "./hooks/useChatConnection";
 import { useChatHistory } from "./hooks/useChatHistory";
 import { useChatMessageEvents } from "./hooks/useChatMessageEvents";
 import { useProfileEditor } from "./hooks/useProfileEditor";
-import { useUserProfiles } from "./hooks/useUserProfiles";
+import { useUserDirectory } from "./hooks/useUserDirectory";
 
 export default function App() {
   const { authChecked, user, userRef, syncUser, logout } = useAuthSession();
@@ -29,59 +29,22 @@ export default function App() {
     clearLocalHistory,
   } = useChatHistory(user?.id);
 
-  const [users, setUsers] = useState([]);
-  const [profilesById, setProfilesById] = useState({});
   const [messageInput, setMessageInput] = useState("");
-  const [profile, setProfile] = useState(null);
   const [replyingTo, setReplyingTo] = useState(null);
   const connectionRef = useRef({ connected: false, socket: null });
 
   const isConnected = useCallback(() => connectionRef.current.connected, []);
   const getSocket = useCallback(() => connectionRef.current.socket, []);
 
-  const mergeUser = useCallback((incoming) => {
-    if (!incoming?.id) return;
-    setProfilesById((current) => ({
-      ...current,
-      [incoming.id]: { ...current[incoming.id], ...incoming },
-    }));
-    setUsers((current) => {
-      const index = current.findIndex((item) => String(item.id) === String(incoming.id));
-      if (index < 0) return [...current, incoming];
-      const next = [...current];
-      next[index] = { ...next[index], ...incoming };
-      return next;
-    });
-  }, []);
-
-  const syncProfile = useCallback((nextUser) => {
-    syncUser(nextUser);
-    setProfile(nextUser);
-    if (nextUser?.id) {
-      setProfilesById((current) => ({ ...current, [nextUser.id]: nextUser }));
-      setUsers((current) =>
-        current.map((item) =>
-          String(item.id) === String(nextUser.id) ? { ...item, ...nextUser } : item,
-        ),
-      );
-      setMessages((current) =>
-        current.map((item) =>
-          String(item.userId) === String(nextUser.id)
-            ? { ...item, ...nextUser }
-            : item,
-        ),
-      );
-    }
-  }, [setMessages, syncUser]);
-
-  useUserProfiles(
-    messages,
+  const {
     users,
-    profilesById,
-    setProfilesById,
     setUsers,
-    setMessages,
-  );
+    profilesById,
+    mergeUser,
+    syncProfile,
+  } = useUserDirectory({ messages, setMessages, syncUser });
+
+  const profile = users.find((item) => String(item.id) === String(user?.id)) || user;
 
   const {
     contextMenu,
@@ -185,10 +148,8 @@ export default function App() {
     } finally {
       logout();
       setUsers([]);
-      setProfilesById({});
       setMessages([]);
       setOfflineQueue([]);
-      setProfile(null);
       setReplyingTo(null);
       setContextMenu(null);
       setReactionPickerMessageId(null);
