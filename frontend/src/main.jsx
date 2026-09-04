@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles/index.css";
-import AutoMessageScroll from "./AutoMessageScroll.jsx";
+import AutoMessageScroll from "./components/AutoMessageScroll.jsx";
 import AppEdit from "./AppEdit.jsx";
 import PrivateDMFeature from "./components/PrivateDMFeature.jsx";
 import DirectMessageNotifier from "./components/DirectMessageNotifier.jsx";
