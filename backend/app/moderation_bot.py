@@ -39,10 +39,10 @@ class ModerationResult:
 
 class ModerationBot:
     PUBLIC_COMMANDS = {
-        "!help": "🤖 Comandos: !help, !rules, !bot, !about, !ping, !status, !online, !time",
+        "!help": "🤖 Comandos: !help, !rules, !bot, !about, !ping, !status, !online, !time, !memory",
         "!rules": "📜 Regras: respeito, nada de spam/scam, abuso ou flood. Em caso de problema, fale com a moderação.",
         "!bot": "🤖 Eu sou o PokiBot, assistente e moderador automático do #geral. Também respondo quando você me menciona.",
-        "!about": "🤖 PokiBot • moderação automática • respostas contextuais • proteção contra flood.",
+        "!about": "🤖 PokiBot • moderação automática • respostas contextuais • memória curta • proteção contra flood.",
         "!ping": "🏓 Pong. PokiBot está online.",
     }
     MOD_HELP = (
@@ -60,6 +60,7 @@ class ModerationBot:
     FLOOD_MAX_MESSAGES = 6
     DUPLICATE_WINDOW_SECONDS = 20.0
     BOT_REPLY_COOLDOWN_SECONDS = 3.0
+    MEMORY_MAX_TURNS = 6
     GREETINGS = {
         "oi": [
             "👋 Oi! Eu sou o PokiBot. Pode me mencionar quando precisar.",
@@ -78,12 +79,19 @@ class ModerationBot:
         "e aí": ["👋 E aí! PokiBot online.", "🤖 E aí! Manda a boa."],
     }
     THANKS = ("obrigado", "obrigada", "valeu", "tmj", "tamo junto")
+    ADDRESS_PATTERNS = (
+        re.compile(r"@poki\s*bot\b", re.IGNORECASE),
+        re.compile(r"\bpoki\s*bot\b", re.IGNORECASE),
+    )
 
     def __init__(self):
         self._muted_until: dict[str, float] = {}
         self._message_times: dict[str, deque[float]] = defaultdict(deque)
         self._last_messages: dict[str, tuple[str, float]] = {}
         self._last_bot_reply_at: dict[str, float] = {}
+        self._conversation_memory: dict[str, deque[tuple[str, str]]] = defaultdict(
+            lambda: deque(maxlen=self.MEMORY_MAX_TURNS)
+        )
         self._total_checked = 0
         self._total_blocked = 0
         self._started_at = time.time()
@@ -100,6 +108,8 @@ class ModerationBot:
             return self.online_message(online_count)
         if command == "!time":
             return self.time_message()
+        if command == "!memory":
+            return self.memory_message()
         return self.PUBLIC_COMMANDS.get(command)
 
     def _remember_message(self, user_id: int, message: str) -> tuple[bool, bool]:
@@ -167,16 +177,25 @@ class ModerationBot:
     def _addressed_to_bot(self, text: str) -> tuple[bool, str]:
         cleaned = text
         addressed = False
-        patterns = (
-            re.compile(r"@poki\s*bot\b", re.IGNORECASE),
-            re.compile(r"\bpoki\s*bot\b", re.IGNORECASE),
-        )
-        for pattern in patterns:
+        for pattern in self.ADDRESS_PATTERNS:
             if pattern.search(cleaned):
                 addressed = True
                 cleaned = pattern.sub(" ", cleaned)
         cleaned = re.sub(r"\s+", " ", cleaned).strip(" ,.!?:;-\t")
         return addressed, cleaned
+
+    def _remember_turn(self, user_id: int | None, role: str, text: str) -> None:
+        if user_id is None:
+            return
+        self._conversation_memory[str(user_id)].append((role, text))
+
+    def _last_bot_message(self, user_id: int | None) -> str | None:
+        if user_id is None:
+            return None
+        for role, text in reversed(self._conversation_memory.get(str(user_id), ())):
+            if role == "bot":
+                return text
+        return None
 
     def conversational_response(
         self,
@@ -193,36 +212,65 @@ class ModerationBot:
         lowered = cleaned.casefold()
         direct = addressed or lowered.startswith(("pokibot", "poki bot"))
 
-        if not direct or not self._can_reply(user_id):
+        if not direct:
+            return None
+        if not self._can_reply(user_id):
             return None
 
+        self._remember_turn(user_id, "user", cleaned)
+        response: str
+
         if lowered in self.GREETINGS:
-            return self._pick(self.GREETINGS[lowered])
-        if not lowered:
-            return "🤖 Estou aqui. Use `!help` ou me faça uma pergunta."
-        if any(term in lowered for term in ("como você está", "como voce esta", "tudo bem", "como ta", "como está")):
-            return self._pick([
+            response = self._pick(self.GREETINGS[lowered])
+        elif not lowered:
+            response = "🤖 Estou aqui. Use `!help` ou me faça uma pergunta."
+        elif any(term in lowered for term in ("como você está", "como voce esta", "tudo bem", "como ta", "como está")):
+            response = self._pick([
                 "🤖 Operacional e de olho no #geral. Obrigado por perguntar.",
                 "🤖 Tudo certo por aqui. Estou online e atento ao canal.",
             ])
-        if any(term in lowered for term in ("regras", "qual a regra", "quais as regras")):
-            return self.PUBLIC_COMMANDS["!rules"]
-        if any(term in lowered for term in ("o que você faz", "o que voce faz", "quem é você", "quem voce e")):
-            return self.PUBLIC_COMMANDS["!bot"]
-        if any(term in lowered for term in ("me ajuda", "preciso de ajuda", "comandos", "o que posso fazer")):
-            return "🧭 Posso moderar o canal, detectar spam/flood e responder perguntas simples. Use `!help` para ver minhas funções."
-        if any(term in lowered for term in ("quem está online", "quem esta online", "tem alguém online", "tem alguem online", "quantas pessoas")):
-            return self.online_message(online_count)
-        if any(term in lowered for term in ("que horas", "qual a hora", "horas agora", "hora agora")):
-            return self.time_message()
-        if any(term in lowered for term in self.THANKS):
-            return self._pick(["😎 Tamo junto.", "🤖 Sempre à disposição.", "🫡 É nóis."])
+        elif lowered in {"e você", "e voce", "e vc", "e tu", "e contigo"}:
+            previous = self._last_bot_message(user_id)
+            response = (
+                "😎 Eu estou de boa e continuo online."
+                if previous
+                else "🤖 Tudo certo por aqui também."
+            )
+        elif any(term in lowered for term in ("regras", "qual a regra", "quais as regras")):
+            response = self.PUBLIC_COMMANDS["!rules"]
+        elif any(term in lowered for term in ("o que você faz", "o que voce faz", "quem é você", "quem voce e")):
+            response = self.PUBLIC_COMMANDS["!bot"]
+        elif any(term in lowered for term in ("me ajuda", "preciso de ajuda", "comandos", "o que posso fazer")):
+            response = "🧭 Posso moderar o canal, detectar spam/flood e responder perguntas simples. Use `!help` para ver minhas funções."
+        elif any(term in lowered for term in ("quem está online", "quem esta online", "tem alguém online", "tem alguem online", "quantas pessoas")):
+            response = self.online_message(online_count)
+        elif any(term in lowered for term in ("que horas", "qual a hora", "horas agora", "hora agora")):
+            response = self.time_message()
+        elif any(term in lowered for term in self.THANKS):
+            response = self._pick(["😎 Tamo junto.", "🤖 Sempre à disposição.", "🫡 É nóis."])
+        elif any(term in lowered for term in ("lembra", "memória", "memoria", "o que eu falei", "o que eu disse")):
+            response = self.memory_message(user_id=user_id)
+        else:
+            response = self._pick([
+                "🤖 Entendi sua mensagem. Ainda estou aprendendo, mas posso ajudar com `!help`, `!rules`, `!online`, `!time` e `!status`.",
+                "🤖 Recebi. Minha especialidade atual é moderar o #geral e responder perguntas simples quando você me chama.",
+                "🤖 Estou acompanhando. Tente uma pergunta mais direta ou use `!help` para ver minhas funções.",
+            ])
 
-        return self._pick([
-            "🤖 Entendi sua mensagem. Ainda estou aprendendo, mas posso ajudar com `!help`, `!rules`, `!online`, `!time` e `!status`.",
-            "🤖 Recebi. Minha especialidade atual é moderar o #geral e responder perguntas simples quando você me chama.",
-            "🤖 Estou acompanhando. Tente uma pergunta mais direta ou use `!help` para ver minhas funções.",
-        ])
+        self._remember_turn(user_id, "bot", response)
+        return response
+
+    def memory_message(self, user_id: int | None = None) -> str:
+        if user_id is None:
+            return "🧠 Minha memória curta está disponível durante esta sessão."
+        turns = list(self._conversation_memory.get(str(user_id), ()))
+        user_turns = [text for role, text in turns if role == "user"]
+        if not user_turns:
+            return "🧠 Ainda não tenho contexto suficiente desta conversa."
+        recent = user_turns[-3:]
+        if len(recent) == 1:
+            return f"🧠 Lembro que você falou sobre: “{recent[0]}”."
+        return "🧠 Das últimas mensagens, lembro de: " + "; ".join(f"“{item}”" for item in recent) + "."
 
     def online_message(self, online_count: int | None) -> str:
         if online_count is None:
