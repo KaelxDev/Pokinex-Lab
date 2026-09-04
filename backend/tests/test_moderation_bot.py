@@ -59,3 +59,48 @@ def test_memory_is_isolated_per_user():
     bot = ModerationBot()
     bot.conversational_response("@PokiBot oi", user_id=1)
     assert bot.memory_message(user_id=2) == "🧠 Ainda não tenho contexto suficiente desta conversa."
+
+
+def test_normalization_handles_leetspeak_and_invisible_characters():
+    normalized = ModerationBot.normalize_for_moderation("fr3e n1tr0\u200b")
+    assert "free nitro" in normalized.casefold()
+
+
+def test_scam_is_blocked_and_can_escalate_to_mute():
+    bot = ModerationBot()
+    result = bot.moderate("Ganhe free nitro agora https://example.com", user_id=33)
+    assert not result.allowed
+    assert result.category == "scam"
+    assert result.severity == "high"
+    assert result.mute_minutes >= 5
+
+
+def test_threat_is_blocked():
+    bot = ModerationBot()
+    result = bot.moderate("vou te matar", user_id=44)
+    assert not result.allowed
+    assert result.category == "threat"
+    assert result.severity == "high"
+
+
+def test_excessive_mentions_are_blocked():
+    bot = ModerationBot()
+    result = bot.moderate("@um @dois @tres @quatro @cinco olha isso", user_id=55)
+    assert not result.allowed
+    assert result.category == "mention_spam"
+
+
+def test_repeated_characters_are_blocked():
+    bot = ModerationBot()
+    result = bot.moderate("kkkkkkkkkkkkkkkk", user_id=66)
+    assert not result.allowed
+    assert result.category == "repeated_chars"
+
+
+def test_second_violation_gets_progressive_mute():
+    bot = ModerationBot()
+    first = bot.moderate("vai se fuder", user_id=77)
+    second = bot.moderate("vai se fuder de novo", user_id=77)
+    assert not first.allowed
+    assert not second.allowed
+    assert second.mute_minutes == 1
