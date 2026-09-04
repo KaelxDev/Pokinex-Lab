@@ -45,7 +45,7 @@ export function useChatHistory(userId) {
     cacheWriteTimerRef.current = window.setTimeout(() => {
       try {
         const cacheable = messages
-          .filter((item) => item?.type === "message")
+          .filter((item) => item?.type === "message" && !item?.ephemeral)
           .slice(-LOCAL_CACHE_LIMIT);
         localStorage.setItem(cacheKey, JSON.stringify(cacheable));
       } catch (error) {
@@ -66,6 +66,7 @@ export function useChatHistory(userId) {
       console.error("Não foi possível atualizar a fila offline:", error);
     }
   }, [offlineQueue, userKey]);
+
   async function loadMessageHistory(before = null, preserveScroll = false) {
     if (historyLoadingRef.current) {
       if (before == null) refreshPendingRef.current = true;
@@ -123,6 +124,7 @@ export function useChatHistory(userId) {
     setOfflineQueue(loadJson(scopedStorageKey(QUEUE_KEY, userKey)));
     void loadMessageHistory();
   }, [userKey]);
+
   function handleMessagesScroll(event) {
     if (event.currentTarget.scrollTop > 80) return;
     if (!hasMoreHistory || historyLoadingRef.current || !historyBefore) return;
