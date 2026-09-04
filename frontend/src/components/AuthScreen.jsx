@@ -1,6 +1,31 @@
 import { useState } from "react";
 import { login, register } from "../services/auth";
 
+const capabilityStyle = {
+  minWidth: 0,
+  display: "flex",
+  alignItems: "center",
+  gap: 9,
+  padding: "10px 11px",
+  border: "1px solid rgba(255,255,255,.055)",
+  borderRadius: 11,
+  background: "rgba(255,255,255,.02)",
+  color: "#8a919e",
+  textAlign: "left",
+  boxSizing: "border-box",
+};
+
+const capabilityIconStyle = {
+  width: 28,
+  height: 28,
+  flex: "0 0 28px",
+  display: "grid",
+  placeItems: "center",
+  borderRadius: 8,
+  background: "rgba(255,255,255,.04)",
+  fontSize: 14,
+};
+
 export default function AuthScreen({ onAuthenticated }) {
   const [mode, setMode] = useState("login");
   const [username, setUsername] = useState("");
@@ -84,21 +109,38 @@ export default function AuthScreen({ onAuthenticated }) {
             </button>
           </form>
 
-          <div className="auth-capabilities" aria-label="Recursos do Pokinex">
-            <div className="auth-capability">
-              <span className="auth-capability-icon" aria-hidden="true">💬</span>
-              <span>
-                <strong>Chat público</strong>
-                <small>Converse em tempo real</small>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9, marginTop: 16 }} aria-label="Recursos do Pokinex">
+            <div style={capabilityStyle}>
+              <span style={capabilityIconStyle} aria-hidden="true">💬</span>
+              <span style={{ minWidth: 0, flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
+                <strong style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#dce0e7", fontSize: 10 }}>Chat público</strong>
+                <small style={{ color: "#626976", fontSize: 9 }}>Converse em tempo real</small>
               </span>
             </div>
-            <button className="auth-capability auth-capability-button" type="button" onClick={showPrivateMessagesNotice}>
-              <span className="auth-capability-icon" aria-hidden="true">✉</span>
-              <span>
-                <strong>Mensagens privadas</strong>
-                <small>Converse diretamente</small>
+            <button
+              type="button"
+              onClick={showPrivateMessagesNotice}
+              style={{
+                ...capabilityStyle,
+                cursor: "pointer",
+                font: "inherit",
+              }}
+              onMouseOver={(event) => {
+                event.currentTarget.style.background = "rgba(88,101,242,.08)";
+                event.currentTarget.style.borderColor = "rgba(88,101,242,.18)";
+              }}
+              onMouseOut={(event) => {
+                event.currentTarget.style.background = "rgba(255,255,255,.02)";
+                event.currentTarget.style.borderColor = "rgba(255,255,255,.055)";
+              }}
+              aria-label="Mensagens privadas"
+            >
+              <span style={capabilityIconStyle} aria-hidden="true">✉</span>
+              <span style={{ minWidth: 0, flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
+                <strong style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#dce0e7", fontSize: 10 }}>Mensagens privadas</strong>
+                <small style={{ color: "#626976", fontSize: 9 }}>Converse diretamente</small>
               </span>
-              <span className="auth-capability-arrow" aria-hidden="true">›</span>
+              <span style={{ flex: "0 0 auto", color: "#707785", fontSize: 17 }} aria-hidden="true">›</span>
             </button>
           </div>
 
