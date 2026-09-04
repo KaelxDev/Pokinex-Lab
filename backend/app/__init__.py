@@ -15,6 +15,7 @@ from .websocket.schemas import ChatMessageEvent
 
 
 _LAUGHTER_RUN = re.compile(r"([kha])\1{8,}", re.IGNORECASE)
+_ZERO_WIDTH = re.compile(r"[\u200b-\u200f\u202a-\u202e\u2060\ufeff]")
 _current_message_id = ContextVar("pokinex_current_message_id", default=None)
 _pending_cleanup_ids = ContextVar("pokinex_pending_cleanup_ids", default=None)
 _original_moderate = ModerationBot.moderate
@@ -51,6 +52,27 @@ def _configured_moderator(user) -> bool:
 # main.py imports this symbol after the package initializer has executed.
 _moderation_module = sys.modules["app.moderation_bot"]
 _moderation_module.is_moderator = _owner_aware_is_moderator
+
+
+def _raw_mention_spam_result(self, message, user_id=None):
+    """Preserve @mentions before the leetspeak normalizer can rewrite '@' to 'a'."""
+    mention_source = _ZERO_WIDTH.sub("", message)
+    mention_count = self._mention_count(mention_source)
+    if mention_count <= self.MAX_MENTIONS_PER_MESSAGE:
+        return None
+
+    self._total_blocked += 1
+    self._categories["mention_spam"] += 1
+    strike, escalation = self._register_violation(user_id)
+    return ModerationResult(
+        False,
+        "Excesso de menções detectado.",
+        f"📣 Evite mencionar muitas pessoas de uma vez. (ocorrência {strike})",
+        "blocked",
+        "mention_spam",
+        "medium",
+        escalation,
+    )
 
 
 def _moderate_with_pokinex_rules(self, message, user_id=None):
@@ -97,6 +119,10 @@ def _moderate_with_pokinex_rules(self, message, user_id=None):
                     mute_minutes,
                 )
 
+            mention_result = _raw_mention_spam_result(self, message, user_id)
+            if mention_result:
+                return mention_result
+
             internal_message = (
                 f"{safe_message} [pokinex-duplicate-check-"
                 f"{count}-{current_message_id or now}]"
@@ -106,10 +132,18 @@ def _moderate_with_pokinex_rules(self, message, user_id=None):
                 entries.append((now, normalized, current_message_id))
             return result
 
+        mention_result = _raw_mention_spam_result(self, message, user_id)
+        if mention_result:
+            return mention_result
+
         result = _original_moderate(self, safe_message, user_id)
         if result.allowed:
             entries.append((now, normalized, current_message_id))
         return result
+
+    mention_result = _raw_mention_spam_result(self, message, user_id)
+    if mention_result:
+        return mention_result
 
     return _original_moderate(self, safe_message, user_id)
 
