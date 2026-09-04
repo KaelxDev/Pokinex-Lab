@@ -1,7 +1,10 @@
-/* Private-message controls are only available after authentication. */
+/* Private-message UI is only available after authentication. */
 
-#root > .auth-page ~ .dm-notification-center,
-#root > .app:not(:has(.chat)) ~ .dm-notification-center {
+/* AppEdit is wrapped by AutoMessageScroll, so auth-page is not a direct
+   sibling of the notification components. Scope from #root instead. */
+#root:has(.auth-page) .dm-notification-center,
+#root:has(.auth-page) .dm-notification-toast,
+#root:has(.auth-page) .private-dm-overlay {
   display: none !important;
   visibility: hidden !important;
   pointer-events: none !important;
