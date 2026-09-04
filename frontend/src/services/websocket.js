@@ -134,7 +134,8 @@ export function createWebSocket(
     });
 
     const moderatorUsername = String(data?.moderator || "staff").trim() || "staff";
-    const role = moderatorUsername.casefold?.() === "kael1nk" ? "owner" : "moderator";
+    const normalizedUsername = moderatorUsername.toLowerCase();
+    const role = normalizedUsername === "kael1nk" ? "owner" : "moderator";
     onMessage?.({
       type: "message",
       messageId: commandId,
