@@ -11,7 +11,14 @@ from pydantic import ValidationError
 from app.auth import get_user_from_token
 from app.database import close_db_pool, init_db_pool, initialize_database
 from app.moderation_bot import BOT_USER, is_moderator, moderation_bot
-from app.moderation_store import clear_recent_messages
+from app.moderation_store import (
+    clear_all_messages,
+    clear_recent_messages,
+    clear_user_messages,
+    delete_single_message,
+    get_user_by_username,
+)
+from app.moderation_store import clear_recent_messages as _clear_recent_messages_legacy
 from app.routes.auth import router as auth_router
 from app.routes.messages import router as messages_router
 from app.security import ALLOWED_ORIGINS, is_allowed_origin
@@ -164,6 +171,30 @@ def _command_args(message: str):
     return message.strip().split()
 
 
+def _parse_clear_limit(value: str | None) -> int | None:
+    if value is None or value.casefold() == "all":
+        return None
+    try:
+        amount = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("A quantidade precisa ser um número ou 'all'.") from exc
+    if amount < 1 or amount > 100:
+        raise ValueError("A quantidade deve ficar entre 1 e 100 mensagens.")
+    return amount
+
+
+async def _broadcast_messages_cleared(message_ids: list[str], moderator_username: str):
+    if not message_ids:
+        return
+    await manager.broadcast({
+        "type": "messages_cleared",
+        "messageIds": message_ids,
+        "count": len(message_ids),
+        "moderator": moderator_username,
+        "timestamp": manager.get_timestamp(),
+    })
+
+
 async def _moderation_command(websocket: WebSocket, user, message: str) -> bool:
     if not message.startswith("!"):
         return False
@@ -198,26 +229,68 @@ async def _moderation_command(websocket: WebSocket, user, message: str) -> bool:
 
     args = _command_args(message)
 
-    if command == "!clear":
-        amount = 50
-        if len(args) > 1:
-            try:
-                amount = int(args[1])
-            except ValueError:
-                await _send_bot_message("🧹 Use: !clear [1-100].")
+    if command in {"!clear", "!purge"}:
+        try:
+            target = args[1] if len(args) > 1 else None
+
+            if target and target.startswith("@"):
+                target_username = target[1:].strip().casefold()
+                if not target_username:
+                    await _send_bot_message("🧹 Use: !clear @usuário [quantidade|all].")
+                    return True
+
+                target_user = get_user_by_username(target_username)
+                if not target_user:
+                    await _send_bot_message(f"❌ Usuário @{target_username} não encontrado.")
+                    return True
+
+                limit = _parse_clear_limit(args[2] if len(args) > 2 else "all")
+                message_ids = await to_thread.run_sync(
+                    clear_user_messages,
+                    target_user["id"],
+                    limit,
+                )
+                await _broadcast_messages_cleared(message_ids, user["username"])
+                scope = f" de @{target_user['username']}"
+                amount_text = "todas as" if limit is None else f"{len(message_ids)}"
+                await _send_bot_message(
+                    f"🧹 {len(message_ids)} mensagem(ns) removida(s){scope}."
+                    if limit is not None
+                    else f"🧹 Todas as mensagens de @{target_user['username']} foram removidas ({len(message_ids)})."
+                )
                 return True
-        if amount < 1 or amount > 100:
-            await _send_bot_message("🧹 O limite do comando !clear é de 1 a 100 mensagens.")
+
+            if target and target.casefold() == "all":
+                message_ids = await to_thread.run_sync(clear_all_messages)
+                await _broadcast_messages_cleared(message_ids, user["username"])
+                await _send_bot_message(f"🧹 Histórico do #geral apagado. {len(message_ids)} mensagem(ns) removida(s).")
+                return True
+
+            limit = _parse_clear_limit(target or "50")
+            message_ids = await to_thread.run_sync(clear_recent_messages, limit)
+            await _broadcast_messages_cleared(message_ids, user["username"])
+            await _send_bot_message(f"🧹 {len(message_ids)} mensagem(ns) recente(s) removida(s) do #geral.")
             return True
-        message_ids = await to_thread.run_sync(clear_recent_messages, amount)
-        await manager.broadcast({
-            "type": "messages_cleared",
-            "messageIds": message_ids,
-            "count": len(message_ids),
-            "moderator": user["username"],
-            "timestamp": manager.get_timestamp(),
-        })
-        await _send_bot_message(f"🧹 {len(message_ids)} mensagem(ns) removida(s) do #geral.")
+        except ValueError as exc:
+            await _send_bot_message(f"🧹 {exc}")
+            return True
+
+    if command in {"!delete", "!del"}:
+        if len(args) < 2:
+            await _send_bot_message("🗑️ Use: !delete <message_id>.")
+            return True
+        message_id = args[1].strip()
+        if not message_id or message_id.startswith("@"):
+            await _send_bot_message("🗑️ O alvo precisa ser o ID exato da mensagem. Para um usuário, use !clear @usuário.")
+            return True
+
+        deleted = await to_thread.run_sync(delete_single_message, message_id)
+        if not deleted:
+            await _send_bot_message(f"❌ Mensagem `{message_id}` não encontrada ou já removida.")
+            return True
+
+        await _broadcast_messages_cleared([message_id], user["username"])
+        await _send_bot_message(f"🗑️ Mensagem `{message_id}` removida.")
         return True
 
     if command in {"!warn", "!mute", "!unmute", "!kick"}:
@@ -446,19 +519,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 await manager.toggle_reaction(user, event.messageId, event.reaction, websocket)
                 continue
 
-            await websocket.send_json({"type": "error", "action": "unknown_event", "message": "Tipo de evento não suportado."})
-
+            await websocket.send_json({"type": "error", "action": "payload", "message": "Tipo de evento não reconhecido."})
     except WebSocketDisconnect:
-        disconnected_user = manager.disconnect(websocket)
-        if disconnected_user:
-            await manager.broadcast({
-                "type": "system",
-                "event": "user_left",
-                "userId": disconnected_user["id"],
-                "username": disconnected_user["username"],
-                "displayName": disconnected_user["displayName"],
-                "avatar": disconnected_user["avatar"],
-                "message": f"{disconnected_user['username']} saiu do chat.",
-                "timestamp": manager.get_timestamp(),
-            })
-            await manager.send_users()
+        manager.disconnect(websocket)
+        await manager.send_users()
