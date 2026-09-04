@@ -25,7 +25,7 @@ def public_user_payload(user, *, online: bool | None = None) -> dict:
         "displayName": user["displayName"],
         "avatar": user["avatar"],
         "status": user["status"],
-        "role": get_user_role(user),
+        "role": user.get("role") or get_user_role(user),
     }
     if online is not None:
         payload["online"] = online
@@ -35,11 +35,18 @@ def public_user_payload(user, *, online: bool | None = None) -> dict:
 class ConnectionManager:
     def __init__(self):
         self.active_connections = {}
+        self.presence_users = {}
         self.processed_message_ids = set()
         self._processed_message_order = deque()
         self.message_owners = {}
         self._message_owner_order = deque()
         self.sequence = 0
+
+    def register_presence_user(self, user) -> None:
+        self.presence_users[user["id"]] = dict(user)
+
+    def unregister_presence_user(self, user_id) -> None:
+        self.presence_users.pop(user_id, None)
 
     def _has_user(self, user_id, exclude=None):
         return any(
@@ -127,6 +134,12 @@ class ConnectionManager:
     async def send_users(self):
         users = []
         seen = set()
+
+        for user in self.presence_users.values():
+            if user["id"] in seen:
+                continue
+            seen.add(user["id"])
+            users.append(public_user_payload(user, online=True))
 
         for user in self.active_connections.values():
             if user["id"] in seen:
