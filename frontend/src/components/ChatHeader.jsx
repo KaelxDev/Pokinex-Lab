@@ -7,26 +7,26 @@ export default function ChatHeader({ connectionStatus, reconnectAttempt, reconne
       : connectionStatus === "connecting"
         ? "connecting"
         : "online";
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
     const handleSidebarState = (event) => {
-      setMobileSidebarOpen(Boolean(event.detail?.open));
+      setSidebarOpen(Boolean(event.detail?.open));
     };
 
-    const handleSidebarClosed = () => setMobileSidebarOpen(false);
+    const handleSidebarClosed = () => setSidebarOpen(false);
 
-    window.addEventListener("pokinex:mobile-sidebar-state", handleSidebarState);
-    window.addEventListener("pokinex:mobile-sidebar-close", handleSidebarClosed);
+    window.addEventListener("pokinex:sidebar-state", handleSidebarState);
+    window.addEventListener("pokinex:sidebar-close", handleSidebarClosed);
 
     return () => {
-      window.removeEventListener("pokinex:mobile-sidebar-state", handleSidebarState);
-      window.removeEventListener("pokinex:mobile-sidebar-close", handleSidebarClosed);
+      window.removeEventListener("pokinex:sidebar-state", handleSidebarState);
+      window.removeEventListener("pokinex:sidebar-close", handleSidebarClosed);
     };
   }, []);
 
-  function toggleMobileSidebar() {
-    window.dispatchEvent(new CustomEvent("pokinex:mobile-sidebar-toggle"));
+  function toggleSidebar() {
+    window.dispatchEvent(new CustomEvent("pokinex:sidebar-toggle"));
   }
 
   return (
@@ -35,13 +35,13 @@ export default function ChatHeader({ connectionStatus, reconnectAttempt, reconne
         <button
           className="chat-menu-toggle"
           type="button"
-          onClick={toggleMobileSidebar}
-          aria-label={mobileSidebarOpen ? "Fechar navegação" : "Abrir navegação"}
-          aria-expanded={mobileSidebarOpen}
-          aria-controls="pokinex-mobile-sidebar"
-          title={mobileSidebarOpen ? "Fechar navegação" : "Abrir navegação"}
+          onClick={toggleSidebar}
+          aria-label={sidebarOpen ? "Fechar navegação" : "Abrir navegação"}
+          aria-expanded={sidebarOpen}
+          aria-controls="pokinex-sidebar"
+          title={sidebarOpen ? "Fechar navegação" : "Abrir navegação"}
         >
-          <span className="chat-menu-icon" aria-hidden="true">
+          <span className={`chat-menu-icon${sidebarOpen ? " open" : ""}`} aria-hidden="true">
             <span />
             <span />
             <span />
