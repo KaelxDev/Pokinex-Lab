@@ -7,7 +7,7 @@ export default function ChatHeader({ connectionStatus, reconnectAttempt, reconne
       : connectionStatus === "connecting"
         ? "connecting"
         : "online";
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 700);
 
   useEffect(() => {
     const handleSidebarState = (event) => {
