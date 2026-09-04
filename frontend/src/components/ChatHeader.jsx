@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
 
+function getInitialSidebarState() {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia("(min-width: 701px)").matches;
+}
+
 export default function ChatHeader({ connectionStatus, reconnectAttempt, reconnectSeconds, onLogout }) {
   const connectionState =
     connectionStatus === "reconnecting"
@@ -7,19 +12,27 @@ export default function ChatHeader({ connectionStatus, reconnectAttempt, reconne
       : connectionStatus === "connecting"
         ? "connecting"
         : "online";
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(getInitialSidebarState);
 
   useEffect(() => {
     const handleSidebarState = (event) => {
-      setSidebarOpen(Boolean(event.detail?.open));
+      if (typeof event.detail?.open === "boolean") {
+        setSidebarOpen(event.detail.open);
+      }
     };
     const handleSidebarClosed = () => setSidebarOpen(false);
+    const handleResize = () => {
+      setSidebarOpen(window.matchMedia("(min-width: 701px)").matches);
+    };
 
-    window.addEventListener("pokinex:mobile-sidebar-state", handleSidebarState);
-    window.addEventListener("pokinex:mobile-sidebar-close", handleSidebarClosed);
+    window.addEventListener("pokinex:sidebar-state", handleSidebarState);
+    window.addEventListener("pokinex:sidebar-close", handleSidebarClosed);
+    window.addEventListener("resize", handleResize);
+
     return () => {
-      window.removeEventListener("pokinex:mobile-sidebar-state", handleSidebarState);
-      window.removeEventListener("pokinex:mobile-sidebar-close", handleSidebarClosed);
+      window.removeEventListener("pokinex:sidebar-state", handleSidebarState);
+      window.removeEventListener("pokinex:sidebar-close", handleSidebarClosed);
+      window.removeEventListener("resize", handleResize);
     };
   }, []);
 
@@ -27,7 +40,7 @@ export default function ChatHeader({ connectionStatus, reconnectAttempt, reconne
     const nextOpen = !sidebarOpen;
     setSidebarOpen(nextOpen);
     window.dispatchEvent(
-      new CustomEvent("pokinex:mobile-sidebar-toggle", { detail: { open: nextOpen } }),
+      new CustomEvent("pokinex:sidebar-toggle", { detail: { open: nextOpen } }),
     );
   }
 
