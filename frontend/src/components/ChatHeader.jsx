@@ -7,33 +7,35 @@ export default function ChatHeader({ connectionStatus, reconnectAttempt, reconne
       : connectionStatus === "connecting"
         ? "connecting"
         : "online";
-  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 700);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     const handleSidebarState = (event) => {
       setSidebarOpen(Boolean(event.detail?.open));
     };
-
     const handleSidebarClosed = () => setSidebarOpen(false);
 
-    window.addEventListener("pokinex:sidebar-state", handleSidebarState);
-    window.addEventListener("pokinex:sidebar-close", handleSidebarClosed);
-
+    window.addEventListener("pokinex:mobile-sidebar-state", handleSidebarState);
+    window.addEventListener("pokinex:mobile-sidebar-close", handleSidebarClosed);
     return () => {
-      window.removeEventListener("pokinex:sidebar-state", handleSidebarState);
-      window.removeEventListener("pokinex:sidebar-close", handleSidebarClosed);
+      window.removeEventListener("pokinex:mobile-sidebar-state", handleSidebarState);
+      window.removeEventListener("pokinex:mobile-sidebar-close", handleSidebarClosed);
     };
   }, []);
 
   function toggleSidebar() {
-    window.dispatchEvent(new CustomEvent("pokinex:sidebar-toggle"));
+    const nextOpen = !sidebarOpen;
+    setSidebarOpen(nextOpen);
+    window.dispatchEvent(
+      new CustomEvent("pokinex:mobile-sidebar-toggle", { detail: { open: nextOpen } }),
+    );
   }
 
   return (
     <header className="chat-header">
       <div className="chat-header-main">
         <button
-          className="chat-menu-toggle"
+          className={`chat-menu-toggle${sidebarOpen ? " is-open" : ""}`}
           type="button"
           onClick={toggleSidebar}
           aria-label={sidebarOpen ? "Fechar navegação" : "Abrir navegação"}
@@ -41,7 +43,7 @@ export default function ChatHeader({ connectionStatus, reconnectAttempt, reconne
           aria-controls="pokinex-sidebar"
           title={sidebarOpen ? "Fechar navegação" : "Abrir navegação"}
         >
-          <span className={`chat-menu-icon${sidebarOpen ? " open" : ""}`} aria-hidden="true">
+          <span className="chat-menu-icon" aria-hidden="true">
             <span />
             <span />
             <span />
