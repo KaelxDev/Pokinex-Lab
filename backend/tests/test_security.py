@@ -3,9 +3,9 @@ import asyncio
 from starlette.requests import Request
 from starlette.responses import Response
 
-from app.main import _validate_websocket_origin, _websocket_token
 from app.routes.auth import set_session_cookie
 from app.security import is_allowed_origin
+from app.websocket.endpoint import validate_websocket_origin, websocket_token
 
 
 class DummyWebSocket:
@@ -80,7 +80,7 @@ def test_session_cookie_is_usable_on_local_http():
 def test_websocket_origin_is_rejected_for_unknown_origin():
     websocket = DummyWebSocket(origin="https://evil.example")
 
-    allowed = asyncio.run(_validate_websocket_origin(websocket))
+    allowed = asyncio.run(validate_websocket_origin(websocket))
 
     assert allowed is False
     assert websocket.closed is True
@@ -94,5 +94,5 @@ def test_websocket_uses_cookie_only():
     )
     legacy_socket = DummyWebSocket(query_params={"token": "legacy-token"})
 
-    assert _websocket_token(cookie_socket) == "cookie-token"
-    assert _websocket_token(legacy_socket) is None
+    assert websocket_token(cookie_socket) == "cookie-token"
+    assert websocket_token(legacy_socket) is None
