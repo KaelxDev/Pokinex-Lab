@@ -1,43 +1,16 @@
 import { useState } from "react";
 import { login, register } from "../services/auth";
 
-const capabilityStyle = {
-  minWidth: 0,
-  display: "flex",
-  alignItems: "center",
-  gap: 9,
-  padding: "10px 11px",
-  border: "1px solid rgba(255,255,255,.055)",
-  borderRadius: 11,
-  background: "rgba(255,255,255,.02)",
-  color: "#8a919e",
-  textAlign: "left",
-  boxSizing: "border-box",
-};
-
-const capabilityIconStyle = {
-  width: 28,
-  height: 28,
-  flex: "0 0 28px",
-  display: "grid",
-  placeItems: "center",
-  borderRadius: 8,
-  background: "rgba(255,255,255,.04)",
-  fontSize: 14,
-};
-
 export default function AuthScreen({ onAuthenticated }) {
   const [mode, setMode] = useState("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function submit(event) {
     event.preventDefault();
     setError("");
-    setNotice("");
     setLoading(true);
     try {
       const currentUser = mode === "login" ? await login(username, password) : await register(username, password);
@@ -52,12 +25,6 @@ export default function AuthScreen({ onAuthenticated }) {
   function switchMode() {
     setMode((current) => (current === "login" ? "register" : "login"));
     setError("");
-    setNotice("");
-  }
-
-  function showPrivateMessagesNotice() {
-    setError("");
-    setNotice("Mensagens privadas estão disponíveis depois que você entrar na sua conta.");
   }
 
   return (
@@ -71,7 +38,7 @@ export default function AuthScreen({ onAuthenticated }) {
           <div className="auth-visual-copy">
             <span className="auth-kicker">CHAT • COMMUNITY • DIVERSÃO</span>
             <h1>Converse em tempo real.</h1>
-            <p>Um espaço simples para conversar em público, trocar ideias e enviar mensagens privadas.</p>
+            <p>Um espaço simples para conversar, compartilhar ideias e se conectar com outras pessoas.</p>
           </div>
           <div className="auth-visual-foot">
             <span className="auth-visual-line" />
@@ -92,7 +59,6 @@ export default function AuthScreen({ onAuthenticated }) {
           </div>
 
           {error && <div className="status disconnected">{error}</div>}
-          {notice && <div className="auth-notice">{notice}</div>}
 
           <form className="login-form" onSubmit={submit}>
             <label className="auth-field">
@@ -108,41 +74,6 @@ export default function AuthScreen({ onAuthenticated }) {
               <span aria-hidden="true">→</span>
             </button>
           </form>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9, marginTop: 16 }} aria-label="Recursos do Pokinex">
-            <div style={capabilityStyle}>
-              <span style={capabilityIconStyle} aria-hidden="true">💬</span>
-              <span style={{ minWidth: 0, flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
-                <strong style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#dce0e7", fontSize: 10 }}>Chat público</strong>
-                <small style={{ color: "#626976", fontSize: 9 }}>Converse em tempo real</small>
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={showPrivateMessagesNotice}
-              style={{
-                ...capabilityStyle,
-                cursor: "pointer",
-                font: "inherit",
-              }}
-              onMouseOver={(event) => {
-                event.currentTarget.style.background = "rgba(88,101,242,.08)";
-                event.currentTarget.style.borderColor = "rgba(88,101,242,.18)";
-              }}
-              onMouseOut={(event) => {
-                event.currentTarget.style.background = "rgba(255,255,255,.02)";
-                event.currentTarget.style.borderColor = "rgba(255,255,255,.055)";
-              }}
-              aria-label="Mensagens privadas"
-            >
-              <span style={capabilityIconStyle} aria-hidden="true">✉</span>
-              <span style={{ minWidth: 0, flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
-                <strong style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#dce0e7", fontSize: 10 }}>Mensagens privadas</strong>
-                <small style={{ color: "#626976", fontSize: 9 }}>Converse diretamente</small>
-              </span>
-              <span style={{ flex: "0 0 auto", color: "#707785", fontSize: 17 }} aria-hidden="true">›</span>
-            </button>
-          </div>
 
           <div className="auth-divider"><span /><small>{mode === "login" ? "Ainda não tem conta?" : "Já possui uma conta?"}</small><span /></div>
           <button className="auth-switch" type="button" onClick={switchMode}>{mode === "login" ? "Criar conta" : "Voltar para entrar"}</button>
