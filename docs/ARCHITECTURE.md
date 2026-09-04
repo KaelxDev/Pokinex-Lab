@@ -24,7 +24,7 @@ O Pokinex é dividido em duas aplicações independentes que se comunicam por HT
 
 ## Frontend
 
-A entrada principal é `frontend/src/main.jsx`. A inicialização visual concentra os estilos globais em `frontend/src/styles/index.css`, deixando o entrypoint responsável somente pela composição da aplicação.
+A entrada principal é `frontend/src/main.jsx`. A inicialização visual concentra os estilos globais em `frontend/src/styles/index.css`.
 
 ```text
 src/
@@ -32,8 +32,20 @@ src/
 ├── config/         configuração de execução da aplicação
 ├── hooks/          estado e efeitos reutilizáveis
 ├── services/       comunicação HTTP/WebSocket
-├── styles/         ponto único de entrada para estilos globais
+├── styles/         estilos organizados por domínio
 └── utils/          funções auxiliares sem estado
+```
+
+Os principais hooks de domínio são:
+
+```text
+useAuthSession       sessão autenticada
+useUserDirectory     presença, usuários e perfis
+useChatHistory       histórico e fila offline
+useChatActions       envio/edição/exclusão/reação/reply
+useChatMessageEvents eventos recebidos pelo WebSocket
+useProfileEditor     edição de perfil/avatar
+useChatConnection    ciclo de vida da conexão realtime
 ```
 
 ### Fluxo de chat
@@ -46,6 +58,8 @@ WebSocket service
 FastAPI /ws
       ↓
 WebSocket endpoint
+      ↓
+WebSocket router
       ↓
 Service layer / ConnectionManager
       ↓
@@ -66,7 +80,8 @@ app/
 ├── services/              regras de aplicação/orquestração
 │   └── moderation.py       comandos e fluxo de moderação
 ├── websocket/              transporte realtime
-│   ├── endpoint.py         dispatcher WebSocket
+│   ├── endpoint.py         conexão, origem e autenticação
+│   ├── router.py           validação e roteamento dos eventos
 │   ├── chat.py             presença, mensagens e reações
 │   └── schemas.py          contratos dos eventos
 ├── auth.py                 autenticação e sessão
@@ -106,30 +121,20 @@ Desenvolvimento local pode usar SQLite; produção usa PostgreSQL. As consultas 
 
 ## WebSocket
 
-O transporte está separado do fluxo de aplicação. `backend/app/websocket/endpoint.py` valida a conexão, autentica a sessão, desserializa eventos e encaminha cada tipo para seu handler. Regras de moderação ficam em `services/moderation.py`; estado de conexões e operações de mensagens ficam em `websocket/chat.py`.
+O transporte e o roteamento são separados:
 
-Os eventos continuam tipados por `type` e validados pelos modelos de `backend/app/websocket/schemas.py`.
+- `endpoint.py` cuida da origem, autenticação, leitura do socket e limite de payload.
+- `router.py` identifica o tipo, valida o payload uma única vez e chama o handler correto.
+- `schemas.py` define os contratos Pydantic.
+- `chat.py` mantém estado de conexão/presença e operações de mensagem.
+- `services/` concentra regras de aplicação que não pertencem ao transporte.
 
-Exemplos:
-
-```text
-message
-message_edited
-message_deleted
-message_reaction
-users
-profile_updated
-direct_message
-moderation
-chat_reset
-```
-
-Novos eventos devem ser adicionados ao schema e ao dispatcher correspondente antes de chegar aos componentes de interface.
+O contrato detalhado está em [`docs/WEBSOCKET.md`](./WEBSOCKET.md).
 
 ## Diretrizes de manutenção
 
-1. Evite colocar lógica de domínio em `main.py` ou em componentes React.
-2. Use `services/` para orquestração que combina múltiplos módulos e `database.py`/stores para persistência.
+1. Evite colocar lógica de domínio em `main.py`, `endpoint.py` ou componentes React.
+2. Use `services/` para orquestração que combina múltiplos módulos e stores/repositories para persistência.
 3. Não duplique regras de autorização no frontend.
 4. Prefira módulos pequenos por responsabilidade a arquivos `Fix`, `Patch` ou `Final`.
 5. Toda mudança no protocolo WebSocket deve possuir teste correspondente.
@@ -138,3 +143,4 @@ Novos eventos devem ser adicionados ao schema e ao dispatcher correspondente ant
 8. Novas configurações de URL devem ser adicionadas a `frontend/src/config/runtime.js`.
 9. Mudanças de schema devem entrar por migração versionada.
 10. Ao extrair lógica de um módulo legado, preserve o protocolo público e remova a duplicação somente depois de a nova camada estar coberta por teste.
+11. O endpoint WebSocket deve permanecer fino; novos eventos devem entrar pelo dispatcher.
