@@ -1,4 +1,4 @@
-from app.database import get_connection, using_postgres
+from app.infrastructure.database import get_connection, using_postgres
 from app.roles import get_user_role
 
 MAX_HISTORY_LIMIT = 100
