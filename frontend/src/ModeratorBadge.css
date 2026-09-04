@@ -16,6 +16,7 @@
   font-weight: 800;
   letter-spacing: 0.08em;
   line-height: 1;
+  white-space: nowrap;
 }
 
 .user-role-badge.bot,
@@ -25,16 +26,33 @@
   background: rgba(255, 91, 97, 0.08);
 }
 
+.user-role-badge.staff,
 .user-role-badge.moderator,
-.profile-role-badge {
-  color: #f0b6bd;
-  border-color: rgba(240, 182, 189, 0.28);
-  background: rgba(240, 182, 189, 0.08);
+.profile-role-badge,
+.message-role-badge.staff,
+.message-role-badge.moderator {
+  color: #f3c1c7;
+  border-color: rgba(243, 193, 199, 0.32);
+  background: rgba(243, 193, 199, 0.08);
+}
+
+.user-role-badge.admin,
+.message-role-badge.admin {
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.26);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.user-role-badge.owner,
+.message-role-badge.owner {
+  color: #ff8a92;
+  border-color: rgba(255, 138, 146, 0.38);
+  background: rgba(255, 138, 146, 0.10);
 }
 
 .profile-role-badge {
   margin-left: auto;
-  min-width: 30px;
+  min-width: 42px;
 }
 
 .message-role-badge {
