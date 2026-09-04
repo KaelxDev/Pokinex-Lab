@@ -8,6 +8,7 @@ from app.database import (
     get_connection,
     using_postgres,
 )
+from app.roles import get_user_role
 
 SESSION_DAYS = 30
 PASSWORD_ITERATIONS = 600_000
@@ -18,7 +19,12 @@ def now_utc() -> datetime:
 
 
 def _derive_password(password: str, salt: bytes) -> bytes:
-    return hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, PASSWORD_ITERATIONS)
+    return hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        salt,
+        PASSWORD_ITERATIONS,
+    )
 
 
 def hash_password(password: str) -> tuple[str, str]:
@@ -54,6 +60,22 @@ def validate_username(username: str) -> tuple[str | None, str | None]:
     if not all(char.isalnum() or char in "_-" for char in username):
         return None, "Username deve usar apenas letras, números, _ ou -."
     return username, None
+
+
+def _user_payload(row, connection) -> dict:
+    user = {
+        "id": row["id"],
+        "username": row["username"],
+        "displayName": row["display_name"],
+        "avatar": _persistent_avatar_reference(
+            connection,
+            row["id"],
+            row["avatar"],
+        ),
+        "status": row["status"],
+    }
+    user["role"] = get_user_role(user)
+    return user
 
 
 def create_user(username: str, password: str) -> dict:
@@ -105,29 +127,21 @@ def get_user_by_id(user_id: int, connection=None) -> dict | None:
     owns_connection = connection is None
     connection = connection or get_connection()
     try:
-        query = """
+        query = (
+            """
             SELECT id, username, display_name, avatar, status
             FROM users
             WHERE id = %s
-        """ if using_postgres() else """
+            """
+            if using_postgres()
+            else """
             SELECT id, username, display_name, avatar, status
             FROM users
             WHERE id = ?
-        """
+            """
+        )
         user = connection.execute(query, (user_id,)).fetchone()
-        if not user:
-            return None
-        return {
-            "id": user["id"],
-            "username": user["username"],
-            "displayName": user["display_name"],
-            "avatar": _persistent_avatar_reference(
-                connection,
-                user["id"],
-                user["avatar"],
-            ),
-            "status": user["status"],
-        }
+        return _user_payload(user, connection) if user else None
     finally:
         if owns_connection:
             connection.close()
@@ -136,15 +150,19 @@ def get_user_by_id(user_id: int, connection=None) -> dict | None:
 def authenticate(username: str, password: str) -> dict | None:
     connection = get_connection()
     try:
-        query = """
+        query = (
+            """
             SELECT id, username, password_hash, password_salt, display_name, avatar, status
             FROM users
             WHERE LOWER(username) = LOWER(%s)
-        """ if using_postgres() else """
+            """
+            if using_postgres()
+            else """
             SELECT id, username, password_hash, password_salt, display_name, avatar, status
             FROM users
             WHERE username = ? COLLATE NOCASE
-        """
+            """
+        )
         user = connection.execute(query, (username.strip(),)).fetchone()
         if not user or not verify_password(
             password,
@@ -153,17 +171,7 @@ def authenticate(username: str, password: str) -> dict | None:
         ):
             return None
 
-        return {
-            "id": user["id"],
-            "username": user["username"],
-            "displayName": user["display_name"],
-            "avatar": _persistent_avatar_reference(
-                connection,
-                user["id"],
-                user["avatar"],
-            ),
-            "status": user["status"],
-        }
+        return _user_payload(user, connection)
     finally:
         connection.close()
 
@@ -175,13 +183,17 @@ def create_session(user_id: int) -> str:
     expires_at = created_at + timedelta(days=SESSION_DAYS)
     connection = get_connection()
     try:
-        query = """
+        query = (
+            """
             INSERT INTO sessions (token_hash, user_id, expires_at, created_at)
             VALUES (%s, %s, %s, %s)
-        """ if using_postgres() else """
+            """
+            if using_postgres()
+            else """
             INSERT INTO sessions (token_hash, user_id, expires_at, created_at)
             VALUES (?, ?, ?, ?)
-        """
+            """
+        )
         connection.execute(
             query,
             (token_hash, user_id, expires_at.isoformat(), created_at.isoformat()),
@@ -198,20 +210,25 @@ def get_user_from_token(token: str | None) -> dict | None:
     token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
     connection = get_connection()
     try:
-        query = """
+        query = (
+            """
             SELECT u.id, u.username, u.display_name, u.avatar, u.status, s.expires_at
             FROM sessions s
             JOIN users u ON u.id = s.user_id
             WHERE s.token_hash = %s
-        """ if using_postgres() else """
+            """
+            if using_postgres()
+            else """
             SELECT u.id, u.username, u.display_name, u.avatar, u.status, s.expires_at
             FROM sessions s
             JOIN users u ON u.id = s.user_id
             WHERE s.token_hash = ?
-        """
+            """
+        )
         row = connection.execute(query, (token_hash,)).fetchone()
         if not row:
             return None
+
         try:
             expires_at = datetime.fromisoformat(row["expires_at"])
         except (ValueError, TypeError):
@@ -225,17 +242,8 @@ def get_user_from_token(token: str | None) -> dict | None:
             connection.execute(delete_query, (token_hash,))
             connection.commit()
             return None
-        return {
-            "id": row["id"],
-            "username": row["username"],
-            "displayName": row["display_name"],
-            "avatar": _persistent_avatar_reference(
-                connection,
-                row["id"],
-                row["avatar"],
-            ),
-            "status": row["status"],
-        }
+
+        return _user_payload(row, connection)
     finally:
         connection.close()
 
@@ -267,6 +275,7 @@ def update_profile(
     username, error = validate_username(username)
     if error:
         raise ValueError(error)
+
     display_name = display_name.strip()[:30]
     status = status.strip()[:60]
     avatar = avatar.strip()
@@ -275,15 +284,19 @@ def update_profile(
 
     connection = get_connection()
     try:
-        query = """
+        query = (
+            """
             UPDATE users
             SET username = %s, display_name = %s, avatar = %s, status = %s
             WHERE id = %s
-        """ if using_postgres() else """
+            """
+            if using_postgres()
+            else """
             UPDATE users
             SET username = ?, display_name = ?, avatar = ?, status = ?
             WHERE id = ?
-        """
+            """
+        )
         connection.execute(query, (username, display_name, avatar, status, user_id))
         connection.commit()
         return get_user_by_id(user_id, connection=connection)
