@@ -1,8 +1,9 @@
 """Package-level compatibility hooks for the Pokinex moderation engine."""
 
-from contextvars import ContextVar
 import re
+import sys
 import time
+from contextvars import ContextVar
 
 from fastapi import WebSocket
 
@@ -48,7 +49,6 @@ def _configured_moderator(user) -> bool:
 
 
 # main.py imports this symbol after the package initializer has executed.
-import sys
 _moderation_module = sys.modules["app.moderation_bot"]
 _moderation_module.is_moderator = _owner_aware_is_moderator
 
