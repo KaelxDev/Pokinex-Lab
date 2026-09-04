@@ -42,7 +42,7 @@ async function readResponseData(response) {
 }
 
 async function request(path, options = {}) {
-  const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+  const headers = { "Content-Type": "application/json", ...options.headers };
 
   let response;
   try {
