@@ -19,12 +19,15 @@ def test_online_command_uses_supplied_count():
     assert response == "👥 Tem 3 usuários online no Pokinex agora."
 
 
-def test_duplicate_message_is_blocked():
+def test_duplicate_burst_is_blocked_on_fifth_message():
     bot = ModerationBot()
-    assert bot.moderate("uma mensagem repetida", user_id=7).allowed
-    result = bot.moderate("uma mensagem repetida", user_id=7)
-    assert not result.allowed
-    assert result.action == "duplicate"
+    results = [
+        bot.moderate("uma mensagem repetida", user_id=7)
+        for _ in range(5)
+    ]
+    assert all(result.allowed for result in results[:4])
+    assert not results[4].allowed
+    assert results[4].action == "duplicate_burst"
 
 
 def test_flood_is_blocked_after_limit():
@@ -92,7 +95,7 @@ def test_excessive_mentions_are_blocked():
 
 def test_repeated_characters_are_blocked():
     bot = ModerationBot()
-    result = bot.moderate("kkkkkkkkkkkkkkkk", user_id=66)
+    result = bot.moderate("!!!!!!!!!!!!!!!!!!", user_id=66)
     assert not result.allowed
     assert result.category == "repeated_chars"
 

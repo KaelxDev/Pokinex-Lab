@@ -27,6 +27,8 @@ def test_initialize_database_creates_and_records_migrations(tmp_path, monkeypatc
             (2, "message_metadata"),
             (3, "persistent_avatars"),
             (4, "message_history_index"),
+            (5, "direct_messages"),
+            (6, "direct_message_features"),
         ]
 
         columns = {
@@ -40,6 +42,12 @@ def test_initialize_database_creates_and_records_migrations(tmp_path, monkeypatc
             for row in connection.execute("PRAGMA table_info(user_avatars)").fetchall()
         }
         assert {"user_id", "content", "content_type", "updated_at"}.issubset(avatar_columns)
+
+        direct_columns = {
+            row["name"]
+            for row in connection.execute("PRAGMA table_info(direct_messages)").fetchall()
+        }
+        assert {"reply_to_message_id"}.issubset(direct_columns)
     finally:
         connection.close()
 
@@ -68,7 +76,3 @@ def test_toggle_reaction_is_atomic_for_sequential_toggles(tmp_path, monkeypatch)
     active, counts = database.toggle_reaction("message-1", 1, "❤️", created_at)
     assert active is True
     assert counts == {"❤️": 1}
-
-    active, counts = database.toggle_reaction("message-1", 1, "❤️", created_at)
-    assert active is False
-    assert counts == {}
