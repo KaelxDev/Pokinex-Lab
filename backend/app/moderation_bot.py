@@ -56,8 +56,9 @@ class ModerationBot:
         "!ping": "🏓 Pong. PokiBot está online.",
     }
     MOD_HELP = (
-        "🛡️ Moderador: !mod, !clear [n], !warn @usuário [motivo], "
-        "!mute @usuário [min], !unmute @usuário, !kick @usuário"
+        "🛡️ Staff: !mod, !clear [n|all], !clear @usuário [n|all], "
+        "!delete <message_id>, !warn @usuário [motivo], !mute @usuário [min], "
+        "!unmute @usuário, !kick @usuário"
     )
 
     SCAM_PATTERNS = (
