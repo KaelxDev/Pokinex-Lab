@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { canGroup, formatTime, normalizeAvatarUrl, REACTION_OPTIONS, userInitial } from "../utils/chat";
 
 export default function MessageList({
@@ -27,11 +28,34 @@ export default function MessageList({
   onLongPressStart,
   onLongPressEnd,
 }) {
+  const [rejectedMessageIds, setRejectedMessageIds] = useState(() => new Set());
   const showEmptyState = !historyLoading && messages.length === 0;
+
+  useEffect(() => {
+    function handleModeration(event) {
+      const messageId = event.detail?.messageId;
+      if (!messageId) return;
+      setRejectedMessageIds((current) => {
+        const next = new Set(current);
+        next.add(messageId);
+        if (next.size > 100) {
+          const oldest = next.values().next().value;
+          if (oldest) next.delete(oldest);
+        }
+        return next;
+      });
+    }
+
+    window.addEventListener("pokinex:moderation", handleModeration);
+    return () => window.removeEventListener("pokinex:moderation", handleModeration);
+  }, []);
+
+  const visibleMessages = messages.filter((message) => !rejectedMessageIds.has(message.messageId));
+  const visibleEmpty = !historyLoading && visibleMessages.length === 0;
 
   return (
     <div
-      className={`messages${showEmptyState ? " messages-empty" : ""}`}
+      className={`messages${visibleEmpty ? " messages-empty" : ""}`}
       ref={messagesRef}
       onScroll={onScroll}
     >
@@ -42,7 +66,7 @@ export default function MessageList({
         </div>
       )}
 
-      {showEmptyState && (
+      {visibleEmpty && (
         <section className="chat-empty-state" aria-label="Conversa vazia">
           <div className="chat-empty-icon">
             <img src="/icone.png?v=3" alt="" />
@@ -57,7 +81,7 @@ export default function MessageList({
         </section>
       )}
 
-      {messages.map((message, index) => {
+      {visibleMessages.map((message, index) => {
         if (message.type === "system") {
           return (
             <div className="system-message" key={`system-${index}`}>
@@ -69,8 +93,8 @@ export default function MessageList({
 
         if (message.type !== "message") return null;
 
-        const previous = messages[index - 1];
-        const next = messages[index + 1];
+        const previous = visibleMessages[index - 1];
+        const next = visibleMessages[index + 1];
         const grouped = canGroup(previous, message);
         const groupEnd = !canGroup(message, next);
         const isMine =
