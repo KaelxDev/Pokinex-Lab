@@ -26,6 +26,7 @@ from app.repositories.user_repository import (
     profile_from_row,
 )
 
+# Temporary compatibility aliases for older imports and tests.
 _persistent_avatar_reference = persistent_avatar_reference
 _profile_from_row = profile_from_row
 
