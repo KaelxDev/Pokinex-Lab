@@ -11,6 +11,8 @@ function formatRemaining(totalSeconds) {
 
 export default function MessageComposer({ connected, offlineQueueLength, replyingTo, messageInput, onChange, onSubmit, onCancelReply }) {
   const textareaRef = useRef(null);
+  const finishTimerRef = useRef(null);
+  const finishScheduledRef = useRef(false);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [moderationLock, setModerationLock] = useState(null);
   const [lockNow, setLockNow] = useState(() => Date.now());
@@ -25,6 +27,8 @@ export default function MessageComposer({ connected, offlineQueueLength, replyin
       const startedAt = Number(data.startedAt) > 0 ? Number(data.startedAt) : Date.now();
       const until = Number(data.until) > Date.now() ? Number(data.until) : Date.now() + remaining * 1000;
 
+      window.clearTimeout(finishTimerRef.current);
+      finishScheduledRef.current = false;
       setModerationLock({
         until,
         startedAt,
@@ -40,6 +44,8 @@ export default function MessageComposer({ connected, offlineQueueLength, replyin
     }
 
     function handleUnlock() {
+      window.clearTimeout(finishTimerRef.current);
+      finishScheduledRef.current = false;
       setModerationLock(null);
       setLockNow(Date.now());
     }
@@ -49,6 +55,7 @@ export default function MessageComposer({ connected, offlineQueueLength, replyin
     return () => {
       window.removeEventListener("pokinex:moderation", handleModeration);
       window.removeEventListener("pokinex:moderation-unlock", handleUnlock);
+      window.clearTimeout(finishTimerRef.current);
     };
   }, [onCancelReply, onChange]);
 
@@ -57,10 +64,20 @@ export default function MessageComposer({ connected, offlineQueueLength, replyin
 
     function updateLock() {
       const timestamp = Date.now();
-      setLockNow(timestamp);
-      if (timestamp >= moderationLock.until) {
-        setModerationLock(null);
+      if (timestamp < moderationLock.until) {
+        setLockNow(timestamp);
+        return;
       }
+
+      setLockNow(moderationLock.until);
+      if (finishScheduledRef.current) return;
+      finishScheduledRef.current = true;
+
+      finishTimerRef.current = window.setTimeout(() => {
+        setModerationLock(null);
+        setLockNow(Date.now());
+        finishScheduledRef.current = false;
+      }, 650);
     }
 
     updateLock();
@@ -70,7 +87,7 @@ export default function MessageComposer({ connected, offlineQueueLength, replyin
 
   const remainingMs = moderationLock ? Math.max(0, moderationLock.until - lockNow) : 0;
   const lockSeconds = Math.ceil(remainingMs / 1000);
-  const locked = lockSeconds > 0;
+  const locked = Boolean(moderationLock) && lockSeconds >= 0 && (lockSeconds > 0 || finishScheduledRef.current);
   const durationMs = Math.max(1000, Number(moderationLock?.durationMs || 1000));
   const elapsedRatio = moderationLock
     ? Math.max(0, Math.min(1, (lockNow - moderationLock.startedAt) / durationMs))
@@ -192,7 +209,7 @@ export default function MessageComposer({ connected, offlineQueueLength, replyin
       </form>
 
       <div className="input-hint">
-        <span>{locked ? "PokiBot bloqueou o envio até a punição terminar" : "Enter envia · Shift + Enter quebra a linha"}</span>
+        <span>{locked ? (lockSeconds === 0 ? "Punição concluída · liberando envio..." : "PokiBot bloqueou o envio até a punição terminar") : "Enter envia · Shift + Enter quebra a linha"}</span>
         <span className={offlineQueueLength ? "queue-active" : ""}>
           {locked ? formatRemaining(lockSeconds) : offlineQueueLength ? `${offlineQueueLength} pendente(s)` : connected ? "Conectado" : "Offline"}
         </span>
