@@ -1,4 +1,8 @@
-"""Database connection and PostgreSQL/SQLite infrastructure."""
+"""Database connection and PostgreSQL/SQLite infrastructure.
+
+The module owns connection lifecycle and dialect selection; application-level
+message queries remain behind `app.database` for compatibility.
+"""
 
 from pathlib import Path
 import os
