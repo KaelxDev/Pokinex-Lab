@@ -1,6 +1,13 @@
-from collections import deque
 from datetime import datetime, timezone
 
+from anyio import to_thread
+
+from app.database import get_message_owner
+from app.services.message_runtime import (
+    MAX_MESSAGE_OWNERS,
+    MAX_PROCESSED_MESSAGE_IDS,
+    MessageRuntimeState,
+)
 from app.services.public_messages import (
     delete_message as delete_message_operation,
     edit_message as edit_message_operation,
@@ -9,19 +16,29 @@ from app.services.public_messages import (
     toggle_reaction as toggle_reaction_operation,
 )
 
-MAX_PROCESSED_MESSAGE_IDS = 10_000
-MAX_MESSAGE_OWNERS = 4_096
-
 
 class ConnectionManager:
     def __init__(self):
         self.active_connections = {}
         self.presence_users = {}
-        self.processed_message_ids = set()
-        self._processed_message_order = deque()
-        self.message_owners = {}
-        self._message_owner_order = deque()
+        self.message_runtime = MessageRuntimeState()
         self.sequence = 0
+
+    @property
+    def processed_message_ids(self):
+        return self.message_runtime.processed_message_ids
+
+    @property
+    def _processed_message_order(self):
+        return self.message_runtime._processed_message_order
+
+    @property
+    def message_owners(self):
+        return self.message_runtime.message_owners
+
+    @property
+    def _message_owner_order(self):
+        return self.message_runtime._message_owner_order
 
     def register_presence_user(self, user) -> None:
         self.presence_users[user["id"]] = dict(user)
@@ -36,45 +53,22 @@ class ConnectionManager:
         )
 
     def remember_processed_message(self, message_id):
-        if message_id in self.processed_message_ids:
-            return
-
-        self.processed_message_ids.add(message_id)
-        self._processed_message_order.append(message_id)
-
-        while len(self._processed_message_order) > MAX_PROCESSED_MESSAGE_IDS:
-            expired_id = self._processed_message_order.popleft()
-            self.processed_message_ids.discard(expired_id)
+        self.message_runtime.remember_processed_message(message_id)
 
     _remember_processed_message = remember_processed_message
 
     def forget_processed_message(self, message_id):
-        self.processed_message_ids.discard(message_id)
-        try:
-            self._processed_message_order.remove(message_id)
-        except ValueError:
-            pass
+        self.message_runtime.forget_processed_message(message_id)
 
     _forget_processed_message = forget_processed_message
 
     def cache_message_owner(self, message_id, owner_id):
-        if message_id not in self.message_owners:
-            self._message_owner_order.append(message_id)
-
-        self.message_owners[message_id] = owner_id
-
-        while len(self._message_owner_order) > MAX_MESSAGE_OWNERS:
-            expired_id = self._message_owner_order.popleft()
-            self.message_owners.pop(expired_id, None)
+        self.message_runtime.cache_message_owner(message_id, owner_id)
 
     _cache_message_owner = cache_message_owner
 
     def forget_message_owner(self, message_id):
-        self.message_owners.pop(message_id, None)
-        try:
-            self._message_owner_order.remove(message_id)
-        except ValueError:
-            pass
+        self.message_runtime.forget_message_owner(message_id)
 
     _forget_message_owner = forget_message_owner
 
@@ -171,9 +165,6 @@ class ConnectionManager:
         owner_id = self.message_owners.get(message_id)
         if owner_id is not None:
             return owner_id
-
-        from anyio import to_thread
-        from app.database import get_message_owner
 
         owner_id = await to_thread.run_sync(get_message_owner, message_id)
         if owner_id is not None:
