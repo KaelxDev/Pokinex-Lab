@@ -107,6 +107,49 @@ export function useChatMessageEvents({
       return;
     }
 
+    if (data?.type === "delivery_failed" && data.messageId) {
+      setMessages((current) => {
+        const existing = current.find(
+          (item) => item.messageId === data.messageId,
+        );
+        if (!existing || existing.deliveryStatus === "sent") return current;
+        return current.map((item) =>
+          item.messageId === data.messageId
+            ? { ...item, offline: true, deliveryStatus: "failed" }
+            : item,
+        );
+      });
+
+      setMessages((current) => {
+        const failed = current.find((item) => item.messageId === data.messageId);
+        if (!failed || failed.ephemeral || !failed.message) return current;
+
+        setOfflineQueue((queue) => {
+          if (queue.some((item) => item.id === data.messageId)) return queue;
+          return [
+            ...queue,
+            {
+              id: data.messageId,
+              type: "message",
+              message: failed.message,
+              createdAt: failed.timestamp || Date.now(),
+              userId: failed.userId,
+              username: failed.username,
+              displayName: failed.displayName,
+              avatar: failed.avatar || "",
+              ...(data.replyTo?.messageId
+                ? { replyTo: { ...failed.replyTo, messageId: data.replyTo.messageId } }
+                : failed.replyTo
+                  ? { replyTo: failed.replyTo }
+                  : {}),
+            },
+          ];
+        });
+        return current;
+      });
+      return;
+    }
+
     if (data?.type === "edit_ack") {
       setEditSaving(false);
       return;
