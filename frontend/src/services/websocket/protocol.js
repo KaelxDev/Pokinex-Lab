@@ -31,7 +31,7 @@ export function messagePayload(message, messageId = null, replyTo = null) {
 
 /**
  * @param {string} message
- * @param {MessageId | null} [messageId]
+ * @param {MessageId | null} messageId
  * @param {number} recipientId
  * @param {ReplyTo | null} [replyTo]
  * @returns {DirectMessagePayload}
