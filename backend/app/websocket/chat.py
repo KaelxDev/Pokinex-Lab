@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 
+from app.infrastructure.realtime import InMemoryRealtimeBus
 from app.services import message_runtime
 from app.services.public_identity import public_user_payload
 
@@ -9,12 +10,18 @@ MAX_MESSAGE_OWNERS = message_runtime.MAX_MESSAGE_OWNERS
 
 
 class ConnectionManager:
-    """Manage WebSocket connections, presence and bounded runtime state."""
+    """Manage WebSocket connections, presence and bounded runtime state.
+
+    Outbound realtime delivery is delegated to ``RealtimeBus`` so application
+    code can later switch from the in-process transport to Redis/pub-sub.
+    """
 
     def __init__(self):
         self.active_connections = {}
         self.presence_users = {}
         self.message_runtime = MessageRuntimeState()
+        self.realtime_bus = InMemoryRealtimeBus()
+        self.realtime_bus.subscribe(self._broadcast_to_connections)
         self.sequence = 0
 
     @property
@@ -109,7 +116,8 @@ class ConnectionManager:
     def get_user(self, websocket):
         return self.active_connections.get(websocket)
 
-    async def _broadcast(self, data):
+    async def _broadcast_to_connections(self, data) -> bool:
+        """Deliver one event to this process's active WebSocket connections."""
         failed = False
         for websocket in list(self.active_connections):
             try:
@@ -118,6 +126,9 @@ class ConnectionManager:
                 self.active_connections.pop(websocket, None)
                 failed = True
         return failed
+
+    async def _broadcast(self, data):
+        return await self.realtime_bus.publish(data)
 
     async def broadcast(self, data):
         failed = await self._broadcast(data)
@@ -140,7 +151,7 @@ class ConnectionManager:
             seen.add(user["id"])
             users.append(public_user_payload(user, online=True))
 
-        await self._broadcast(
+        await self._broadcast_to_connections(
             {
                 "type": "users",
                 "users": users,
