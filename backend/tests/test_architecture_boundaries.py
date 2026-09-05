@@ -29,6 +29,17 @@ def _imports_websocket_package(path: Path) -> bool:
     return False
 
 
+def _imports_route_package(path: Path) -> bool:
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            if any(alias.name.startswith("app.routes") for alias in node.names):
+                return True
+        if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("app.routes"):
+            return True
+    return False
+
+
 def test_production_code_does_not_import_database_compatibility_facade():
     offenders = []
     for path in BACKEND_APP.rglob("*.py"):
@@ -45,6 +56,24 @@ def test_legacy_database_compatibility_facade_is_removed():
 def test_message_routes_do_not_depend_on_websocket_persistence():
     routes_file = BACKEND_APP / "routes" / "messages.py"
     assert not _imports_websocket_package(routes_file)
+
+
+def test_message_routes_do_not_depend_on_other_http_routes():
+    routes_file = BACKEND_APP / "routes" / "messages.py"
+    assert not _imports_route_package(routes_file)
+
+
+def test_http_auth_dependency_does_not_depend_on_route_modules():
+    dependency_file = BACKEND_APP / "dependencies.py"
+    assert dependency_file.exists()
+    assert not _imports_route_package(dependency_file)
+
+
+def test_auth_service_uses_repository_boundaries():
+    auth_file = BACKEND_APP / "auth.py"
+    source = auth_file.read_text(encoding="utf-8")
+    assert "app.repositories" in source
+    assert "app.infrastructure.database" not in source
 
 
 def test_direct_message_persistence_has_a_repository_boundary():
@@ -79,7 +108,7 @@ def test_connection_manager_does_not_own_public_message_operations():
 
 
 def test_public_message_service_owns_message_operations():
-    service = (BACKEND_APP / "services" / "public_messages.py").read_text(encoding="utf-8")
+    service = BACKEND_APP / "services" / "public_messages.py"
 
     for function_name in (
         "async def send_message",
@@ -87,7 +116,7 @@ def test_public_message_service_owns_message_operations():
         "async def delete_message",
         "async def toggle_reaction",
     ):
-        assert function_name in service
+        assert function_name in service.read_text(encoding="utf-8")
 
 
 def test_public_bot_commands_have_a_dedicated_service():

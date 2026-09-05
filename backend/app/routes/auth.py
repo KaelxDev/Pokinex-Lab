@@ -1,4 +1,3 @@
-from functools import partial
 import time
 
 from anyio import to_thread
@@ -6,22 +5,23 @@ from fastapi import APIRouter, File, Header, HTTPException, Request, Response, U
 from pydantic import BaseModel, Field
 
 from app.auth import (
-    SESSION_DAYS,
     authenticate,
     create_session,
     create_user,
     delete_session,
     get_user_by_id,
-    get_user_from_token,
     update_profile,
 )
 from app.avatar_storage import get_avatar, store_avatar
-from app.security import is_allowed_origin
+from app.dependencies import (
+    clear_session_cookie,
+    require_user,
+    set_cookie_from_legacy_bearer,
+    set_session_cookie,
+)
 from app.websocket.chat import manager
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
-SESSION_COOKIE_NAME = "session"
-SESSION_COOKIE_MAX_AGE = SESSION_DAYS * 24 * 60 * 60
 MAX_AVATAR_SIZE = 2 * 1024 * 1024
 ALLOWED_IMAGE_TYPES = {
     "image/jpeg": ".jpg",
@@ -41,69 +41,6 @@ class ProfileUpdate(BaseModel):
     displayName: str = Field(min_length=1, max_length=30)
     avatar: str = Field(default="", max_length=500)
     status: str = Field(default="", max_length=60)
-
-
-def _bearer_token(authorization: str | None) -> str | None:
-    if not authorization or not authorization.startswith("Bearer "):
-        return None
-    token = authorization.removeprefix("Bearer ").strip()
-    return token or None
-
-
-def require_user(
-    request: Request,
-    authorization: str | None,
-    *,
-    require_origin: bool = False,
-):
-    cookie_token = request.cookies.get(SESSION_COOKIE_NAME)
-    bearer_token = _bearer_token(authorization)
-
-    candidates = []
-    if cookie_token:
-        candidates.append((cookie_token, True))
-    if bearer_token and bearer_token != cookie_token:
-        candidates.append((bearer_token, False))
-
-    for token, is_cookie_auth in candidates:
-        if is_cookie_auth and require_origin:
-            origin = request.headers.get("origin")
-            if not is_allowed_origin(origin):
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Origem não autorizada.",
-                )
-
-        user = get_user_from_token(token)
-        if user:
-            return token, user
-
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Sessão inválida ou expirada.",
-    )
-
-
-def set_session_cookie(response: Response, request: Request, token: str) -> None:
-    secure = request.url.scheme == "https"
-    response.set_cookie(
-        key=SESSION_COOKIE_NAME,
-        value=token,
-        max_age=SESSION_COOKIE_MAX_AGE,
-        httponly=True,
-        secure=secure,
-        samesite="none" if secure else "lax",
-        path="/",
-    )
-
-
-def clear_session_cookie(response: Response) -> None:
-    response.delete_cookie(key=SESSION_COOKIE_NAME, path="/")
-
-
-def _set_cookie_from_legacy_bearer(response: Response, request: Request, token: str) -> None:
-    if request.cookies.get(SESSION_COOKIE_NAME) is None:
-        set_session_cookie(response, request, token)
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
@@ -150,7 +87,7 @@ def me(
     authorization: str | None = Header(default=None),
 ):
     token, user = require_user(request, authorization)
-    _set_cookie_from_legacy_bearer(response, request, token)
+    set_cookie_from_legacy_bearer(response, request, token)
     return {"user": user}
 
 
@@ -196,8 +133,7 @@ async def upload_avatar(
     authorization: str | None = Header(default=None),
 ):
     _, user = await to_thread.run_sync(
-        partial(
-            require_user,
+        lambda: require_user(
             request,
             authorization,
             require_origin=True,
@@ -240,8 +176,7 @@ async def profile(
     authorization: str | None = Header(default=None),
 ):
     _, user = await to_thread.run_sync(
-        partial(
-            require_user,
+        lambda: require_user(
             request,
             authorization,
             require_origin=True,
