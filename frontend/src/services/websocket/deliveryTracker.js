@@ -33,7 +33,8 @@ export class DeliveryTracker {
 
   /** @param {MessageId | null | undefined} messageId */
   forget(messageId) {
-    const id = String(messageId || "");
+    if (messageId === null || messageId === undefined) return;
+    const id = String(messageId);
     const index = this.pendingIds.indexOf(messageId);
     if (index >= 0) this.pendingIds.splice(index, 1);
     this.clearTimer(id);
