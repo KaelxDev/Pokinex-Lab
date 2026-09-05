@@ -1,4 +1,8 @@
 from app.moderation_bot import ModerationBot
+from app.services.moderation_compat import install_moderation_compat
+
+
+install_moderation_compat()
 
 
 def test_mention_returns_conversational_response():
