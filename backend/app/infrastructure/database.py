@@ -11,7 +11,9 @@ import sqlite3
 from app.migrations import migrate
 
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
-BASE_DIR = Path(__file__).resolve().parent.parent
+# database.py originally lived in backend/app/, so the SQLite file belongs at
+# backend/poknex.db. Keep that location stable after moving this module.
+BASE_DIR = Path(__file__).resolve().parents[2]
 SQLITE_DB_PATH = BASE_DIR / "poknex.db"
 
 PG_POOL_MIN_SIZE = 1
