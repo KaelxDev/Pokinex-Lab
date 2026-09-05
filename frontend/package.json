@@ -8,6 +8,7 @@
     "build": "vite build",
     "lint": "oxlint",
     "test": "node --test test/*.test.js",
+    "typecheck": "npx --yes -p typescript@7.0.2 tsc --noEmit -p jsconfig.json",
     "preview": "vite preview"
   },
   "dependencies": {
