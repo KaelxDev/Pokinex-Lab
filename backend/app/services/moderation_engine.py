@@ -108,7 +108,14 @@ class ModerationEngine:
         message_id: str | None,
         now: float,
     ) -> ModerationDecision | None:
-        count, cleanup_ids = self.state.duplicate_count(user_id, normalized, message_id, now)
+        count, cleanup_ids = self.state.duplicate_count(
+            user_id,
+            normalized,
+            message_id,
+            now,
+            self.DUPLICATE_THRESHOLD,
+            self.bot.DUPLICATE_WINDOW_SECONDS,
+        )
         if count < self.DUPLICATE_THRESHOLD:
             return None
 
@@ -122,7 +129,11 @@ class ModerationEngine:
         return ModerationDecision(result, cleanup_ids)
 
     def _check_flood(self, user_id: int, now: float) -> ModerationResult | None:
-        message_count = self.state.record_message_time(user_id, now)
+        message_count = self.state.record_message_time(
+            user_id,
+            now,
+            self.bot.FLOOD_WINDOW_SECONDS,
+        )
         if message_count <= self.bot.FLOOD_MAX_MESSAGES:
             return None
         return self._record_block(
