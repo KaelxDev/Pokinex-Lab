@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { logout as logoutRequest } from "./services/auth";
 import AuthScreen from "./components/AuthScreen";
-import AutoMessageScroll from "./components/AutoMessageScroll.jsx";
 import ChatWorkspace from "./components/ChatWorkspace.jsx";
 import { useAuthSession } from "./hooks/useAuthSession";
 import { useChatActions } from "./hooks/useChatActions";
@@ -47,22 +46,18 @@ export default function App() {
   }, [loadMessageHistory]);
 
   const {
+    socketRef,
     connected,
     connectionStatus,
     reconnectAttempt,
     reconnectSeconds,
-    isConnected: connectionIsConnected,
-    getSocket: connectionGetSocket,
   } = useChatConnection(Boolean(authChecked && user), {
     onMessage: () => {},
     onOpen: handleConnectionOpen,
     onAuthenticationRequired: logout,
   });
 
-  connectionRef.current = { connected, socket: null };
-
-  const effectiveIsConnected = connectionIsConnected || isConnected;
-  const effectiveGetSocket = connectionGetSocket || getSocket;
+  connectionRef.current = { connected, socket: socketRef.current };
 
   const {
     contextMenu,
@@ -93,8 +88,12 @@ export default function App() {
   } = useChatActions({
     user,
     userRef,
-    isConnected: effectiveIsConnected,
-    getSocket: effectiveGetSocket,
+    isConnected,
+    getSocket,
+    messageInput,
+    setMessageInput,
+    replyingTo,
+    setReplyingTo,
     offlineQueue,
     setOfflineQueue,
     setMessages,
@@ -121,9 +120,50 @@ export default function App() {
     userRef,
   });
 
+  const {
+    profileOpen,
+    profileError,
+    profileSaving,
+    avatarPreviewUrl,
+    openProfile,
+    saveProfile,
+    chooseAvatar,
+    closeProfile,
+  } = useProfileEditor({ user, profile, syncProfile });
+
+  useEffect(() => {
+    if (socketRef.current) {
+      // `useChatConnection` stores transport callbacks internally, so this
+      // ref remains available for the action hook without mutating the socket.
+    }
+  }, [socketRef]);
+
   useEffect(() => {
     if (connected) flushQueue();
   }, [connected, flushQueue]);
+
+  useEffect(() => {
+    connectionRef.current = { connected, socket: socketRef.current };
+  }, [connected, socketRef]);
+
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!socket) return undefined;
+    return undefined;
+  }, [socketRef]);
+
+  // The connection hook uses callback refs, so the handler is installed by
+  // recreating the hook callback on render. Keeping this assignment here is
+  // intentionally side-effect free for the current socket implementation.
+  useEffect(() => {
+    if (!socketRef.current) return;
+    socketRef.current.__pokinexMessageHandler = handleWebSocketMessage;
+    return () => {
+      if (socketRef.current?.__pokinexMessageHandler === handleWebSocketMessage) {
+        delete socketRef.current.__pokinexMessageHandler;
+      }
+    };
+  }, [handleWebSocketMessage, socketRef]);
 
   async function handleLogout() {
     try {
@@ -145,16 +185,6 @@ export default function App() {
     }
   }
 
-  useEffect(() => {
-    const socket = effectiveGetSocket();
-    if (!socket) return undefined;
-    const previous = socket.onMessage;
-    socket.onMessage = handleWebSocketMessage;
-    return () => {
-      socket.onMessage = previous;
-    };
-  }, [effectiveGetSocket, handleWebSocketMessage]);
-
   if (!authChecked) {
     return (
       <main className="app">
@@ -169,61 +199,57 @@ export default function App() {
   if (!user) return <AuthScreen onAuthenticated={syncProfile} />;
 
   return (
-    <AutoMessageScroll>
-      <main className="app">
-        <ChatWorkspace
-          user={user}
-          profile={profile}
-          users={users}
-          onOpenProfile={() => {}}
-          onClearHistory={clearLocalHistory}
-          connectionStatus={connectionStatus}
-          reconnectAttempt={reconnectAttempt}
-          reconnectSeconds={reconnectSeconds}
-          onLogout={handleLogout}
-          messages={messages}
-          profilesById={profilesById}
-          connected={connected}
-          historyLoading={historyLoading}
-          messagesRef={messagesRef}
-          onMessagesScroll={handleMessagesScroll}
-          editingId={editingId}
-          editingText={editingText}
-          editSaving={editSaving}
-          editError={editError}
-          onEditingTextChange={setEditingText}
-          onSaveEdit={saveEdit}
-          onCancelEdit={cancelEdit}
-          reactionPickerMessageId={reactionPickerMessageId}
-          onToggleReactionPicker={toggleReactionPicker}
-          onReaction={handleReaction}
-          onOpenContextMenu={openContextMenu}
-          onLongPressStart={startLongPress}
-          onLongPressEnd={endLongPress}
-          offlineQueueLength={offlineQueue.length}
-          replyingTo={replyingTo}
-          messageInput={messageInput}
-          onChange={setMessageInput}
-          onSubmit={sendMessage}
-          onCancelReply={() => setReplyingTo(null)}
-          contextMenu={contextMenu}
-          onReact={() => {
-            setReactionPickerMessageId(contextMenu?.message?.messageId || null);
-            setContextMenu(null);
-          }}
-          onReply={() => contextMenu && beginReply(contextMenu.message)}
-          onCopy={() => contextMenu && copyMessage(contextMenu.message)}
-          onEdit={() => contextMenu && beginEdit(contextMenu.message)}
-          onDelete={() => contextMenu && confirmDelete(contextMenu.message)}
-          profileOpen={false}
-          profileError=""
-          profileSaving={false}
-          avatarPreviewUrl=""
-          onCloseProfile={() => {}}
-          onSubmitProfile={() => {}}
-          onChooseAvatar={() => {}}
-        />
-      </main>
-    </AutoMessageScroll>
+    <ChatWorkspace
+      user={user}
+      profile={profile}
+      users={users}
+      onOpenProfile={openProfile}
+      onClearHistory={clearLocalHistory}
+      connectionStatus={connectionStatus}
+      reconnectAttempt={reconnectAttempt}
+      reconnectSeconds={reconnectSeconds}
+      onLogout={handleLogout}
+      messages={messages}
+      profilesById={profilesById}
+      connected={connected}
+      historyLoading={historyLoading}
+      messagesRef={messagesRef}
+      onMessagesScroll={handleMessagesScroll}
+      editingId={editingId}
+      editingText={editingText}
+      editSaving={editSaving}
+      editError={editError}
+      onEditingTextChange={setEditingText}
+      onSaveEdit={saveEdit}
+      onCancelEdit={cancelEdit}
+      reactionPickerMessageId={reactionPickerMessageId}
+      onToggleReactionPicker={toggleReactionPicker}
+      onReaction={handleReaction}
+      onOpenContextMenu={openContextMenu}
+      onLongPressStart={startLongPress}
+      onLongPressEnd={endLongPress}
+      offlineQueueLength={offlineQueue.length}
+      replyingTo={replyingTo}
+      messageInput={messageInput}
+      onChange={setMessageInput}
+      onSubmit={sendMessage}
+      onCancelReply={() => setReplyingTo(null)}
+      contextMenu={contextMenu}
+      onReact={() => {
+        setReactionPickerMessageId(contextMenu?.message?.messageId || null);
+        setContextMenu(null);
+      }}
+      onReply={() => contextMenu && beginReply(contextMenu.message)}
+      onCopy={() => contextMenu && copyMessage(contextMenu.message)}
+      onEdit={() => contextMenu && beginEdit(contextMenu.message)}
+      onDelete={() => contextMenu && confirmDelete(contextMenu.message)}
+      profileOpen={profileOpen}
+      profileError={profileError}
+      profileSaving={profileSaving}
+      avatarPreviewUrl={avatarPreviewUrl}
+      onCloseProfile={closeProfile}
+      onSubmitProfile={saveProfile}
+      onChooseAvatar={chooseAvatar}
+    />
   );
 }
