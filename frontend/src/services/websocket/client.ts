@@ -6,7 +6,6 @@ import {
   RECONNECT_BASE_DELAY_MS,
   RECONNECT_JITTER_MS,
   RECONNECT_MAX_DELAY_MS,
-  type WebSocketEventType,
 } from "./constants.ts";
 import { DeliveryTracker } from "./deliveryTracker.ts";
 import {
@@ -25,12 +24,11 @@ import {
   reactionPayload,
 } from "./protocol.ts";
 import type {
-  DirectMessagePayload,
+  DeliveryFailedEvent,
   MessageId,
   MessagePayload,
-  ReplyTo,
+  OutgoingMessagePayload,
 } from "../../types/websocket";
-import type { DeliveryFailedEvent, OutgoingMessagePayload } from "../../types/websocket";
 
 export interface WebSocketCallbacks {
   onMessage?: (data: ServerEvent | DeliveryFailedEvent) => void;
@@ -74,7 +72,7 @@ function isMessageId(value: unknown): value is MessageId {
   return typeof value === "string" || typeof value === "number";
 }
 
-function isOutgoingMessagePayload(payload: OutgoingEvent): payload is OutgoingEvent & OutgoingMessagePayload {
+function isOutgoingMessagePayload(payload: OutgoingEvent): payload is MessagePayload {
   return payload.type === "message";
 }
 
@@ -133,7 +131,9 @@ export function createWebSocket(
         }
         if (
           data.type === "messages_cleared" &&
-          emitFullChannelClear(data as ModerationEventData, deliveryTracker, onMessage)
+          emitFullChannelClear(data as ModerationEventData, deliveryTracker, (event) =>
+            onMessage?.(event as ServerEvent),
+          )
         ) {
           return;
         }
