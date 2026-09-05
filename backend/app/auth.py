@@ -3,8 +3,19 @@ import hashlib
 import hmac
 import secrets
 
-from app.infrastructure.database import get_connection, using_postgres
-from app.repositories.user_repository import persistent_avatar_reference
+from app.repositories.session_repository import (
+    create_session as persist_session,
+    delete_session as remove_session,
+    get_session_user_row,
+)
+from app.repositories.user_repository import (
+    UserAlreadyExistsError,
+    create_user_record,
+    get_user_credentials_by_username,
+    get_user_profile_by_id,
+    persistent_avatar_reference,
+    update_user_record,
+)
 from app.roles import get_user_role
 
 SESSION_DAYS = 30
@@ -59,18 +70,10 @@ def validate_username(username: str) -> tuple[str | None, str | None]:
     return username, None
 
 
-def _user_payload(row, connection) -> dict:
-    user = {
-        "id": row["id"],
-        "username": row["username"],
-        "displayName": row["display_name"],
-        "avatar": persistent_avatar_reference(
-            connection,
-            row["id"],
-            row["avatar"],
-        ),
-        "status": row["status"],
-    }
+def _with_role(user: dict | None) -> dict | None:
+    if user is None:
+        return None
+    user = dict(user)
     user["role"] = get_user_role(user)
     return user
 
@@ -82,95 +85,35 @@ def create_user(username: str, password: str) -> dict:
 
     password_hash, password_salt = hash_password(password)
     created_at = now_utc().isoformat()
-    connection = get_connection()
     try:
-        if using_postgres():
-            cursor = connection.execute(
-                """
-                INSERT INTO users (username, password_hash, password_salt, display_name, created_at)
-                VALUES (%s, %s, %s, %s, %s)
-                RETURNING id
-                """,
-                (username, password_hash, password_salt, username, created_at),
-            )
-            user_id = cursor.fetchone()["id"]
-        else:
-            cursor = connection.execute(
-                """
-                INSERT INTO users (username, password_hash, password_salt, display_name, created_at)
-                VALUES (?, ?, ?, ?, ?)
-                """,
-                (username, password_hash, password_salt, username, created_at),
-            )
-            user_id = cursor.lastrowid
-        connection.commit()
-        return get_user_by_id(user_id, connection=connection)
-    except Exception as exc:
-        connection.rollback()
-        if using_postgres():
-            import psycopg
-            if isinstance(exc, psycopg.errors.UniqueViolation):
-                raise ValueError("Username já está em uso.") from exc
-        else:
-            import sqlite3
-            if isinstance(exc, sqlite3.IntegrityError):
-                raise ValueError("Username já está em uso.") from exc
-        raise
-    finally:
-        connection.close()
+        user_id = create_user_record(
+            username,
+            password_hash,
+            password_salt,
+            created_at,
+        )
+    except UserAlreadyExistsError as exc:
+        raise ValueError(str(exc)) from exc
+
+    return get_user_by_id(user_id)
 
 
 def get_user_by_id(user_id: int, connection=None) -> dict | None:
-    owns_connection = connection is None
-    connection = connection or get_connection()
-    try:
-        query = (
-            """
-            SELECT id, username, display_name, avatar, status
-            FROM users
-            WHERE id = %s
-            """
-            if using_postgres()
-            else """
-            SELECT id, username, display_name, avatar, status
-            FROM users
-            WHERE id = ?
-            """
-        )
-        user = connection.execute(query, (user_id,)).fetchone()
-        return _user_payload(user, connection) if user else None
-    finally:
-        if owns_connection:
-            connection.close()
+    # `connection` remains accepted for backwards compatibility. New repository
+    # operations own their connections so callers cannot accidentally leak one.
+    return _with_role(get_user_profile_by_id(user_id))
 
 
 def authenticate(username: str, password: str) -> dict | None:
-    connection = get_connection()
-    try:
-        query = (
-            """
-            SELECT id, username, password_hash, password_salt, display_name, avatar, status
-            FROM users
-            WHERE LOWER(username) = LOWER(%s)
-            """
-            if using_postgres()
-            else """
-            SELECT id, username, password_hash, password_salt, display_name, avatar, status
-            FROM users
-            WHERE username = ? COLLATE NOCASE
-            """
-        )
-        user = connection.execute(query, (username.strip(),)).fetchone()
-        if not user or not verify_password(
-            password,
-            user["password_hash"],
-            user["password_salt"],
-        ):
-            return None
+    user = get_user_credentials_by_username(username.strip())
+    if not user or not verify_password(
+        password,
+        user["password_hash"],
+        user["password_salt"],
+    ):
+        return None
 
-        return _user_payload(user, connection)
-    finally:
-        connection.close()
+    return get_user_by_id(user["id"])
 
 
 def create_session(user_id: int) -> str:
@@ -178,88 +121,42 @@ def create_session(user_id: int) -> str:
     token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
     created_at = now_utc()
     expires_at = created_at + timedelta(days=SESSION_DAYS)
-    connection = get_connection()
-    try:
-        query = (
-            """
-            INSERT INTO sessions (token_hash, user_id, expires_at, created_at)
-            VALUES (%s, %s, %s, %s)
-            """
-            if using_postgres()
-            else """
-            INSERT INTO sessions (token_hash, user_id, expires_at, created_at)
-            VALUES (?, ?, ?, ?)
-            """
-        )
-        connection.execute(
-            query,
-            (token_hash, user_id, expires_at.isoformat(), created_at.isoformat()),
-        )
-        connection.commit()
-    finally:
-        connection.close()
+
+    persist_session(
+        user_id,
+        token_hash,
+        expires_at.isoformat(),
+        created_at.isoformat(),
+    )
     return raw_token
 
 
 def get_user_from_token(token: str | None) -> dict | None:
     if not token:
         return None
+
     token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
-    connection = get_connection()
+    row = get_session_user_row(token_hash)
+    if not row:
+        return None
+
     try:
-        query = (
-            """
-            SELECT u.id, u.username, u.display_name, u.avatar, u.status, s.expires_at
-            FROM sessions s
-            JOIN users u ON u.id = s.user_id
-            WHERE s.token_hash = %s
-            """
-            if using_postgres()
-            else """
-            SELECT u.id, u.username, u.display_name, u.avatar, u.status, s.expires_at
-            FROM sessions s
-            JOIN users u ON u.id = s.user_id
-            WHERE s.token_hash = ?
-            """
-        )
-        row = connection.execute(query, (token_hash,)).fetchone()
-        if not row:
-            return None
+        expires_at = datetime.fromisoformat(row["expires_at"])
+    except (ValueError, TypeError):
+        return None
 
-        try:
-            expires_at = datetime.fromisoformat(row["expires_at"])
-        except (ValueError, TypeError):
-            return None
-        if expires_at <= now_utc():
-            delete_query = (
-                "DELETE FROM sessions WHERE token_hash = %s"
-                if using_postgres()
-                else "DELETE FROM sessions WHERE token_hash = ?"
-            )
-            connection.execute(delete_query, (token_hash,))
-            connection.commit()
-            return None
+    if expires_at <= now_utc():
+        remove_session(token_hash)
+        return None
 
-        return _user_payload(row, connection)
-    finally:
-        connection.close()
+    return get_user_by_id(row["id"])
 
 
 def delete_session(token: str | None) -> None:
     if not token:
         return
     token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
-    connection = get_connection()
-    try:
-        query = (
-            "DELETE FROM sessions WHERE token_hash = %s"
-            if using_postgres()
-            else "DELETE FROM sessions WHERE token_hash = ?"
-        )
-        connection.execute(query, (token_hash,))
-        connection.commit()
-    finally:
-        connection.close()
+    remove_session(token_hash)
 
 
 def update_profile(
@@ -279,34 +176,36 @@ def update_profile(
     if not display_name:
         return None
 
-    connection = get_connection()
     try:
-        query = (
-            """
-            UPDATE users
-            SET username = %s, display_name = %s, avatar = %s, status = %s
-            WHERE id = %s
-            """
-            if using_postgres()
-            else """
-            UPDATE users
-            SET username = ?, display_name = ?, avatar = ?, status = ?
-            WHERE id = ?
-            """
+        updated = update_user_record(
+            user_id,
+            username,
+            display_name,
+            avatar,
+            status,
         )
-        connection.execute(query, (username, display_name, avatar, status, user_id))
-        connection.commit()
-        return get_user_by_id(user_id, connection=connection)
-    except Exception as exc:
-        connection.rollback()
-        if using_postgres():
-            import psycopg
-            if isinstance(exc, psycopg.errors.UniqueViolation):
-                raise ValueError("Username já está em uso.") from exc
-        else:
-            import sqlite3
-            if isinstance(exc, sqlite3.IntegrityError):
-                raise ValueError("Username já está em uso.") from exc
-        raise
-    finally:
-        connection.close()
+    except UserAlreadyExistsError as exc:
+        raise ValueError(str(exc)) from exc
+
+    return _with_role(updated)
+
+
+# Kept as a compatibility export for older modules that used this helper
+# directly from auth.py.
+__all__ = [
+    "SESSION_DAYS",
+    "PASSWORD_ITERATIONS",
+    "now_utc",
+    "hash_password",
+    "verify_password",
+    "validate_credentials",
+    "validate_username",
+    "create_user",
+    "get_user_by_id",
+    "authenticate",
+    "create_session",
+    "get_user_from_token",
+    "delete_session",
+    "update_profile",
+    "persistent_avatar_reference",
+]
