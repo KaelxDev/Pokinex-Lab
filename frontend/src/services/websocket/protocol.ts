@@ -25,13 +25,13 @@ export function messagePayload(
     type: WebSocketEventType.MESSAGE,
     message,
     messageId,
-    ...(replyTo ? { replyTo } : {}),
+    ...(replyTo != null ? { replyTo } : {}),
   };
 }
 
 export function directMessagePayload(
   message: string,
-  messageId: MessageId | null = null,
+  messageId: MessageId | null,
   recipientId: number,
   replyTo: ReplyTo | null = null,
 ): DirectMessagePayload {
