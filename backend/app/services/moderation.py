@@ -7,6 +7,7 @@ from app.services.moderation_commands import (
     online_user_count,
     send_bot_message,
 )
+from app.services.moderation_engine import moderation_engine
 from app.websocket.chat import manager
 from app.websocket.schemas import ChatMessageEvent
 
@@ -25,21 +26,31 @@ async def handle_public_message(websocket, user, event: ChatMessageEvent) -> boo
     if await handle_moderation_command(websocket, user, message, event.messageId):
         return True
 
-    if not has_moderator_access(user) and moderation_bot.is_muted(user["id"]):
+    is_staff = has_moderator_access(user)
+    user_id = user["id"]
+
+    if not is_staff and moderation_engine.is_muted(user_id):
+        remaining = moderation_engine.remaining_mute_seconds(user_id)
         await websocket.send_json(
             {
                 "type": "moderation",
                 "action": "muted",
                 "message": "Você está silenciado no #geral no momento.",
+                "muteRemainingSeconds": remaining,
             }
         )
         return True
 
-    moderation = moderation_bot.moderate(message, user["id"])
+    decision = moderation_engine.moderate(
+        message,
+        user_id,
+        event.messageId,
+    )
+    moderation = decision.result
     if not moderation.allowed:
         mute_minutes = moderation.mute_minutes
-        if mute_minutes > 0 and not has_moderator_access(user):
-            moderation_bot.mute(user["id"], mute_minutes)
+        if mute_minutes > 0 and not is_staff:
+            moderation_engine.mute(user_id, mute_minutes)
 
         moderation_message = (
             moderation.reason
@@ -48,16 +59,25 @@ async def handle_public_message(websocket, user, event: ChatMessageEvent) -> boo
         if mute_minutes > 0:
             moderation_message += f" Você foi silenciado por {mute_minutes} minuto(s)."
 
-        await websocket.send_json(
-            {
-                "type": "moderation",
-                "action": moderation.action or "blocked",
-                "category": moderation.category,
-                "severity": moderation.severity,
-                "muteMinutes": mute_minutes,
-                "message": moderation_message,
-            }
-        )
+        remaining = moderation_engine.remaining_mute_seconds(user_id)
+        payload = {
+            "type": "moderation",
+            "action": moderation.action or "blocked",
+            "category": moderation.category,
+            "severity": moderation.severity,
+            "muteMinutes": mute_minutes,
+            "message": moderation_message,
+            "muteRemainingSeconds": remaining,
+        }
+        if decision.cleanup_message_ids:
+            payload["removeMessageIds"] = list(decision.cleanup_message_ids)
+            payload["cleanupCount"] = len(decision.cleanup_message_ids)
+
+        await websocket.send_json(payload)
+
+        for message_id in decision.cleanup_message_ids:
+            await manager.delete_message(user, message_id, websocket)
+
         if moderation.bot_message:
             await send_bot_message(moderation.bot_message)
         if event.messageId:
@@ -76,7 +96,7 @@ async def handle_public_message(websocket, user, event: ChatMessageEvent) -> boo
 
     bot_reply = moderation_bot.conversational_response(
         message,
-        user["id"],
+        user_id,
         online_count=online_user_count(),
     )
     if bot_reply:

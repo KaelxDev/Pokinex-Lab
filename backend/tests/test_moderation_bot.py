@@ -1,8 +1,5 @@
 from app.moderation_bot import ModerationBot
-from app.services.moderation_compat import install_moderation_compat
-
-
-install_moderation_compat()
+from app.services.moderation_engine import ModerationEngine
 
 
 def test_mention_returns_conversational_response():
@@ -24,10 +21,14 @@ def test_online_command_uses_supplied_count():
 
 
 def test_duplicate_burst_is_blocked_on_fifth_message():
-    bot = ModerationBot()
+    engine = ModerationEngine(ModerationBot())
     results = [
-        bot.moderate("uma mensagem repetida", user_id=7)
-        for _ in range(5)
+        engine.moderate(
+            "uma mensagem repetida",
+            user_id=7,
+            message_id=f"msg-{index}",
+        ).result
+        for index in range(5)
     ]
     assert all(result.allowed for result in results[:4])
     assert not results[4].allowed
@@ -35,8 +36,15 @@ def test_duplicate_burst_is_blocked_on_fifth_message():
 
 
 def test_flood_is_blocked_after_limit():
-    bot = ModerationBot()
-    results = [bot.moderate(f"mensagem {index}", user_id=9) for index in range(7)]
+    engine = ModerationEngine(ModerationBot())
+    results = [
+        engine.moderate(
+            f"mensagem {index}",
+            user_id=9,
+            message_id=f"msg-{index}",
+        ).result
+        for index in range(7)
+    ]
     assert all(result.allowed for result in results[:6])
     assert not results[6].allowed
     assert results[6].action == "flood"
@@ -74,8 +82,11 @@ def test_normalization_handles_leetspeak_and_invisible_characters():
 
 
 def test_scam_is_blocked_and_can_escalate_to_mute():
-    bot = ModerationBot()
-    result = bot.moderate("Ganhe free nitro agora https://example.com", user_id=33)
+    engine = ModerationEngine(ModerationBot())
+    result = engine.moderate(
+        "Ganhe free nitro agora https://example.com",
+        user_id=33,
+    ).result
     assert not result.allowed
     assert result.category == "scam"
     assert result.severity == "high"
@@ -83,31 +94,34 @@ def test_scam_is_blocked_and_can_escalate_to_mute():
 
 
 def test_threat_is_blocked():
-    bot = ModerationBot()
-    result = bot.moderate("vou te matar", user_id=44)
+    engine = ModerationEngine(ModerationBot())
+    result = engine.moderate("vou te matar", user_id=44).result
     assert not result.allowed
     assert result.category == "threat"
     assert result.severity == "high"
 
 
 def test_excessive_mentions_are_blocked():
-    bot = ModerationBot()
-    result = bot.moderate("@um @dois @tres @quatro @cinco olha isso", user_id=55)
+    engine = ModerationEngine(ModerationBot())
+    result = engine.moderate(
+        "@um @dois @tres @quatro @cinco olha isso",
+        user_id=55,
+    ).result
     assert not result.allowed
     assert result.category == "mention_spam"
 
 
 def test_repeated_characters_are_blocked():
-    bot = ModerationBot()
-    result = bot.moderate("!!!!!!!!!!!!!!!!!!", user_id=66)
+    engine = ModerationEngine(ModerationBot())
+    result = engine.moderate("!!!!!!!!!!!!!!!!!!", user_id=66).result
     assert not result.allowed
     assert result.category == "repeated_chars"
 
 
 def test_second_violation_gets_progressive_mute():
-    bot = ModerationBot()
-    first = bot.moderate("vai se fuder", user_id=77)
-    second = bot.moderate("vai se fuder de novo", user_id=77)
+    engine = ModerationEngine(ModerationBot())
+    first = engine.moderate("vai se fuder", user_id=77).result
+    second = engine.moderate("vai se fuder de novo", user_id=77).result
     assert not first.allowed
     assert not second.allowed
     assert second.mute_minutes == 1
