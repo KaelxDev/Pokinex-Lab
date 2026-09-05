@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 import app.database as database
 import app.infrastructure.database as database_infra
-from app.message_history import get_message_history
+from app.services.message_history import get_message_history
 
 
 def _prepare_database(tmp_path, monkeypatch):
