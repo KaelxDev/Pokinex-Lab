@@ -1,7 +1,6 @@
 from collections import deque
 from datetime import datetime, timezone
 
-from app.roles import get_user_role
 from app.services.public_messages import (
     REACTIONS,
     delete_message as delete_message_operation,
