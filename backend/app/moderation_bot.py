@@ -1,11 +1,11 @@
-from collections import defaultdict, deque
 from dataclasses import dataclass
 from datetime import datetime
-import os
 import random
 import re
-import time
 import unicodedata
+
+from app.roles import is_moderator as role_is_moderator
+from app.services.moderation_state import ModerationState
 
 
 BOT_USER = {
@@ -18,22 +18,9 @@ BOT_USER = {
 }
 
 
-def _csv_env(name: str) -> set[str]:
-    return {
-        item.strip().casefold()
-        for item in os.getenv(name, "").split(",")
-        if item.strip()
-    }
-
-
 def is_moderator(user) -> bool:
-    ids = _csv_env("POKINEX_MODERATOR_IDS")
-    usernames = _csv_env("POKINEX_MODERATOR_USERNAMES")
-    user_id = str(user.get("id", "")).strip()
-    username = str(user.get("username", "")).strip().casefold()
-    return (bool(user_id) and user_id in ids) or (
-        bool(username) and username in usernames
-    )
+    """Backward-compatible alias for the central role policy."""
+    return role_is_moderator(user)
 
 
 @dataclass(frozen=True)
@@ -48,11 +35,7 @@ class ModerationResult:
 
 
 class ModerationBot:
-    """PokiBot conversational layer and moderation state container.
-
-    Automatic message-policy decisions are delegated to ``ModerationEngine`` so
-    moderation behavior stays explicit and independently testable.
-    """
+    """PokiBot conversational layer backed by isolated moderation state."""
 
     PUBLIC_COMMANDS = {
         "!help": "🤖 Comandos: !help, !rules, !bot, !about, !ping, !status, !online, !time, !memory",
@@ -95,12 +78,6 @@ class ModerationBot:
     FLOOD_MAX_MESSAGES = 6
     DUPLICATE_WINDOW_SECONDS = 20.0
     DUPLICATE_MIN_LENGTH = 4
-    VIOLATION_WINDOW_SECONDS = 120.0
-    BOT_REPLY_COOLDOWN_SECONDS = 3.0
-    MEMORY_MAX_TURNS = 6
-    MAX_NORMALIZED_MESSAGE_LENGTH = 1000
-    MAX_LINKS_PER_MESSAGE = 3
-    MAX_MENTIONS_PER_MESSAGE = 4
     CAPS_MIN_ALPHA = 10
     CAPS_RATIO_LIMIT = 0.82
     REPEATED_CHARACTER_LIMIT = 8
@@ -138,18 +115,21 @@ class ModerationBot:
         "$": "s",
     })
 
-    def __init__(self):
-        self._muted_until: dict[str, float] = {}
-        self._violation_times: dict[str, deque[float]] = defaultdict(deque)
-        self._last_bot_reply_at: dict[str, float] = {}
-        self._conversation_memory: dict[str, deque[tuple[str, str]]] = defaultdict(
-            lambda: deque(maxlen=self.MEMORY_MAX_TURNS)
-        )
-        self._categories: dict[str, int] = defaultdict(int)
-        self._total_checked = 0
-        self._total_blocked = 0
-        self._started_at = time.time()
+    def __init__(self, state: ModerationState | None = None):
+        self.state = state or ModerationState()
         self._rng = random.Random()
+
+    @property
+    def FLOOD_WINDOW_SECONDS(self):
+        return self.state.__class__.__dict__.get("FLOOD_WINDOW_SECONDS", 8.0)
+
+    @property
+    def VIOLATION_WINDOW_SECONDS(self):
+        return self.state.VIOLATION_WINDOW_SECONDS
+
+    @property
+    def BOT_REPLY_COOLDOWN_SECONDS(self):
+        return self.state.BOT_REPLY_COOLDOWN_SECONDS
 
     def command_name(self, message: str) -> str:
         return message.strip().split()[0].lower() if message.strip() else ""
@@ -181,24 +161,10 @@ class ModerationBot:
         return normalized
 
     def _register_violation(self, user_id: int | None) -> tuple[int, int]:
-        if user_id is None:
-            return 1, 0
-        key = str(user_id)
-        now = time.time()
-        violations = self._violation_times[key]
-        while violations and now - violations[0] > self.VIOLATION_WINDOW_SECONDS:
-            violations.popleft()
-        violations.append(now)
-        strike = len(violations)
-        mute_minutes = {1: 0, 2: 1, 3: 5}.get(strike, 15)
-        return strike, mute_minutes
+        return self.state.register_violation(user_id)
 
     def _can_reply(self, user_id: int | None, *, is_follow_up: bool = False) -> bool:
-        if user_id is None or is_follow_up:
-            return True
-        now = time.time()
-        key = str(user_id)
-        return now - self._last_bot_reply_at.get(key, 0.0) >= self.BOT_REPLY_COOLDOWN_SECONDS
+        return self.state.can_bot_reply(user_id, is_follow_up=is_follow_up)
 
     def _pick(self, values: list[str]) -> str:
         return self._rng.choice(values)
@@ -214,9 +180,7 @@ class ModerationBot:
         return addressed, cleaned
 
     def _remember_turn(self, user_id: int | None, role: str, text: str) -> None:
-        if user_id is None or not text:
-            return
-        self._conversation_memory[str(user_id)].append((role, text))
+        self.state.remember_turn(user_id, role, text)
 
     def conversational_response(
         self,
@@ -270,18 +234,15 @@ class ModerationBot:
                 "🤖 Estou acompanhando. Tente uma pergunta mais direta ou use `!help` para ver minhas funções.",
             ])
         self._remember_turn(user_id, "bot", response)
-        if user_id is not None:
-            self._last_bot_reply_at[str(user_id)] = time.time()
+        self.state.mark_bot_reply(user_id)
         return response
 
     def memory_message(self, user_id: int | None = None) -> str:
         if user_id is None:
             return "🧠 Minha memória curta está disponível durante esta sessão."
-        turns = list(self._conversation_memory.get(str(user_id), ()))
-        user_turns = [text for role, text in turns if role == "user"]
-        if not user_turns:
+        recent = self.state.recent_user_turns(user_id)
+        if not recent:
             return "🧠 Ainda não tenho contexto suficiente desta conversa."
-        recent = user_turns[-3:]
         if len(recent) == 1:
             return f"🧠 Lembro que você falou sobre: “{recent[0]}”."
         return "🧠 Das últimas mensagens, lembro de: " + "; ".join(f"“{item}”" for item in recent) + "."
@@ -300,15 +261,15 @@ class ModerationBot:
         return f"🕒 Agora são {now.strftime('%H:%M:%S')} ({now.strftime('%d/%m/%Y')})."
 
     def status_message(self) -> str:
-        uptime = max(0, int(time.time() - self._started_at))
+        uptime, checked, categories, blocked = self.state.status_snapshot()
         hours, remainder = divmod(uptime, 3600)
         minutes, seconds = divmod(remainder, 60)
-        top_categories = sorted(self._categories.items(), key=lambda item: item[1], reverse=True)[:4]
-        categories = ", ".join(f"{name}:{count}" for name, count in top_categories) or "nenhuma"
+        top_categories = sorted(categories.items(), key=lambda item: item[1], reverse=True)[:4]
+        category_text = ", ".join(f"{name}:{count}" for name, count in top_categories) or "nenhuma"
         return (
             f"📊 PokiBot status • online • uptime {hours:02d}:{minutes:02d}:{seconds:02d} "
-            f"• analisadas: {self._total_checked} • bloqueadas: {self._total_blocked} "
-            f"• categorias: {categories}"
+            f"• analisadas: {checked} • bloqueadas: {blocked} "
+            f"• categorias: {category_text}"
         )
 
     def parse_target(self, message: str):
@@ -321,29 +282,16 @@ class ModerationBot:
         return target.casefold(), parts[2].strip() if len(parts) > 2 else ""
 
     def mute(self, user_id: int, minutes: int) -> None:
-        self._muted_until[str(user_id)] = time.time() + (minutes * 60)
+        self.state.mute(user_id, minutes)
 
     def unmute(self, user_id: int) -> None:
-        self._muted_until.pop(str(user_id), None)
+        self.state.unmute(user_id)
 
     def is_muted(self, user_id: int) -> bool:
-        key = str(user_id)
-        expires = self._muted_until.get(key)
-        if expires is None:
-            return False
-        if time.time() >= expires:
-            self._muted_until.pop(key, None)
-            return False
-        return True
+        return self.state.is_muted(user_id)
 
     def remaining_mute_seconds(self, user_id: int) -> int:
-        expires = self._muted_until.get(str(user_id))
-        if expires is None:
-            return 0
-        remaining = max(0, int(expires - time.time() + 0.999))
-        if remaining == 0:
-            self._muted_until.pop(str(user_id), None)
-        return remaining
+        return self.state.remaining_mute_seconds(user_id)
 
 
 moderation_bot = ModerationBot()
