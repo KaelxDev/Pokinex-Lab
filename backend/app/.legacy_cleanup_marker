@@ -1,0 +1,1 @@
+Legacy direct-message persistence module was removed; use app.websocket.direct_message_features and its repository/infrastructure dependencies.
