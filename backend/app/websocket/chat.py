@@ -22,16 +22,8 @@ class ConnectionManager:
         return self.message_runtime.processed_message_ids
 
     @property
-    def _processed_message_order(self):
-        return self.message_runtime._processed_message_order
-
-    @property
     def message_owners(self):
         return self.message_runtime.message_owners
-
-    @property
-    def _message_owner_order(self):
-        return self.message_runtime._message_owner_order
 
     def register_presence_user(self, user) -> None:
         self.presence_users[user["id"]] = dict(user)
@@ -48,22 +40,14 @@ class ConnectionManager:
     def remember_processed_message(self, message_id):
         self.message_runtime.remember_processed_message(message_id)
 
-    _remember_processed_message = remember_processed_message
-
     def forget_processed_message(self, message_id):
         self.message_runtime.forget_processed_message(message_id)
-
-    _forget_processed_message = forget_processed_message
 
     def cache_message_owner(self, message_id, owner_id):
         self.message_runtime.cache_message_owner(message_id, owner_id)
 
-    _cache_message_owner = cache_message_owner
-
     def forget_message_owner(self, message_id):
         self.message_runtime.forget_message_owner(message_id)
-
-    _forget_message_owner = forget_message_owner
 
     async def connect(self, websocket, user):
         await websocket.accept()
