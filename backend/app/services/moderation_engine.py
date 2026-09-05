@@ -44,12 +44,13 @@ class ModerationDecision:
 
 
 class ModerationEngine:
-    """Application-level moderation policy without runtime monkey patches."""
+    """Application-level moderation policy independent from bot state storage."""
 
     DUPLICATE_THRESHOLD = 5
 
     def __init__(self, bot: ModerationBot | None = None):
         self.bot = bot or moderation_bot
+        self.state = self.bot.state
         self._message_times: dict[str, deque[float]] = defaultdict(deque)
         self._duplicate_history: dict[str, list[tuple[float, str, str | None]]] = defaultdict(list)
 
@@ -85,9 +86,8 @@ class ModerationEngine:
         mute_floor: int | None = None,
         action: str = "blocked",
     ) -> ModerationResult:
-        self.bot._total_blocked += 1
-        self.bot._categories[category] += 1
-        strike, escalation = self.bot._register_violation(user_id)
+        self.state.record_blocked(category)
+        strike, escalation = self.state.register_violation(user_id)
         mute_minutes = escalation
         if mute_floor is not None:
             mute_minutes = max(mute_floor, escalation)
@@ -157,7 +157,7 @@ class ModerationEngine:
         user_id: int | None = None,
         message_id: str | None = None,
     ) -> ModerationDecision:
-        self.bot._total_checked += 1
+        self.state.record_checked()
         normalized = self.normalize(message)
         safe_message = _LAUGHTER_RUN.sub(lambda match: match.group(1) * 4, message)
         safe_normalized = self.normalize(safe_message)
@@ -286,16 +286,16 @@ class ModerationEngine:
         return ModerationDecision(ModerationResult(True))
 
     def mute(self, user_id: int, minutes: int) -> None:
-        self.bot.mute(user_id, minutes)
+        self.state.mute(user_id, minutes)
 
     def unmute(self, user_id: int) -> None:
-        self.bot.unmute(user_id)
+        self.state.unmute(user_id)
 
     def is_muted(self, user_id: int) -> bool:
-        return self.bot.is_muted(user_id)
+        return self.state.is_muted(user_id)
 
     def remaining_mute_seconds(self, user_id: int) -> int:
-        return self.bot.remaining_mute_seconds(user_id)
+        return self.state.remaining_mute_seconds(user_id)
 
 
 moderation_engine = ModerationEngine()
