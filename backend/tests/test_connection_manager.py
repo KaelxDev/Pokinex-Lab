@@ -103,7 +103,7 @@ def test_processed_message_cache_is_bounded():
     manager = ConnectionManager()
 
     for index in range(MAX_PROCESSED_MESSAGE_IDS + 250):
-        manager._remember_processed_message(f"message-{index}")
+        manager.remember_processed_message(f"message-{index}")
 
     assert len(manager.processed_message_ids) == MAX_PROCESSED_MESSAGE_IDS
     assert "message-0" not in manager.processed_message_ids
@@ -114,7 +114,7 @@ def test_message_owner_cache_is_bounded():
     manager = ConnectionManager()
 
     for index in range(MAX_MESSAGE_OWNERS + 250):
-        manager._cache_message_owner(f"message-{index}", index)
+        manager.cache_message_owner(f"message-{index}", index)
 
     assert len(manager.message_owners) == MAX_MESSAGE_OWNERS
     assert "message-0" not in manager.message_owners
