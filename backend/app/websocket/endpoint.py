@@ -6,7 +6,7 @@ from anyio import to_thread
 from fastapi import WebSocket, WebSocketDisconnect
 
 from app.auth import get_user_from_token
-from app.moderation_bot import is_moderator
+from app.roles import has_moderator_access
 from app.services.moderation import register_system_users
 from app.security import is_allowed_origin
 from app.websocket.chat import manager
@@ -43,7 +43,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     await websocket.send_json(
         {
             "type": "moderator_session",
-            "enabled": is_moderator(user),
+            "enabled": has_moderator_access(user),
         }
     )
 
