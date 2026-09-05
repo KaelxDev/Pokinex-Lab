@@ -1,16 +1,7 @@
 from datetime import datetime, timezone
 
-from anyio import to_thread
-
-from app.repositories.message_repository import get_message_owner
 from app.services import message_runtime
 from app.services.public_identity import public_user_payload
-from app.services.public_messages import (
-    delete_message as delete_message_operation,
-    edit_message as edit_message_operation,
-    send_message as send_message_operation,
-    toggle_reaction as toggle_reaction_operation,
-)
 
 MessageRuntimeState = message_runtime.MessageRuntimeState
 MAX_PROCESSED_MESSAGE_IDS = message_runtime.MAX_PROCESSED_MESSAGE_IDS
@@ -18,6 +9,8 @@ MAX_MESSAGE_OWNERS = message_runtime.MAX_MESSAGE_OWNERS
 
 
 class ConnectionManager:
+    """Manage WebSocket connections, presence and bounded runtime state."""
+
     def __init__(self):
         self.active_connections = {}
         self.presence_users = {}
@@ -155,38 +148,6 @@ class ConnectionManager:
             }
         )
         await self.send_users()
-
-    async def send_message(self, user, message, message_id=None, sender=None, reply_to_message_id=None):
-        return await send_message_operation(
-            self,
-            user,
-            message,
-            message_id,
-            sender,
-            reply_to_message_id,
-        )
-
-    async def toggle_reaction(self, user, message_id, reaction, sender):
-        return await toggle_reaction_operation(self, user, message_id, reaction, sender)
-
-    async def resolve_message_owner(self, message_id):
-        owner_id = self.message_owners.get(message_id)
-        if owner_id is not None:
-            return owner_id
-
-        owner_id = await to_thread.run_sync(get_message_owner, message_id)
-        if owner_id is not None:
-            self.cache_message_owner(message_id, owner_id)
-        return owner_id
-
-    async def _owner(self, message_id):
-        return await self.resolve_message_owner(message_id)
-
-    async def edit_message(self, user, message_id, message, sender):
-        return await edit_message_operation(self, user, message_id, message, sender)
-
-    async def delete_message(self, user, message_id, sender):
-        return await delete_message_operation(self, user, message_id, sender)
 
     @staticmethod
     def get_timestamp():
