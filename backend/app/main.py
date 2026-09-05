@@ -12,6 +12,7 @@ from app.database import close_db_pool, init_db_pool, initialize_database
 from app.routes.auth import router as auth_router
 from app.routes.messages import router as messages_router
 from app.security import ALLOWED_ORIGINS
+from app.services.moderation_compat import install_moderation_compat
 from app.websocket.endpoint import websocket_endpoint
 
 APP_DIR = Path(__file__).resolve().parent
@@ -22,6 +23,7 @@ AVATAR_DIR.mkdir(parents=True, exist_ok=True)
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    install_moderation_compat()
     await to_thread.run_sync(init_db_pool)
     await to_thread.run_sync(initialize_database)
     try:
