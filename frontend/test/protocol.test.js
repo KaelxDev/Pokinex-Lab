@@ -10,7 +10,7 @@ import {
   editMessagePayload,
   deleteMessagePayload,
   reactionPayload,
-} from "../src/services/websocket/protocol.js";
+} from "../src/services/websocket/protocol.ts";
 
 test("protocol exposes the expected websocket event types", () => {
   assert.deepEqual(WebSocketEventType, {
@@ -33,23 +33,22 @@ test("messagePayload omits replyTo when absent", () => {
   });
 });
 
-test("messagePayload preserves replyTo metadata", () => {
-  const replyTo = { messageId: "original-1", username: "kael" };
-  assert.deepEqual(messagePayload("reply", "m2", replyTo), {
+test("messagePayload preserves reply target", () => {
+  assert.deepEqual(messagePayload("reply", "m2", "original-1"), {
     type: "message",
     message: "reply",
     messageId: "m2",
-    replyTo,
+    replyTo: "original-1",
   });
 });
 
 test("direct message payload builders preserve their contracts", () => {
-  assert.deepEqual(directMessagePayload("hi", "dm1", 42, { messageId: "m1" }), {
+  assert.deepEqual(directMessagePayload("hi", "dm1", 42, "m1"), {
     type: "direct_message",
     message: "hi",
     messageId: "dm1",
     recipientId: 42,
-    replyTo: { messageId: "m1" },
+    replyTo: "m1",
   });
   assert.deepEqual(directMessageEditPayload("dm1", "updated"), {
     type: "direct_message_edit",
