@@ -88,6 +88,8 @@ export function createWebSocket(
     if (!messageId) return;
     const id = String(messageId);
 
+    const previousIndex = pendingMessageIds.indexOf(messageId);
+    if (previousIndex >= 0) pendingMessageIds.splice(previousIndex, 1);
     pendingMessageIds.push(messageId);
     pendingMessagePayloads.set(id, { ...payload });
     clearDeliveryTimer(id);
@@ -236,6 +238,9 @@ export function createWebSocket(
           });
         }
         if (data?.type === "ack" && data.messageId) {
+          forgetOutgoingMessage(data.messageId);
+        }
+        if (data?.type === "message" && data.messageId) {
           forgetOutgoingMessage(data.messageId);
         }
         if (data?.type === "moderation") {
