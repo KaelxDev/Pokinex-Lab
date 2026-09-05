@@ -12,8 +12,8 @@
     "skipLibCheck": true
   },
   "include": [
-    "src/services/websocket/**/*.js",
-    "src/services/websocket/**/*.ts",
+    "src/services/websocket/protocol.ts",
+    "src/services/websocket/deliveryTracker.ts",
     "src/types/**/*.d.ts"
   ],
   "exclude": ["node_modules", "dist"]
