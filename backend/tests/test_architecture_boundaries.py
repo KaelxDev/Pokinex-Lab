@@ -86,3 +86,4 @@ def test_runtime_moderation_compatibility_layer_is_gone():
 
 def test_legacy_direct_message_module_is_removed():
     assert not (BACKEND_APP / "direct_messages.py").exists()
+    assert not (BACKEND_APP / "websocket" / "direct_messages.py").exists()
