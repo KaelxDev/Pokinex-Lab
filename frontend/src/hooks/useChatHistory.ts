@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { Dispatch, RefObject, SetStateAction, UIEvent } from "react";
 import { getMessageHistory } from "../services/auth.ts";
 import {
   HISTORY_PAGE_SIZE,
@@ -8,28 +9,7 @@ import {
   loadJson,
   mergeServerHistory,
 } from "../utils/chat";
-
-export interface ChatMessage {
-  type?: string;
-  messageId?: string | number;
-  userId?: string | number;
-  username?: string;
-  displayName?: string;
-  message?: string;
-  timestamp?: number | string;
-  avatar?: string;
-  ephemeral?: boolean;
-  deliveryStatus?: string;
-  offline?: boolean;
-  [key: string]: unknown;
-}
-
-export interface OfflineQueueItem extends ChatMessage {
-  id: string;
-  type: "message";
-  message: string;
-  createdAt: number;
-}
+import type { ChatMessage, OfflineQueueItem } from "../types/chat";
 
 function scopedStorageKey(baseKey: string, userKey: string | null): string | null {
   return userKey == null ? null : `${baseKey}:user:${userKey}`;
@@ -45,13 +25,13 @@ function asQueue(value: unknown): OfflineQueueItem[] {
 
 export interface ChatHistoryState {
   messages: ChatMessage[];
-  setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
+  setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
   offlineQueue: OfflineQueueItem[];
-  setOfflineQueue: React.Dispatch<React.SetStateAction<OfflineQueueItem[]>>;
+  setOfflineQueue: Dispatch<SetStateAction<OfflineQueueItem[]>>;
   historyLoading: boolean;
   loadMessageHistory: (before?: string | null, preserveScroll?: boolean) => Promise<void>;
-  messagesRef: React.RefObject<HTMLDivElement | null>;
-  handleMessagesScroll: (event: React.UIEvent<HTMLDivElement>) => void;
+  messagesRef: RefObject<HTMLDivElement | null>;
+  handleMessagesScroll: (event: UIEvent<HTMLDivElement>) => void;
   clearLocalHistory: () => void;
 }
 
@@ -176,7 +156,7 @@ export function useChatHistory(userId: string | number | null | undefined): Chat
     void loadMessageHistory();
   }, [userKey]);
 
-  function handleMessagesScroll(event: React.UIEvent<HTMLDivElement>): void {
+  function handleMessagesScroll(event: UIEvent<HTMLDivElement>): void {
     if (event.currentTarget.scrollTop > 80) return;
     if (!hasMoreHistory || historyLoadingRef.current || !historyBefore) return;
     void loadMessageHistory(historyBefore, true);
