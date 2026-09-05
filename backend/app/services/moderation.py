@@ -8,6 +8,7 @@ from app.services.moderation_commands import (
     send_bot_message,
 )
 from app.services.moderation_engine import moderation_engine
+from app.services.public_messages import delete_message, send_message
 from app.websocket.chat import manager
 from app.websocket.schemas import ChatMessageEvent
 
@@ -76,7 +77,7 @@ async def handle_public_message(websocket, user, event: ChatMessageEvent) -> boo
         await websocket.send_json(payload)
 
         for message_id in decision.cleanup_message_ids:
-            await manager.delete_message(user, message_id, websocket)
+            await delete_message(manager, user, message_id, websocket)
 
         if moderation.bot_message:
             await send_bot_message(moderation.bot_message)
@@ -86,7 +87,8 @@ async def handle_public_message(websocket, user, event: ChatMessageEvent) -> boo
             )
         return True
 
-    await manager.send_message(
+    await send_message(
+        manager,
         user,
         message,
         event.messageId,
