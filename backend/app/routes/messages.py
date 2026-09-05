@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Header, HTTPException, Query, Request
 
 from app.auth import get_user_by_id
-from app.message_history import get_message_history
 from app.routes.auth import require_user
+from app.services.message_history import get_message_history
 from app.websocket.direct_message_features import get_direct_message_history
 
 router = APIRouter(prefix="/api/messages", tags=["messages"])
