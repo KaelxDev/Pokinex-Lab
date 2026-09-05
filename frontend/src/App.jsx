@@ -1,12 +1,7 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { logout as logoutRequest } from "./services/auth";
 import AuthScreen from "./components/AuthScreen";
-import ChatHeader from "./components/ChatHeader";
-import ChatSidebar from "./components/ChatSidebar";
-import MessageComposer from "./components/MessageComposer";
-import MessageContextMenu from "./components/MessageContextMenu";
-import MessageList from "./components/MessageList";
-import ProfileModal from "./components/ProfileModal";
+import ChatWorkspace from "./components/ChatWorkspace.jsx";
 import { useAuthSession } from "./hooks/useAuthSession";
 import { useChatActions } from "./hooks/useChatActions";
 import { useChatConnection } from "./hooks/useChatConnection";
@@ -29,6 +24,8 @@ export default function App() {
     clearLocalHistory,
   } = useChatHistory(user?.id);
 
+  const [messageInput, setMessageInput] = useState("");
+  const [replyingTo, setReplyingTo] = useState(null);
   const messageHandlerRef = useRef(() => {});
 
   const {
@@ -50,6 +47,7 @@ export default function App() {
   }, [loadMessageHistory]);
 
   const {
+    socketRef,
     connected,
     connectionStatus,
     reconnectAttempt,
@@ -63,10 +61,6 @@ export default function App() {
   });
 
   const {
-    messageInput: composerInput,
-    setMessageInput,
-    replyingTo: replyTarget,
-    setReplyingTo,
     contextMenu,
     setContextMenu,
     editingId,
@@ -97,6 +91,10 @@ export default function App() {
     userRef,
     isConnected,
     getSocket,
+    messageInput,
+    setMessageInput,
+    replyingTo,
+    setReplyingTo,
     offlineQueue,
     setOfflineQueue,
     setMessages,
@@ -108,7 +106,7 @@ export default function App() {
     editingId,
     mergeUser,
     reactionPickerMessageId,
-    replyingTo: replyTarget,
+    replyingTo,
     setContextMenu,
     setEditError,
     setEditSaving,
@@ -136,6 +134,9 @@ export default function App() {
 
   useEffect(() => {
     messageHandlerRef.current = handleWebSocketMessage;
+    return () => {
+      messageHandlerRef.current = () => {};
+    };
   }, [handleWebSocketMessage]);
 
   useEffect(() => {
@@ -176,83 +177,57 @@ export default function App() {
   if (!user) return <AuthScreen onAuthenticated={syncProfile} />;
 
   return (
-    <main className="app">
-      <section className="chat">
-        <ChatSidebar
-          user={user}
-          profile={profile}
-          users={users}
-          onOpenProfile={openProfile}
-          onClearHistory={clearLocalHistory}
-        />
-
-        <div className="chat-content">
-          <ChatHeader
-            connectionStatus={connectionStatus}
-            reconnectAttempt={reconnectAttempt}
-            reconnectSeconds={reconnectSeconds}
-            onLogout={handleLogout}
-          />
-
-          <MessageList
-            messages={messages}
-            user={user}
-            profile={profile}
-            profilesById={profilesById}
-            connected={connected}
-            historyLoading={historyLoading}
-            messagesRef={messagesRef}
-            onScroll={handleMessagesScroll}
-            editingId={editingId}
-            editingText={editingText}
-            editSaving={editSaving}
-            editError={editError}
-            onEditingTextChange={setEditingText}
-            onSaveEdit={saveEdit}
-            onCancelEdit={cancelEdit}
-            reactionPickerMessageId={reactionPickerMessageId}
-            onToggleReactionPicker={toggleReactionPicker}
-            onReaction={handleReaction}
-            onOpenContextMenu={openContextMenu}
-            onLongPressStart={startLongPress}
-            onLongPressEnd={endLongPress}
-          />
-
-          <MessageComposer
-            connected={connected}
-            offlineQueueLength={offlineQueue.length}
-            replyingTo={replyTarget}
-            messageInput={composerInput}
-            onChange={setMessageInput}
-            onSubmit={sendMessage}
-            onCancelReply={() => setReplyingTo(null)}
-          />
-        </div>
-
-        <MessageContextMenu
-          contextMenu={contextMenu}
-          onReact={() => {
-            setReactionPickerMessageId(contextMenu?.message?.messageId || null);
-            setContextMenu(null);
-          }}
-          onReply={() => contextMenu && beginReply(contextMenu.message)}
-          onCopy={() => contextMenu && copyMessage(contextMenu.message)}
-          onEdit={() => contextMenu && beginEdit(contextMenu.message)}
-          onDelete={() => contextMenu && confirmDelete(contextMenu.message)}
-        />
-
-        <ProfileModal
-          open={profileOpen}
-          user={user}
-          profile={profile}
-          avatarPreview={avatarPreviewUrl}
-          profileError={profileError}
-          profileSaving={profileSaving}
-          onClose={closeProfile}
-          onSubmit={saveProfile}
-          onChooseAvatar={chooseAvatar}
-        />
-      </section>
-    </main>
+    <ChatWorkspace
+      user={user}
+      profile={profile}
+      users={users}
+      onOpenProfile={openProfile}
+      onClearHistory={clearLocalHistory}
+      connectionStatus={connectionStatus}
+      reconnectAttempt={reconnectAttempt}
+      reconnectSeconds={reconnectSeconds}
+      onLogout={handleLogout}
+      messages={messages}
+      profilesById={profilesById}
+      connected={connected}
+      historyLoading={historyLoading}
+      messagesRef={messagesRef}
+      onMessagesScroll={handleMessagesScroll}
+      editingId={editingId}
+      editingText={editingText}
+      editSaving={editSaving}
+      editError={editError}
+      onEditingTextChange={setEditingText}
+      onSaveEdit={saveEdit}
+      onCancelEdit={cancelEdit}
+      reactionPickerMessageId={reactionPickerMessageId}
+      onToggleReactionPicker={toggleReactionPicker}
+      onReaction={handleReaction}
+      onOpenContextMenu={openContextMenu}
+      onLongPressStart={startLongPress}
+      onLongPressEnd={endLongPress}
+      offlineQueueLength={offlineQueue.length}
+      replyingTo={replyingTo}
+      messageInput={messageInput}
+      onChange={setMessageInput}
+      onSubmit={sendMessage}
+      onCancelReply={() => setReplyingTo(null)}
+      contextMenu={contextMenu}
+      onReact={() => {
+        setReactionPickerMessageId(contextMenu?.message?.messageId || null);
+        setContextMenu(null);
+      }}
+      onReply={() => contextMenu && beginReply(contextMenu.message)}
+      onCopy={() => contextMenu && copyMessage(contextMenu.message)}
+      onEdit={() => contextMenu && beginEdit(contextMenu.message)}
+      onDelete={() => contextMenu && confirmDelete(contextMenu.message)}
+      profileOpen={profileOpen}
+      profileError={profileError}
+      profileSaving={profileSaving}
+      avatarPreviewUrl={avatarPreviewUrl}
+      onCloseProfile={closeProfile}
+      onSubmitProfile={saveProfile}
+      onChooseAvatar={chooseAvatar}
+    />
   );
 }

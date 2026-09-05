@@ -1,0 +1,132 @@
+import ChatHeader from "./ChatHeader";
+import ChatSidebar from "./ChatSidebar";
+import MessageComposer from "./MessageComposer";
+import MessageContextMenu from "./MessageContextMenu";
+import MessageList from "./MessageList";
+import ProfileModal from "./ProfileModal";
+
+export default function ChatWorkspace({
+  user,
+  profile,
+  users,
+  onOpenProfile,
+  onClearHistory,
+  connectionStatus,
+  reconnectAttempt,
+  reconnectSeconds,
+  onLogout,
+  messages,
+  profilesById,
+  connected,
+  historyLoading,
+  messagesRef,
+  onMessagesScroll,
+  editingId,
+  editingText,
+  editSaving,
+  editError,
+  onEditingTextChange,
+  onSaveEdit,
+  onCancelEdit,
+  reactionPickerMessageId,
+  onToggleReactionPicker,
+  onReaction,
+  onOpenContextMenu,
+  onLongPressStart,
+  onLongPressEnd,
+  offlineQueueLength,
+  replyingTo,
+  messageInput,
+  onChange,
+  onSubmit,
+  onCancelReply,
+  contextMenu,
+  onReact,
+  onReply,
+  onCopy,
+  onEdit,
+  onDelete,
+  profileOpen,
+  profileError,
+  profileSaving,
+  avatarPreviewUrl,
+  onCloseProfile,
+  onSubmitProfile,
+  onChooseAvatar,
+}) {
+  return (
+    <section className="chat">
+      <ChatSidebar
+        user={user}
+        profile={profile}
+        users={users}
+        onOpenProfile={onOpenProfile}
+        onClearHistory={onClearHistory}
+      />
+
+      <div className="chat-content">
+        <ChatHeader
+          connectionStatus={connectionStatus}
+          reconnectAttempt={reconnectAttempt}
+          reconnectSeconds={reconnectSeconds}
+          onLogout={onLogout}
+        />
+
+        <MessageList
+          messages={messages}
+          user={user}
+          profile={profile}
+          profilesById={profilesById}
+          connected={connected}
+          historyLoading={historyLoading}
+          messagesRef={messagesRef}
+          onScroll={onMessagesScroll}
+          editingId={editingId}
+          editingText={editingText}
+          editSaving={editSaving}
+          editError={editError}
+          onEditingTextChange={onEditingTextChange}
+          onSaveEdit={onSaveEdit}
+          onCancelEdit={onCancelEdit}
+          reactionPickerMessageId={reactionPickerMessageId}
+          onToggleReactionPicker={onToggleReactionPicker}
+          onReaction={onReaction}
+          onOpenContextMenu={onOpenContextMenu}
+          onLongPressStart={onLongPressStart}
+          onLongPressEnd={onLongPressEnd}
+        />
+
+        <MessageComposer
+          connected={connected}
+          offlineQueueLength={offlineQueueLength}
+          replyingTo={replyingTo}
+          messageInput={messageInput}
+          onChange={onChange}
+          onSubmit={onSubmit}
+          onCancelReply={onCancelReply}
+        />
+      </div>
+
+      <MessageContextMenu
+        contextMenu={contextMenu}
+        onReact={onReact}
+        onReply={onReply}
+        onCopy={onCopy}
+        onEdit={onEdit}
+        onDelete={onDelete}
+      />
+
+      <ProfileModal
+        open={profileOpen}
+        user={user}
+        profile={profile}
+        avatarPreview={avatarPreviewUrl}
+        profileError={profileError}
+        profileSaving={profileSaving}
+        onClose={onCloseProfile}
+        onSubmit={onSubmitProfile}
+        onChooseAvatar={onChooseAvatar}
+      />
+    </section>
+  );
+}
