@@ -12,6 +12,17 @@ import {
   emitFullChannelClear,
   emitModerationEvent,
 } from "./moderation";
+import {
+  deleteMessagePayload,
+  deleteMessagePayload as buildDeleteMessagePayload,
+  directMessageDeletePayload,
+  directMessageEditPayload,
+  directMessagePayload,
+  directMessageReactionPayload,
+  editMessagePayload,
+  messagePayload,
+  reactionPayload,
+} from "./protocol";
 
 export function createWebSocket(
   _legacyToken,
@@ -128,31 +139,31 @@ export function createWebSocket(
       return socket;
     },
     sendMessage(message, messageId = null) {
-      return send({ type: "message", message, messageId });
+      return send(messagePayload(message, messageId));
     },
     sendDirectMessage(message, messageId = null, recipientId, replyTo = null) {
-      return send({ type: "direct_message", message, messageId, recipientId, replyTo });
+      return send(directMessagePayload(message, messageId, recipientId, replyTo));
     },
     sendDirectEditMessage(messageId, message) {
-      return send({ type: "direct_message_edit", messageId, message });
+      return send(directMessageEditPayload(messageId, message));
     },
     sendDirectDeleteMessage(messageId) {
-      return send({ type: "direct_message_delete", messageId });
+      return send(directMessageDeletePayload(messageId));
     },
     sendDirectReaction(messageId, reaction) {
-      return send({ type: "direct_message_reaction", messageId, reaction });
+      return send(directMessageReactionPayload(messageId, reaction));
     },
     sendEditMessage(messageId, message) {
-      return send({ type: "edit_message", messageId, message });
+      return send(editMessagePayload(messageId, message));
     },
     sendDeleteMessage(messageId) {
-      return send({ type: "delete_message", messageId });
+      return send(buildDeleteMessagePayload(messageId));
     },
     sendReplyMessage(message, messageId = null, replyTo = null) {
-      return send({ type: "message", message, messageId, replyTo });
+      return send(messagePayload(message, messageId, replyTo));
     },
     sendReaction(messageId, reaction) {
-      return send({ type: "reaction", messageId, reaction });
+      return send(reactionPayload(messageId, reaction));
     },
     close() {
       manuallyClosed = true;
