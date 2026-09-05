@@ -6,11 +6,14 @@ from anyio import to_thread
 from fastapi import WebSocket, WebSocketDisconnect
 
 from app.auth import get_user_from_token
+from app.rate_limit import allow_request
 from app.roles import has_moderator_access
 from app.services.moderation import register_system_users
 from app.security import is_allowed_origin
 from app.websocket.chat import manager
 from app.websocket.router import MAX_WEBSOCKET_PAYLOAD, dispatch_event
+
+WEBSOCKET_EVENTS_PER_MINUTE = 120
 
 
 def websocket_token(websocket: WebSocket) -> str | None:
@@ -31,55 +34,33 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     if not await validate_websocket_origin(websocket):
         return
 
-    user = await to_thread.run_sync(
-        get_user_from_token,
-        websocket_token(websocket),
-    )
+    user = await to_thread.run_sync(get_user_from_token, websocket_token(websocket))
     if not user:
         await websocket.close(code=1008, reason="Authentication required")
         return
 
     await manager.connect(websocket, user)
-    await websocket.send_json(
-        {
-            "type": "moderator_session",
-            "enabled": has_moderator_access(user),
-        }
-    )
+    await websocket.send_json({"type": "moderator_session", "enabled": has_moderator_access(user)})
 
     try:
         while True:
             raw_data = await websocket.receive_text()
             if len(raw_data.encode("utf-8")) > MAX_WEBSOCKET_PAYLOAD:
-                await websocket.send_json(
-                    {
-                        "type": "error",
-                        "action": "payload",
-                        "message": "Evento muito grande.",
-                    }
-                )
+                await websocket.send_json({"type": "error", "action": "payload", "message": "Evento muito grande."})
+                continue
+
+            if not allow_request(f"websocket:{user['id']}", WEBSOCKET_EVENTS_PER_MINUTE, 60):
+                await websocket.send_json({"type": "error", "action": "rate_limit", "message": "Muitos eventos. Aguarde um momento."})
                 continue
 
             try:
                 data = json.loads(raw_data)
             except json.JSONDecodeError:
-                await websocket.send_json(
-                    {
-                        "type": "error",
-                        "action": "payload",
-                        "message": "JSON inválido.",
-                    }
-                )
+                await websocket.send_json({"type": "error", "action": "payload", "message": "JSON inválido."})
                 continue
 
             if not isinstance(data, dict):
-                await websocket.send_json(
-                    {
-                        "type": "error",
-                        "action": "payload",
-                        "message": "O evento deve ser um objeto JSON.",
-                    }
-                )
+                await websocket.send_json({"type": "error", "action": "payload", "message": "O evento deve ser um objeto JSON."})
                 continue
 
             await dispatch_event(websocket, data, user)
