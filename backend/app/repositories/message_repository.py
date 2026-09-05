@@ -20,8 +20,12 @@ def save_message(message_id, user_id, message, created_at, reply_to_message_id=N
             VALUES (?, ?, ?, ?, ?)
             """,
         )
-        connection.execute(query, (message_id, user_id, message, created_at, reply_to_message_id))
+        cursor = connection.execute(
+            query,
+            (message_id, user_id, message, created_at, reply_to_message_id),
+        )
         connection.commit()
+        return cursor.rowcount > 0
     finally:
         connection.close()
 
