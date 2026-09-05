@@ -1,5 +1,15 @@
 import { useCallback } from "react";
 
+export function sendQueuedMessage(socket, item) {
+  if (!socket || !item) return false;
+
+  if (item.type === "message" && item.replyTo?.messageId) {
+    return socket.sendReplyMessage(item.message, item.id, item.replyTo.messageId);
+  }
+
+  return socket.sendMessage(item.message, item.id);
+}
+
 export function useOfflineQueue({
   getSocket,
   offlineQueue,
@@ -18,11 +28,7 @@ export function useOfflineQueue({
         ),
       );
 
-      if (item.type === "message" && item.replyTo?.messageId) {
-        socket.sendReplyMessage(item.message, item.id, item.replyTo.messageId);
-      } else {
-        socket.sendMessage(item.message, item.id);
-      }
+      sendQueuedMessage(socket, item);
     }
   }, [getSocket, offlineQueue, setMessages]);
 

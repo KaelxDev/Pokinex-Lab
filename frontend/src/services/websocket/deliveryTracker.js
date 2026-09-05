@@ -1,14 +1,15 @@
 import {
   DELIVERY_TIMEOUT_MS,
   MAX_PENDING_OUTGOING,
-} from "./constants";
+} from "./constants.js";
 
 export class DeliveryTracker {
-  constructor({ onFailed } = {}) {
+  constructor({ onFailed, timeoutMs = DELIVERY_TIMEOUT_MS } = {}) {
     this.pendingIds = [];
     this.pendingPayloads = new Map();
     this.timers = new Map();
     this.onFailed = onFailed;
+    this.timeoutMs = timeoutMs;
   }
 
   clearTimer(messageId) {
@@ -46,7 +47,7 @@ export class DeliveryTracker {
         message: pending?.message || "",
         replyTo: pending?.replyTo || null,
       });
-    }, DELIVERY_TIMEOUT_MS);
+    }, this.timeoutMs);
 
     this.timers.set(id, timer);
 
