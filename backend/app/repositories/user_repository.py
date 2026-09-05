@@ -1,6 +1,6 @@
 """Persistence operations for users and public profile data."""
 
-from app.infrastructure.database import get_connection, postgres_or_sqlite
+from app.infrastructure.database import get_connection, postgres_or_sqlite, using_postgres
 
 
 class UserAlreadyExistsError(ValueError):
@@ -43,10 +43,11 @@ def profile_from_row(connection, row):
     return user
 
 
-def create_user(connection, username, password_hash, password_salt, created_at):
+def create_user_record(username, password_hash, password_salt, created_at):
     """Insert a user and return its generated id."""
+    connection = get_connection()
     try:
-        if _using_postgres(connection):
+        if using_postgres():
             cursor = connection.execute(
                 """
                 INSERT INTO users (username, password_hash, password_salt, display_name, created_at)
@@ -55,78 +56,95 @@ def create_user(connection, username, password_hash, password_salt, created_at):
                 """,
                 (username, password_hash, password_salt, username, created_at),
             )
-            return cursor.fetchone()["id"]
+            user_id = cursor.fetchone()["id"]
+        else:
+            cursor = connection.execute(
+                """
+                INSERT INTO users (username, password_hash, password_salt, display_name, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (username, password_hash, password_salt, username, created_at),
+            )
+            user_id = cursor.lastrowid
 
-        cursor = connection.execute(
-            """
-            INSERT INTO users (username, password_hash, password_salt, display_name, created_at)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (username, password_hash, password_salt, username, created_at),
-        )
-        return cursor.lastrowid
+        connection.commit()
+        return user_id
     except Exception as exc:
+        connection.rollback()
         if _is_integrity_error(exc):
             raise UserAlreadyExistsError("Username já está em uso.") from exc
         raise
+    finally:
+        connection.close()
 
 
-def get_user_row_by_id(connection, user_id):
-    query = postgres_or_sqlite(
-        """
-        SELECT id, username, display_name, avatar, status
-        FROM users
-        WHERE id = %s
-        """,
-        """
-        SELECT id, username, display_name, avatar, status
-        FROM users
-        WHERE id = ?
-        """,
-    )
-    return connection.execute(query, (user_id,)).fetchone()
-
-
-def get_user_credentials_by_username(connection, username):
-    query = postgres_or_sqlite(
-        """
-        SELECT id, username, password_hash, password_salt, display_name, avatar, status
-        FROM users
-        WHERE LOWER(username) = LOWER(%s)
-        """,
-        """
-        SELECT id, username, password_hash, password_salt, display_name, avatar, status
-        FROM users
-        WHERE username = ? COLLATE NOCASE
-        """,
-    )
-    return connection.execute(query, (username,)).fetchone()
-
-
-def update_user(connection, user_id, username, display_name, avatar, status):
-    query = postgres_or_sqlite(
-        """
-        UPDATE users
-        SET username = %s, display_name = %s, avatar = %s, status = %s
-        WHERE id = %s
-        """,
-        """
-        UPDATE users
-        SET username = ?, display_name = ?, avatar = ?, status = ?
-        WHERE id = ?
-        """,
-    )
+def get_user_profile_by_id(user_id):
+    connection = get_connection()
     try:
+        query = postgres_or_sqlite(
+            """
+            SELECT id, username, display_name, avatar, status
+            FROM users
+            WHERE id = %s
+            """,
+            """
+            SELECT id, username, display_name, avatar, status
+            FROM users
+            WHERE id = ?
+            """,
+        )
+        row = connection.execute(query, (user_id,)).fetchone()
+        return profile_from_row(connection, row)
+    finally:
+        connection.close()
+
+
+def get_user_credentials_by_username(username):
+    connection = get_connection()
+    try:
+        query = postgres_or_sqlite(
+            """
+            SELECT id, username, password_hash, password_salt, display_name, avatar, status
+            FROM users
+            WHERE LOWER(username) = LOWER(%s)
+            """,
+            """
+            SELECT id, username, password_hash, password_salt, display_name, avatar, status
+            FROM users
+            WHERE username = ? COLLATE NOCASE
+            """,
+        )
+        return connection.execute(query, (username,)).fetchone()
+    finally:
+        connection.close()
+
+
+def update_user_record(user_id, username, display_name, avatar, status):
+    connection = get_connection()
+    try:
+        query = postgres_or_sqlite(
+            """
+            UPDATE users
+            SET username = %s, display_name = %s, avatar = %s, status = %s
+            WHERE id = %s
+            """,
+            """
+            UPDATE users
+            SET username = ?, display_name = ?, avatar = ?, status = ?
+            WHERE id = ?
+            """,
+        )
         connection.execute(query, (username, display_name, avatar, status, user_id))
+        connection.commit()
     except Exception as exc:
+        connection.rollback()
         if _is_integrity_error(exc):
             raise UserAlreadyExistsError("Username já está em uso.") from exc
         raise
+    finally:
+        connection.close()
 
-
-def _using_postgres(connection):
-    module = connection.__class__.__module__
-    return module.startswith("psycopg")
+    return get_user_profile_by_id(user_id)
 
 
 def _is_integrity_error(exc):
