@@ -2,11 +2,8 @@
 
 from app.moderation_bot import BOT_USER, moderation_bot
 from app.roles import has_moderator_access
-from app.services.moderation_commands import (
-    handle_moderation_command,
-    online_user_count,
-    send_bot_message,
-)
+from app.services.bot_commands import online_user_count, send_bot_message
+from app.services.moderation_commands import handle_moderation_command
 from app.services.moderation_engine import moderation_engine
 from app.services.public_messages import delete_message, send_message
 from app.websocket.chat import manager
