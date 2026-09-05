@@ -42,6 +42,7 @@ export default function ChatWorkspace({ onLogout }) {
     sendMessage,
     setReplyingTo,
     contextMenu,
+    setContextMenu,
     setReactionPickerMessageId,
     beginReply,
     copyMessage,
