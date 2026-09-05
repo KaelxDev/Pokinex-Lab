@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { getMessageHistory } from "../services/auth";
+import { getMessageHistory } from "../services/auth.ts";
 import {
   HISTORY_PAGE_SIZE,
   LOCAL_CACHE_LIMIT,
@@ -140,7 +140,7 @@ export function useChatHistory(userId: string | number | null | undefined): Chat
     const previousScrollTop = container?.scrollTop || 0;
 
     try {
-      const data = (await getMessageHistory(HISTORY_PAGE_SIZE, before)) as HistoryResponse;
+      const data = await getMessageHistory(HISTORY_PAGE_SIZE, before);
       const incoming = asChatMessages(data?.messages);
       setMessages((current) => mergeServerHistory(current, incoming) as ChatMessage[]);
       setHistoryBefore(data?.nextBefore || null);
