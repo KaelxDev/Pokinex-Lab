@@ -6,14 +6,12 @@ export function useChatActions({
   userRef,
   isConnected,
   getSocket,
-  messageInput,
-  setMessageInput,
-  replyingTo,
-  setReplyingTo,
   offlineQueue,
   setOfflineQueue,
   setMessages,
 }) {
+  const [messageInput, setMessageInput] = useState("");
+  const [replyingTo, setReplyingTo] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [editingText, setEditingText] = useState("");
@@ -89,7 +87,7 @@ export function useChatActions({
 
     setMessageInput("");
     setReplyingTo(null);
-  }, [getSocket, isConnected, messageInput, replyingTo, setMessageInput, setMessages, setOfflineQueue, setReplyingTo, userRef]);
+  }, [getSocket, isConnected, messageInput, replyingTo, setMessages, setOfflineQueue, userRef]);
 
   const beginEdit = useCallback((message) => {
     setContextMenu(null);
@@ -98,7 +96,7 @@ export function useChatActions({
     setEditingId(message.messageId);
     setEditingText(message.message);
     setReplyingTo(null);
-  }, [setReplyingTo]);
+  }, []);
 
   const cancelEdit = useCallback(() => {
     if (editSaving) return;
@@ -163,7 +161,7 @@ export function useChatActions({
     setEditingId(null);
     setEditError("");
     setReplyingTo(message);
-  }, [setReplyingTo]);
+  }, []);
 
   const handleReaction = useCallback((messageId, reaction) => {
     const socket = getSocket();
@@ -247,6 +245,10 @@ export function useChatActions({
   useEffect(() => () => clearTimeout(longPressRef.current), []);
 
   return {
+    messageInput,
+    setMessageInput,
+    replyingTo,
+    setReplyingTo,
     contextMenu,
     setContextMenu,
     editingId,

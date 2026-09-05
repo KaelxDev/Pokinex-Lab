@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { logout as logoutRequest } from "./services/auth";
 import AuthScreen from "./components/AuthScreen";
 import ChatHeader from "./components/ChatHeader";
@@ -29,8 +29,6 @@ export default function App() {
     clearLocalHistory,
   } = useChatHistory(user?.id);
 
-  const [messageInput, setMessageInput] = useState("");
-  const [replyingTo, setReplyingTo] = useState(null);
   const messageHandlerRef = useRef(() => {});
 
   const {
@@ -65,6 +63,10 @@ export default function App() {
   });
 
   const {
+    messageInput: composerInput,
+    setMessageInput,
+    replyingTo: replyTarget,
+    setReplyingTo,
     contextMenu,
     setContextMenu,
     editingId,
@@ -95,10 +97,6 @@ export default function App() {
     userRef,
     isConnected,
     getSocket,
-    messageInput,
-    setMessageInput,
-    replyingTo,
-    setReplyingTo,
     offlineQueue,
     setOfflineQueue,
     setMessages,
@@ -110,7 +108,7 @@ export default function App() {
     editingId,
     mergeUser,
     reactionPickerMessageId,
-    replyingTo,
+    replyingTo: replyTarget,
     setContextMenu,
     setEditError,
     setEditSaving,
@@ -160,6 +158,7 @@ export default function App() {
       setEditingId(null);
       setEditingText("");
       setEditError("");
+      setMessageInput("");
     }
   }
 
@@ -222,8 +221,8 @@ export default function App() {
           <MessageComposer
             connected={connected}
             offlineQueueLength={offlineQueue.length}
-            replyingTo={replyingTo}
-            messageInput={messageInput}
+            replyingTo={replyTarget}
+            messageInput={composerInput}
             onChange={setMessageInput}
             onSubmit={sendMessage}
             onCancelReply={() => setReplyingTo(null)}
