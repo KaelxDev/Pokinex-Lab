@@ -248,18 +248,22 @@ export default function MessageList({
                         className={
                           message.deliveryStatus === "pending" || message.offline
                             ? "message-pending"
-                            : ""
+                            : message.deliveryStatus === "failed"
+                              ? "message-failed"
+                              : ""
                         }
                       >
                         {formatTime(message.timestamp)} • {message.deletePending
                           ? "◌ Excluindo"
                           : message.editPending
                             ? "◌ Salvando edição"
-                            : message.deliveryStatus === "pending" || message.offline
-                              ? "⏳ Pendente"
-                              : message.deliveryStatus === "sending"
-                                ? "◌ Enviando"
-                                : "✓ Enviada"}
+                            : message.deliveryStatus === "failed"
+                              ? "⚠ Falha no envio · será reenviada ao reconectar"
+                              : message.deliveryStatus === "pending" || message.offline
+                                ? "⏳ Pendente"
+                                : message.deliveryStatus === "sending"
+                                  ? "◌ Enviando"
+                                  : "✓ Enviada"}
                         {message.edited && !message.editPending && !message.deleted ? " • editada" : ""}
                       </span>
                     </div>
