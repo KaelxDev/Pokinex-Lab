@@ -1,5 +1,5 @@
+import ast
 from pathlib import Path
-import re
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -7,15 +7,23 @@ BACKEND_APP = REPO_ROOT / "backend" / "app"
 FRONTEND_SRC = REPO_ROOT / "frontend" / "src"
 
 
-def test_production_code_does_not_import_database_compatibility_facade():
-    import_pattern = re.compile(r"^(?:from|import)\s+app\.database\b", re.MULTILINE)
-    offenders = []
+def _imports_database_facade(path: Path) -> bool:
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            if any(alias.name == "app.database" for alias in node.names):
+                return True
+        if isinstance(node, ast.ImportFrom) and node.module == "app.database":
+            return True
+    return False
 
+
+def test_production_code_does_not_import_database_compatibility_facade():
+    offenders = []
     for path in BACKEND_APP.rglob("*.py"):
         if path.name == "database.py":
             continue
-        text = path.read_text(encoding="utf-8")
-        if import_pattern.search(text):
+        if _imports_database_facade(path):
             offenders.append(path.relative_to(REPO_ROOT).as_posix())
 
     assert offenders == []
