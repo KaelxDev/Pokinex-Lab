@@ -11,7 +11,7 @@ from app.moderation_store import (
     get_user_by_username,
 )
 from app.roles import has_moderator_access
-from app.services.bot_commands import handle_public_bot_command, online_user_count, send_bot_message
+from app.services.bot_commands import handle_public_bot_command, send_bot_message
 from app.services.public_identity import public_user_payload
 from app.websocket.chat import manager
 
