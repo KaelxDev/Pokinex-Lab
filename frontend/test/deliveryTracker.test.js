@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DeliveryTracker } from "../src/services/websocket/deliveryTracker.js";
+import { DeliveryTracker } from "../src/services/websocket/deliveryTracker.ts";
 
 function createLocalStorage(seed = {}) {
   const values = new Map(Object.entries(seed));
@@ -51,7 +51,7 @@ test("delivery timeout reports the original message and reply target", async () 
     timeoutMs: 5,
     onFailed: (event) => failures.push(event),
   });
-  const replyTo = { messageId: "original-1" };
+  const replyTo = "original-1";
 
   tracker.remember({ messageId: "m1", message: "reply", replyTo });
   await new Promise((resolve) => setTimeout(resolve, 20));

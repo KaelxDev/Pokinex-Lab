@@ -1,9 +1,1 @@
-export const RECONNECT_BASE_DELAY_MS = 1000;
-export const RECONNECT_MAX_DELAY_MS = 30000;
-export const RECONNECT_JITTER_MS = 500;
-export const DELIVERY_TIMEOUT_MS = 10000;
-export const AUTH_CLOSE_CODE = 1008;
-export const AUTH_CLOSE_REASON = "authentication required";
-export const MODERATION_LOCK_STORAGE_KEY = "pokinex.moderationLock";
-export const CLEAR_ALL_MARKER = "__pokinex_clear_all__::";
-export const MAX_PENDING_OUTGOING = 100;
+export * from "./constants.ts";
