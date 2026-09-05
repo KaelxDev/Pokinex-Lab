@@ -1,12 +1,12 @@
 from datetime import datetime, timezone
 
-import app.database as database
-import app.infrastructure.database as database_infra
+import app.infrastructure.database as database
+from app.repositories.message_repository import toggle_reaction
 
 
 def _prepare_database(tmp_path, monkeypatch):
     db_path = tmp_path / "test.db"
-    monkeypatch.setattr(database_infra, "SQLITE_DB_PATH", db_path)
+    monkeypatch.setattr(database, "SQLITE_DB_PATH", db_path)
     database.initialize_database()
     return db_path
 
@@ -74,6 +74,6 @@ def test_toggle_reaction_is_atomic_for_sequential_toggles(tmp_path, monkeypatch)
     finally:
         connection.close()
 
-    active, counts = database.toggle_reaction("message-1", 1, "❤️", created_at)
+    active, counts = toggle_reaction("message-1", 1, "❤️", created_at)
     assert active is True
     assert counts == {"❤️": 1}
