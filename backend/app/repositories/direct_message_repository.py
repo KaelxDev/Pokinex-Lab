@@ -2,6 +2,7 @@
 
 from app.infrastructure.database import get_connection, postgres_or_sqlite, using_postgres
 from app.repositories.user_repository import persistent_avatar_reference
+from app.services.history_cursor import decode_cursor, encode_cursor
 
 MAX_HISTORY_LIMIT = 100
 
@@ -32,7 +33,20 @@ def get_direct_message_history(user_id, other_user_id, limit=50, before=None):
     connection = get_connection()
     try:
         placeholder = "%s" if using_postgres() else "?"
-        before_clause = f" AND dm.created_at < {placeholder}" if before else ""
+        cursor = decode_cursor(before)
+        if before and cursor is None:
+            return {"messages": [], "hasMore": False, "nextBefore": None}
+
+        if cursor:
+            before_created_at, before_message_id = cursor
+            before_clause = (
+                f" AND (dm.created_at < {placeholder} OR "
+                f"(dm.created_at = {placeholder} AND dm.message_id < {placeholder}))"
+            )
+        else:
+            before_created_at = before_message_id = None
+            before_clause = ""
+
         query = f"""
             SELECT dm.message_id, dm.sender_id, dm.recipient_id, dm.message,
                    dm.created_at, dm.edited_at, dm.deleted_at, dm.reply_to_message_id,
@@ -53,8 +67,8 @@ def get_direct_message_history(user_id, other_user_id, limit=50, before=None):
         """
 
         params = [user_id, other_user_id, other_user_id, user_id]
-        if before:
-            params.append(before)
+        if cursor:
+            params.extend([before_created_at, before_created_at, before_message_id])
         params.append(limit + 1)
 
         rows = connection.execute(query, tuple(params)).fetchall()
@@ -115,10 +129,15 @@ def get_direct_message_history(user_id, other_user_id, limit=50, before=None):
 
             messages.append(item)
 
+        oldest = rows[-1] if rows else None
         return {
             "messages": messages,
             "hasMore": has_more,
-            "nextBefore": messages[0]["timestamp"] if has_more and messages else None,
+            "nextBefore": (
+                encode_cursor(oldest["created_at"], oldest["message_id"])
+                if has_more and oldest
+                else None
+            ),
         }
     finally:
         connection.close()
@@ -183,9 +202,9 @@ def get_direct_message(message_id):
             """,
             """
             SELECT dm.message_id, dm.sender_id, dm.recipient_id, dm.message,
-                   dm.created_at, dm.edited_at, dm.deleted_at,
                    su.username AS sender_username, su.display_name AS sender_display_name, su.avatar AS sender_avatar,
-                   ru.username AS recipient_username, ru.display_name AS recipient_display_name, ru.avatar AS recipient_avatar
+                   ru.username AS recipient_username, ru.display_name AS recipient_display_name, ru.avatar AS recipient_avatar,
+                   dm.created_at, dm.edited_at, dm.deleted_at
             FROM direct_messages dm
             JOIN users su ON su.id = dm.sender_id
             JOIN users ru ON ru.id = dm.recipient_id
