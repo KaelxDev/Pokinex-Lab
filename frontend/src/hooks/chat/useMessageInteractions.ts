@@ -7,8 +7,7 @@ import type {
   TouchEvent,
 } from "react";
 import { copyText } from "../../utils/chat";
-import type { ChatMessage } from "../useChatHistory.ts";
-import type { UserRecord, ContextMenuState } from "../useChatMessageEvents.ts";
+import type { ChatMessage, ContextMenuState, UserRecord } from "../../types/chat";
 import type { MessageId } from "../../types/websocket";
 
 export interface MessageInteractionsState {
