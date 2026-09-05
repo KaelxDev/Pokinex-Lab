@@ -21,7 +21,6 @@ _LEET_TRANSLATION = str.maketrans({
     "$": "s",
 })
 
-
 ROBOTIC_MODERATION_MESSAGES = {
     "length": "Mensagem bloqueada. O conteúdo excede o limite permitido.",
     "scam": "Mensagem bloqueada. Possível tentativa de golpe ou phishing detectada.",
@@ -82,12 +81,8 @@ class ModerationEngine:
         if mute_floor is not None:
             mute_minutes = max(mute_floor, escalation)
         bot_message = ROBOTIC_MODERATION_MESSAGES.get(category)
-        if category != "duplicate_burst":
-            bot_message = (
-                f"{bot_message} (ocorrência {strike})"
-                if bot_message
-                else None
-            )
+        if category != "duplicate_burst" and bot_message:
+            bot_message = f"{bot_message} (ocorrência {strike})"
         return ModerationResult(
             False,
             reason,
@@ -97,31 +92,6 @@ class ModerationEngine:
             severity,
             mute_minutes,
         )
-
-    def _remember_allowed_message(
-        self,
-        user_id: int,
-        normalized: str,
-        message_id: str | None,
-        now: float,
-    ) -> None:
-        key = str(user_id)
-        timestamps = self._message_times[key]
-        while timestamps and now - timestamps[0] > self.bot.FLOOD_WINDOW_SECONDS:
-            timestamps.popleft()
-        timestamps.append(now)
-
-        history = self._duplicate_history[key]
-        history[:] = [
-            entry
-            for entry in history
-            if now - entry[0] <= self.bot.DUPLICATE_WINDOW_SECONDS
-        ]
-        if history and history[-1][1] != normalized:
-            history.clear()
-        history.append((now, normalized, message_id))
-        if len(history) > self.DUPLICATE_THRESHOLD:
-            del history[:-self.DUPLICATE_THRESHOLD]
 
     def _check_duplicate_burst(
         self,
@@ -144,11 +114,7 @@ class ModerationEngine:
             history.append((now, normalized, message_id))
             return None
 
-        cleanup_ids = tuple(
-            entry[2]
-            for entry in history[-4:]
-            if entry[2]
-        )
+        cleanup_ids = tuple(entry[2] for entry in history[-4:] if entry[2])
         history.clear()
         result = self._record_block(
             "duplicate_burst",
@@ -156,15 +122,6 @@ class ModerationEngine:
             user_id,
             "medium",
             action="duplicate_burst",
-        )
-        result = ModerationResult(
-            result.allowed,
-            result.reason,
-            ROBOTIC_MODERATION_MESSAGES["duplicate_burst"],
-            result.action,
-            result.category,
-            result.severity,
-            result.mute_minutes,
         )
         return ModerationDecision(result, cleanup_ids)
 
@@ -193,98 +150,111 @@ class ModerationEngine:
         normalized = self.normalize(message)
         safe_message = _LAUGHTER_RUN.sub(lambda match: match.group(1) * 4, message)
         safe_normalized = self.normalize(safe_message)
+
         if len(normalized) > self.bot.MAX_NORMALIZED_MESSAGE_LENGTH:
-            result = self._record_block(
-                "length",
-                "Mensagem acima do limite permitido.",
-                user_id,
-                "medium",
-            )
-            return ModerationDecision(result)
-
-        for pattern in self.bot.SCAM_PATTERNS:
-            if pattern.search(normalized):
-                result = self._record_block(
-                    "scam",
-                    "Possível golpe/phishing detectado.",
-                    user_id,
-                    "high",
-                    mute_floor=5,
-                )
-                return ModerationDecision(result)
-
-        for pattern in self.bot.SUSPICIOUS_LINK_PATTERNS:
-            if pattern.search(normalized):
-                result = self._record_block(
-                    "suspicious_link",
-                    "Link potencialmente suspeito.",
-                    user_id,
-                    "high",
-                    mute_floor=5,
-                )
-                return ModerationDecision(result)
-
-        for pattern in self.bot.THREAT_PATTERNS:
-            if pattern.search(normalized):
-                result = self._record_block(
-                    "threat",
-                    "Ameaça detectada.",
-                    user_id,
-                    "high",
-                    mute_floor=5,
-                )
-                return ModerationDecision(result)
-
-        for pattern in self.bot.HARASSMENT_PATTERNS:
-            if pattern.search(normalized):
-                result = self._record_block(
-                    "harassment",
-                    "Abuso ou assédio detectado.",
+            return ModerationDecision(
+                self._record_block(
+                    "length",
+                    "Mensagem acima do limite permitido.",
                     user_id,
                     "medium",
                 )
-                return ModerationDecision(result)
+            )
+
+        for pattern in self.bot.SCAM_PATTERNS:
+            if pattern.search(normalized):
+                return ModerationDecision(
+                    self._record_block(
+                        "scam",
+                        "Possível golpe/phishing detectado.",
+                        user_id,
+                        "high",
+                        mute_floor=5,
+                    )
+                )
+
+        for pattern in self.bot.SUSPICIOUS_LINK_PATTERNS:
+            if pattern.search(normalized):
+                return ModerationDecision(
+                    self._record_block(
+                        "suspicious_link",
+                        "Link potencialmente suspeito.",
+                        user_id,
+                        "high",
+                        mute_floor=5,
+                    )
+                )
+
+        for pattern in self.bot.THREAT_PATTERNS:
+            if pattern.search(normalized):
+                return ModerationDecision(
+                    self._record_block(
+                        "threat",
+                        "Ameaça detectada.",
+                        user_id,
+                        "high",
+                        mute_floor=5,
+                    )
+                )
+
+        for pattern in self.bot.HARASSMENT_PATTERNS:
+            if pattern.search(normalized):
+                return ModerationDecision(
+                    self._record_block(
+                        "harassment",
+                        "Abuso ou assédio detectado.",
+                        user_id,
+                        "medium",
+                    )
+                )
 
         if self.bot._link_count(normalized) > self.bot.MAX_LINKS_PER_MESSAGE:
-            result = self._record_block(
-                "link_spam",
-                "Excesso de links na mensagem.",
-                user_id,
-                "medium",
+            return ModerationDecision(
+                self._record_block(
+                    "link_spam",
+                    "Excesso de links na mensagem.",
+                    user_id,
+                    "medium",
+                )
             )
-            return ModerationDecision(result)
 
         mention_source = _ZERO_WIDTH.sub("", message)
         if self._mention_count(mention_source) > self.bot.MAX_MENTIONS_PER_MESSAGE:
-            result = self._record_block(
-                "mention_spam",
-                "Excesso de menções detectado.",
-                user_id,
-                "medium",
+            return ModerationDecision(
+                self._record_block(
+                    "mention_spam",
+                    "Excesso de menções detectado.",
+                    user_id,
+                    "medium",
+                )
             )
-            return ModerationDecision(result)
 
-        if self.bot._caps_ratio(normalized) >= self.bot.CAPS_RATIO_LIMIT and len(normalized) >= 14:
-            result = self._record_block(
-                "caps",
-                "Excesso de texto em caixa alta.",
-                user_id,
-                "low",
+        if (
+            self.bot._caps_ratio(normalized) >= self.bot.CAPS_RATIO_LIMIT
+            and len(normalized) >= 14
+        ):
+            return ModerationDecision(
+                self._record_block(
+                    "caps",
+                    "Excesso de texto em caixa alta.",
+                    user_id,
+                    "low",
+                )
             )
-            return ModerationDecision(result)
 
         if re.search(
             r"(.)\1{" + str(self.bot.REPEATED_CHARACTER_LIMIT) + r",}",
             safe_normalized,
             flags=re.IGNORECASE,
         ):
-            result = self._record_block(
-                "repeated_chars",
-                "Repetição excessiva de caracteres detectada.",
-                user_id,
-                "low",
+            return ModerationDecision(
+                self._record_block(
+                    "repeated_chars",
+                    "Repetição excessiva de caracteres detectada.",
+                    user_id,
+                    "low",
+                )
             )
-            return ModerationDecision(result)
 
         if user_id is not None:
             now = time.time()
@@ -314,15 +284,14 @@ class ModerationEngine:
         return self.bot.is_muted(user_id)
 
     def remaining_mute_seconds(self, user_id: int) -> int:
-        expires = self.bot._muted_until.get(str(user_id))
-        if expires is None:
-            return 0
-        remaining = max(0, int(expires - time.time() + 0.999))
-        if remaining == 0:
-            self.bot._muted_until.pop(str(user_id), None)
-        return remaining
+        return self.bot.remaining_mute_seconds(user_id)
 
 
 moderation_engine = ModerationEngine()
 
-__all__ = ["ModerationDecision", "ModerationEngine", "moderation_engine", "ROBOTIC_MODERATION_MESSAGES"]
+__all__ = [
+    "ModerationDecision",
+    "ModerationEngine",
+    "moderation_engine",
+    "ROBOTIC_MODERATION_MESSAGES",
+]
