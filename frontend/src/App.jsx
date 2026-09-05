@@ -29,10 +29,6 @@ export default function App() {
     clearLocalHistory,
   } = useChatHistory(user?.id);
 
-  const [messageInput] = [];
-  void messageInput;
-  const [replyingTo] = [];
-  void replyingTo;
   const messageHandlerRef = useRef(() => {});
 
   const {
