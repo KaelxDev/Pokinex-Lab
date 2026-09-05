@@ -31,10 +31,7 @@ export default function App() {
 
   const [messageInput, setMessageInput] = useState("");
   const [replyingTo, setReplyingTo] = useState(null);
-  const connectionRef = useRef({ connected: false, socket: null });
-
-  const isConnected = useCallback(() => connectionRef.current.connected, []);
-  const getSocket = useCallback(() => connectionRef.current.socket, []);
+  const messageHandlerRef = useRef(() => {});
 
   const {
     users,
@@ -45,6 +42,27 @@ export default function App() {
   } = useUserDirectory({ messages, setMessages, syncUser });
 
   const profile = users.find((item) => String(item.id) === String(user?.id)) || user;
+
+  const handleWebSocketMessageProxy = useCallback((data) => {
+    messageHandlerRef.current(data);
+  }, []);
+
+  const handleConnectionOpen = useCallback(({ reconnected } = {}) => {
+    if (reconnected) void loadMessageHistory();
+  }, [loadMessageHistory]);
+
+  const {
+    connected,
+    connectionStatus,
+    reconnectAttempt,
+    reconnectSeconds,
+    isConnected,
+    getSocket,
+  } = useChatConnection(Boolean(authChecked && user), {
+    onMessage: handleWebSocketMessageProxy,
+    onOpen: handleConnectionOpen,
+    onAuthenticationRequired: logout,
+  });
 
   const {
     contextMenu,
@@ -86,17 +104,6 @@ export default function App() {
     setMessages,
   });
 
-  const {
-    profileOpen,
-    profileError,
-    profileSaving,
-    avatarPreviewUrl,
-    openProfile,
-    saveProfile,
-    chooseAvatar,
-    closeProfile,
-  } = useProfileEditor({ user, profile, syncProfile });
-
   const handleWebSocketMessage = useChatMessageEvents({
     clearLocalHistory,
     contextMenu,
@@ -118,23 +125,20 @@ export default function App() {
     userRef,
   });
 
-  const handleConnectionOpen = useCallback(({ reconnected } = {}) => {
-    if (reconnected) void loadMessageHistory();
-  }, [loadMessageHistory]);
-
   const {
-    socketRef,
-    connected,
-    connectionStatus,
-    reconnectAttempt,
-    reconnectSeconds,
-  } = useChatConnection(Boolean(authChecked && user), {
-    onMessage: handleWebSocketMessage,
-    onOpen: handleConnectionOpen,
-    onAuthenticationRequired: logout,
-  });
+    profileOpen,
+    profileError,
+    profileSaving,
+    avatarPreviewUrl,
+    openProfile,
+    saveProfile,
+    chooseAvatar,
+    closeProfile,
+  } = useProfileEditor({ user, profile, syncProfile });
 
-  connectionRef.current = { connected, socket: socketRef.current };
+  useEffect(() => {
+    messageHandlerRef.current = handleWebSocketMessage;
+  }, [handleWebSocketMessage]);
 
   useEffect(() => {
     if (connected) flushQueue();
