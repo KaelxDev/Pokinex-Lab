@@ -1,3 +1,5 @@
+import { API_URL } from "../config/runtime";
+
 export const STORAGE_KEY = "poknex_messages";
 export const QUEUE_KEY = "poknex_offline_queue";
 export const GROUP_WINDOW_MS = 5 * 60 * 1000;
@@ -5,23 +7,12 @@ export const HISTORY_PAGE_SIZE = 50;
 export const LOCAL_CACHE_LIMIT = 200;
 export const REACTION_OPTIONS = ["❤️", "😂", "😮", "😢", "😡", "👍"];
 
-const DEFAULT_API_URL = "https://nexchat-backend-2cyf.onrender.com/api/auth";
-
 function getApiOrigin() {
-  const configured = import.meta.env.VITE_API_URL?.trim();
-  if (configured) {
-    try {
-      return new URL(configured).origin;
-    } catch {
-      // Fall back to the known API origin below.
-    }
+  try {
+    return new URL(API_URL).origin;
+  } catch {
+    return window.location.origin;
   }
-
-  if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
-    return `http://${window.location.hostname}:8000`;
-  }
-
-  return new URL(DEFAULT_API_URL).origin;
 }
 
 export function normalizeAvatarUrl(avatar, userId = null) {
@@ -73,7 +64,9 @@ function isTransientCachedMessage(item) {
 export function loadJson(key) {
   try {
     const value = JSON.parse(localStorage.getItem(key) || "[]");
-    return Array.isArray(value) ? value.filter((item) => !isTransientCachedMessage(item)) : [];
+    return Array.isArray(value)
+      ? value.filter((item) => !isTransientCachedMessage(item))
+      : [];
   } catch {
     return [];
   }
