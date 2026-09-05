@@ -5,7 +5,6 @@ from fastapi import APIRouter, File, Header, HTTPException, Request, Response, U
 from pydantic import BaseModel, Field
 
 from app.auth import (
-    SESSION_DAYS,
     authenticate,
     create_session,
     create_user,
