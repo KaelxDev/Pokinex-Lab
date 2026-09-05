@@ -67,6 +67,7 @@ def parse_clear_limit(value: str | None) -> int | None:
 async def broadcast_messages_cleared(
     message_ids: list[str],
     moderator_username: str,
+    moderator_role: str | None = None,
 ) -> None:
     if not message_ids:
         return
@@ -76,6 +77,7 @@ async def broadcast_messages_cleared(
             "messageIds": message_ids,
             "count": len(message_ids),
             "moderator": moderator_username,
+            "moderatorRole": moderator_role or "moderator",
             "timestamp": manager.get_timestamp(),
         }
     )
@@ -134,6 +136,7 @@ async def handle_moderation_command(
         return True
 
     args = command_args(message)
+    moderator_role = public_user_payload(user).get("role")
 
     if command in {"!clear", "!purge"}:
         try:
@@ -156,7 +159,11 @@ async def handle_moderation_command(
                     target_user["id"],
                     limit,
                 )
-                await broadcast_messages_cleared(message_ids, user["username"])
+                await broadcast_messages_cleared(
+                    message_ids,
+                    user["username"],
+                    moderator_role,
+                )
                 if limit is not None:
                     await send_bot_message(
                         f"🧹 {len(message_ids)} mensagem(ns) removida(s) de @{target_user['username']}."
@@ -188,7 +195,11 @@ async def handle_moderation_command(
 
             limit = parse_clear_limit(target or "50")
             message_ids = await to_thread.run_sync(clear_recent_messages, limit)
-            await broadcast_messages_cleared(message_ids, user["username"])
+            await broadcast_messages_cleared(
+                message_ids,
+                user["username"],
+                moderator_role,
+            )
             await send_bot_message(
                 f"🧹 {len(message_ids)} mensagem(ns) recente(s) removida(s) do #geral."
             )
@@ -215,7 +226,11 @@ async def handle_moderation_command(
             )
             return True
 
-        await broadcast_messages_cleared([target_message_id], user["username"])
+        await broadcast_messages_cleared(
+            [target_message_id],
+            user["username"],
+            moderator_role,
+        )
         await send_bot_message(f"🗑️ Mensagem `{target_message_id}` removida.")
         return True
 
