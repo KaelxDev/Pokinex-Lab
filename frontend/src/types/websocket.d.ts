@@ -1,27 +1,11 @@
 export type MessageId = string | number;
-
-export interface ReplyTo {
-  messageId: MessageId;
-  username?: string;
-  displayName?: string;
-}
-
-export const WebSocketEventType: {
-  readonly MESSAGE: "message";
-  readonly DIRECT_MESSAGE: "direct_message";
-  readonly DIRECT_MESSAGE_EDIT: "direct_message_edit";
-  readonly DIRECT_MESSAGE_DELETE: "direct_message_delete";
-  readonly DIRECT_MESSAGE_REACTION: "direct_message_reaction";
-  readonly EDIT_MESSAGE: "edit_message";
-  readonly DELETE_MESSAGE: "delete_message";
-  readonly REACTION: "reaction";
-};
+export type ReplyTo = MessageId;
 
 export interface MessagePayload {
   type: "message";
   message: string;
   messageId: MessageId | null;
-  replyTo?: ReplyTo;
+  replyTo?: ReplyTo | null;
 }
 
 export interface DirectMessagePayload {
