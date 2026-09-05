@@ -54,3 +54,7 @@ def test_frontend_user_directory_has_replaced_legacy_profile_hook():
 
 def test_runtime_moderation_compatibility_layer_is_gone():
     assert not (BACKEND_APP / "services" / "moderation_compat.py").exists()
+
+
+def test_legacy_direct_message_module_is_removed():
+    assert not (BACKEND_APP / "direct_messages.py").exists()
