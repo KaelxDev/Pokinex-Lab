@@ -1,4 +1,4 @@
-"""Administrative and public PokiBot command handling."""
+"""Administrative moderation command handling."""
 
 from anyio import to_thread
 
@@ -11,23 +11,9 @@ from app.moderation_store import (
     get_user_by_username,
 )
 from app.roles import has_moderator_access
+from app.services.bot_commands import handle_public_bot_command, send_bot_message
 from app.services.public_identity import public_user_payload
 from app.websocket.chat import manager
-
-
-async def send_bot_message(message: str) -> None:
-    manager.sequence += 1
-    bot_message_id = f"bot-{manager.sequence}-{manager.get_timestamp()}"
-    await manager.broadcast(
-        {
-            "type": "message",
-            "messageId": bot_message_id,
-            **public_user_payload(BOT_USER),
-            "message": message,
-            "timestamp": manager.get_timestamp(),
-            "sequence": manager.sequence,
-        }
-    )
 
 
 def find_online_user(username: str):
@@ -36,16 +22,6 @@ def find_online_user(username: str):
         if str(user.get("username", "")).casefold() == normalized:
             return user
     return None
-
-
-def online_user_count() -> int:
-    return len(
-        {
-            str(user.get("id"))
-            for user in manager.active_connections.values()
-            if user.get("id") != BOT_USER["id"]
-        }
-    )
 
 
 def command_args(message: str) -> list[str]:
@@ -99,18 +75,12 @@ async def handle_moderation_command(
     message: str,
     message_id: str | None = None,
 ) -> bool:
-    """Handle bot and staff commands. Returns True when the message is consumed."""
+    """Handle public bot commands and staff moderation commands."""
     if not message.startswith("!"):
         return False
 
     command = moderation_bot.command_name(message)
-    public_response = moderation_bot.public_command(
-        message,
-        online_count=online_user_count(),
-        user_id=user["id"],
-    )
-    if public_response:
-        await send_bot_message(public_response)
+    if await handle_public_bot_command(message, user_id=user["id"]):
         return True
 
     moderator = has_moderator_access(user)
