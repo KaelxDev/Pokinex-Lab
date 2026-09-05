@@ -1,3 +1,8 @@
+/** @typedef {import("../../types/websocket").MessageId} MessageId */
+/** @typedef {import("../../types/websocket").ReplyTo} ReplyTo */
+/** @typedef {import("../../types/websocket").MessagePayload} MessagePayload */
+/** @typedef {import("../../types/websocket").DirectMessagePayload} DirectMessagePayload */
+
 export const WebSocketEventType = Object.freeze({
   MESSAGE: "message",
   DIRECT_MESSAGE: "direct_message",
@@ -9,6 +14,12 @@ export const WebSocketEventType = Object.freeze({
   REACTION: "reaction",
 });
 
+/**
+ * @param {string} message
+ * @param {MessageId | null} [messageId]
+ * @param {ReplyTo | null} [replyTo]
+ * @returns {MessagePayload}
+ */
 export function messagePayload(message, messageId = null, replyTo = null) {
   return {
     type: WebSocketEventType.MESSAGE,
@@ -18,6 +29,13 @@ export function messagePayload(message, messageId = null, replyTo = null) {
   };
 }
 
+/**
+ * @param {string} message
+ * @param {MessageId | null} [messageId]
+ * @param {number} recipientId
+ * @param {ReplyTo | null} [replyTo]
+ * @returns {DirectMessagePayload}
+ */
 export function directMessagePayload(message, messageId = null, recipientId, replyTo = null) {
   return {
     type: WebSocketEventType.DIRECT_MESSAGE,
@@ -28,6 +46,10 @@ export function directMessagePayload(message, messageId = null, recipientId, rep
   };
 }
 
+/**
+ * @param {MessageId} messageId
+ * @param {string} message
+ */
 export function directMessageEditPayload(messageId, message) {
   return {
     type: WebSocketEventType.DIRECT_MESSAGE_EDIT,
@@ -36,6 +58,7 @@ export function directMessageEditPayload(messageId, message) {
   };
 }
 
+/** @param {MessageId} messageId */
 export function directMessageDeletePayload(messageId) {
   return {
     type: WebSocketEventType.DIRECT_MESSAGE_DELETE,
@@ -43,6 +66,10 @@ export function directMessageDeletePayload(messageId) {
   };
 }
 
+/**
+ * @param {MessageId} messageId
+ * @param {string} reaction
+ */
 export function directMessageReactionPayload(messageId, reaction) {
   return {
     type: WebSocketEventType.DIRECT_MESSAGE_REACTION,
@@ -51,6 +78,10 @@ export function directMessageReactionPayload(messageId, reaction) {
   };
 }
 
+/**
+ * @param {MessageId} messageId
+ * @param {string} message
+ */
 export function editMessagePayload(messageId, message) {
   return {
     type: WebSocketEventType.EDIT_MESSAGE,
@@ -59,6 +90,7 @@ export function editMessagePayload(messageId, message) {
   };
 }
 
+/** @param {MessageId} messageId */
 export function deleteMessagePayload(messageId) {
   return {
     type: WebSocketEventType.DELETE_MESSAGE,
@@ -66,6 +98,10 @@ export function deleteMessagePayload(messageId) {
   };
 }
 
+/**
+ * @param {MessageId} messageId
+ * @param {string} reaction
+ */
 export function reactionPayload(messageId, reaction) {
   return {
     type: WebSocketEventType.REACTION,
