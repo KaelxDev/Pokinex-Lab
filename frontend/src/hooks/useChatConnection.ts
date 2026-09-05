@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createWebSocket } from "../services/websocket.ts";
-import type { WebSocketClient } from "../services/websocket/client.ts";
+import { createWebSocket } from "../services/websocket/client.ts";
+import type { WebSocketClient, ServerEvent } from "../services/websocket/client.ts";
 import type { DeliveryFailedEvent } from "../types/websocket";
-import type { ServerEvent } from "../services/websocket/client.ts";
 
 export type ConnectionStatus = "connecting" | "connected" | "reconnecting" | "disconnected";
-
 type ChatMessageEvent = ServerEvent | DeliveryFailedEvent;
 
 export interface ChatConnectionCallbacks {
