@@ -11,12 +11,16 @@ class FakeWebSocket:
     def __init__(self):
         self.accepted = False
         self.messages = []
+        self.closed = None
 
     async def accept(self):
         self.accepted = True
 
     async def send_json(self, data):
         self.messages.append(data)
+
+    async def close(self, code=None, reason=None):
+        self.closed = (code, reason)
 
 
 class FailingWebSocket(FakeWebSocket):
@@ -63,6 +67,28 @@ async def test_same_user_on_two_connections_is_not_duplicated_in_presence(user):
 
     assert manager.disconnect(first) is None
     assert manager.disconnect(second) == user
+
+
+@pytest.mark.asyncio
+async def test_disconnect_user_closes_all_user_connections(user):
+    manager = ConnectionManager()
+    first = FakeWebSocket()
+    second = FakeWebSocket()
+    other_user = {**user, "id": 2, "username": "maria"}
+    third = FakeWebSocket()
+
+    manager.active_connections[first] = user
+    manager.active_connections[second] = user
+    manager.active_connections[third] = other_user
+
+    removed = await manager.disconnect_user(user["id"])
+
+    assert removed == 2
+    assert manager.get_user(first) is None
+    assert manager.get_user(second) is None
+    assert manager.get_user(third) == other_user
+    assert first.closed == (4003, "Removido por um moderador")
+    assert second.closed == (4003, "Removido por um moderador")
 
 
 @pytest.mark.asyncio

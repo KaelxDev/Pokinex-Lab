@@ -256,16 +256,7 @@ async def handle_moderation_command(
             await send_bot_message(
                 f"👢 @{target['username']} foi removido do #geral por um moderador."
             )
-            for target_socket, current in list(manager.active_connections.items()):
-                if current["id"] == target["id"]:
-                    try:
-                        await target_socket.close(
-                            code=4003,
-                            reason="Removido por um moderador",
-                        )
-                    except Exception:
-                        pass
-                    manager.active_connections.pop(target_socket, None)
+            await manager.disconnect_user(target["id"])
             await manager.send_users()
             return True
 

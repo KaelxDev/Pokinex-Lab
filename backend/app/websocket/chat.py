@@ -73,6 +73,31 @@ class ConnectionManager:
             return None
         return user if not self._has_user(user["id"]) else None
 
+    async def disconnect_user(
+        self,
+        user_id,
+        *,
+        code: int = 4003,
+        reason: str = "Removido por um moderador",
+    ) -> int:
+        """Close and remove every active socket belonging to a user."""
+        sockets = [
+            websocket
+            for websocket, user in self.active_connections.items()
+            if user.get("id") == user_id
+        ]
+
+        for websocket in sockets:
+            self.active_connections.pop(websocket, None)
+
+        for websocket in sockets:
+            try:
+                await websocket.close(code=code, reason=reason)
+            except Exception:
+                pass
+
+        return len(sockets)
+
     def update_user(self, user):
         updated = False
         for websocket, current in list(self.active_connections.items()):
