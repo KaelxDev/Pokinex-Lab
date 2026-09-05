@@ -1,6 +1,5 @@
 """Deterministic moderation policy used by the public chat service."""
 
-from collections import defaultdict, deque
 from dataclasses import dataclass
 import re
 import time
@@ -44,14 +43,13 @@ class ModerationDecision:
 
 
 class ModerationEngine:
-    """Application-level moderation policy without runtime monkey patches."""
+    """Application-level moderation policy independent from bot state storage."""
 
     DUPLICATE_THRESHOLD = 5
 
     def __init__(self, bot: ModerationBot | None = None):
         self.bot = bot or moderation_bot
-        self._message_times: dict[str, deque[float]] = defaultdict(deque)
-        self._duplicate_history: dict[str, list[tuple[float, str, str | None]]] = defaultdict(list)
+        self.state = self.bot.state
 
     @staticmethod
     def normalize(message: str) -> str:
@@ -85,9 +83,8 @@ class ModerationEngine:
         mute_floor: int | None = None,
         action: str = "blocked",
     ) -> ModerationResult:
-        self.bot._total_blocked += 1
-        self.bot._categories[category] += 1
-        strike, escalation = self.bot._register_violation(user_id)
+        self.state.record_blocked(category)
+        strike, escalation = self.state.register_violation(user_id)
         mute_minutes = escalation
         if mute_floor is not None:
             mute_minutes = max(mute_floor, escalation)
@@ -111,22 +108,17 @@ class ModerationEngine:
         message_id: str | None,
         now: float,
     ) -> ModerationDecision | None:
-        key = str(user_id)
-        history = self._duplicate_history[key]
-        history[:] = [
-            entry
-            for entry in history
-            if now - entry[0] <= self.bot.DUPLICATE_WINDOW_SECONDS
-            and entry[1] == normalized
-        ]
-
-        count = len(history) + 1
+        count, cleanup_ids = self.state.duplicate_count(
+            user_id,
+            normalized,
+            message_id,
+            now,
+            self.DUPLICATE_THRESHOLD,
+            self.bot.DUPLICATE_WINDOW_SECONDS,
+        )
         if count < self.DUPLICATE_THRESHOLD:
-            history.append((now, normalized, message_id))
             return None
 
-        cleanup_ids = tuple(entry[2] for entry in history[-4:] if entry[2])
-        history.clear()
         result = self._record_block(
             "duplicate_burst",
             "A mesma mensagem foi enviada 5 vezes seguidas.",
@@ -137,11 +129,12 @@ class ModerationEngine:
         return ModerationDecision(result, cleanup_ids)
 
     def _check_flood(self, user_id: int, now: float) -> ModerationResult | None:
-        timestamps = self._message_times[str(user_id)]
-        while timestamps and now - timestamps[0] > self.bot.FLOOD_WINDOW_SECONDS:
-            timestamps.popleft()
-        timestamps.append(now)
-        if len(timestamps) <= self.bot.FLOOD_MAX_MESSAGES:
+        message_count = self.state.record_message_time(
+            user_id,
+            now,
+            self.bot.FLOOD_WINDOW_SECONDS,
+        )
+        if message_count <= self.bot.FLOOD_MAX_MESSAGES:
             return None
         return self._record_block(
             "flood",
@@ -157,7 +150,7 @@ class ModerationEngine:
         user_id: int | None = None,
         message_id: str | None = None,
     ) -> ModerationDecision:
-        self.bot._total_checked += 1
+        self.state.record_checked()
         normalized = self.normalize(message)
         safe_message = _LAUGHTER_RUN.sub(lambda match: match.group(1) * 4, message)
         safe_normalized = self.normalize(safe_message)
@@ -280,22 +273,22 @@ class ModerationEngine:
 
             flood = self._check_flood(user_id, now)
             if flood is not None:
-                self._duplicate_history[str(user_id)].clear()
+                self.state.clear_duplicate_history(user_id)
                 return ModerationDecision(flood)
 
         return ModerationDecision(ModerationResult(True))
 
     def mute(self, user_id: int, minutes: int) -> None:
-        self.bot.mute(user_id, minutes)
+        self.state.mute(user_id, minutes)
 
     def unmute(self, user_id: int) -> None:
-        self.bot.unmute(user_id)
+        self.state.unmute(user_id)
 
     def is_muted(self, user_id: int) -> bool:
-        return self.bot.is_muted(user_id)
+        return self.state.is_muted(user_id)
 
     def remaining_mute_seconds(self, user_id: int) -> int:
-        return self.bot.remaining_mute_seconds(user_id)
+        return self.state.remaining_mute_seconds(user_id)
 
 
 moderation_engine = ModerationEngine()
