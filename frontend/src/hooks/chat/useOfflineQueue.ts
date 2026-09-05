@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { WebSocketClient } from "../../services/websocket/client.ts";
-import type { ChatMessage, OfflineQueueItem } from "../useChatHistory.ts";
+import type { ChatMessage, OfflineQueueItem } from "../../types/chat";
 
 export interface OfflineQueueState {
   flushQueue: () => void;
@@ -18,6 +18,10 @@ export function sendQueuedMessage(
     if (typeof replyToId === "string" || typeof replyToId === "number") {
       return socket.sendReplyMessage(item.message, item.id, replyToId);
     }
+  }
+
+  if (typeof item.replyTo === "string" || typeof item.replyTo === "number") {
+    return socket.sendReplyMessage(item.message, item.id, item.replyTo);
   }
 
   return socket.sendMessage(item.message, item.id);
