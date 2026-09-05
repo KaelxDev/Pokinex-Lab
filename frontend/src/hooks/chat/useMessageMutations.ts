@@ -2,8 +2,7 @@ import { useCallback } from "react";
 import type { Dispatch, FormEvent, MutableRefObject, SetStateAction } from "react";
 import type { MessageId } from "../../types/websocket";
 import type { WebSocketClient } from "../../services/websocket/client.ts";
-import type { ChatMessage, OfflineQueueItem } from "../useChatHistory.ts";
-import type { UserRecord, ReplyTarget, ContextMenuState } from "../useChatMessageEvents.ts";
+import type { ChatMessage, OfflineQueueItem, UserRecord, ReplyTarget, ContextMenuState } from "../../types/chat";
 
 export interface MessageMutationsOptions {
   userRef: MutableRefObject<UserRecord | null>;
@@ -206,7 +205,14 @@ export function useMessageMutations({
     setReactionPickerMessageId(null);
     setEditingId(null);
     setEditError("");
-    setReplyingTo(message as ReplyTarget);
+    setReplyingTo({
+      messageId: message.messageId,
+      userId: message.userId,
+      username: message.username,
+      displayName: message.displayName,
+      message: message.message,
+      deleted: Boolean(message.deleted),
+    });
   }, [setContextMenu, setEditError, setEditingId, setReactionPickerMessageId, setReplyingTo]);
 
   const handleReaction = useCallback((messageId: MessageId, reaction: string) => {
