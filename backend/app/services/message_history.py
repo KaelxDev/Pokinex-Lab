@@ -2,6 +2,7 @@
 
 from app.infrastructure.database import get_connection, using_postgres
 from app.roles import get_user_role
+from app.services.history_cursor import decode_cursor, encode_cursor
 
 MAX_HISTORY_LIMIT = 100
 
@@ -16,8 +17,19 @@ def get_message_history(limit: int = 50, before: str | None = None) -> dict:
 
     try:
         placeholder = "%s" if using_postgres() else "?"
-        before_clause = f" AND m.created_at < {placeholder}" if before else ""
-        limit_placeholder = "%s" if using_postgres() else "?"
+        cursor = decode_cursor(before)
+        if before and cursor is None:
+            return {"messages": [], "hasMore": False, "nextBefore": None}
+
+        if cursor:
+            before_created_at, before_message_id = cursor
+            before_clause = (
+                f" AND (m.created_at < {placeholder} OR "
+                f"(m.created_at = {placeholder} AND m.message_id < {placeholder}))"
+            )
+        else:
+            before_created_at = before_message_id = None
+            before_clause = ""
 
         query = f"""
             SELECT
@@ -58,12 +70,12 @@ def get_message_history(limit: int = 50, before: str | None = None) -> dict:
             WHERE 1 = 1
             {before_clause}
             ORDER BY m.created_at DESC, m.message_id DESC
-            LIMIT {limit_placeholder}
+            LIMIT {placeholder}
         """
 
         params = []
-        if before:
-            params.append(before)
+        if cursor:
+            params.extend([before_created_at, before_created_at, before_message_id])
         params.append(limit + 1)
 
         rows = connection.execute(query, tuple(params)).fetchall()
@@ -124,10 +136,11 @@ def get_message_history(limit: int = 50, before: str | None = None) -> dict:
 
             messages.append(item)
 
+        oldest = rows[-1]
         return {
             "messages": messages,
             "hasMore": has_more,
-            "nextBefore": messages[0]["timestamp"] if has_more else None,
+            "nextBefore": encode_cursor(oldest["created_at"], oldest["message_id"]) if has_more else None,
         }
     finally:
         connection.close()
