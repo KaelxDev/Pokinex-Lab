@@ -5,6 +5,7 @@ from anyio import to_thread
 from app.repositories.message_repository import (
     delete_message as delete_message_record,
     get_message,
+    get_message_owner,
     save_message,
     toggle_reaction as toggle_reaction_record,
     update_message as update_message_record,
@@ -12,6 +13,22 @@ from app.repositories.message_repository import (
 from app.services.public_identity import public_user_payload
 
 REACTIONS = ("❤️", "😂", "😮", "😢", "😡", "👍")
+
+
+def _resolve_message_owner(manager, message_id):
+    owner_id = manager.message_owners.get(message_id)
+    if owner_id is not None:
+        return owner_id
+
+    owner_id = get_message_owner(message_id)
+    if owner_id is not None:
+        manager.cache_message_owner(message_id, owner_id)
+    return owner_id
+
+
+def _next_sequence(manager):
+    manager.sequence += 1
+    return manager.sequence
 
 
 async def send_message(
@@ -72,14 +89,13 @@ async def send_message(
             raise
         manager.cache_message_owner(message_id, user["id"])
 
-    manager.sequence += 1
     event = {
         "type": "message",
         "messageId": message_id,
         **public_user_payload(user),
         "message": message,
         "timestamp": timestamp,
-        "sequence": manager.sequence,
+        "sequence": _next_sequence(manager),
     }
     if reply:
         event["replyTo"] = reply
@@ -131,7 +147,6 @@ async def toggle_reaction(manager, user, message_id, reaction, sender):
         reaction,
         manager.get_timestamp(),
     )
-    manager.sequence += 1
     await manager.broadcast(
         {
             "type": "message_reaction",
@@ -140,13 +155,13 @@ async def toggle_reaction(manager, user, message_id, reaction, sender):
             "userId": user["id"],
             "active": active,
             "reactions": reactions,
-            "sequence": manager.sequence,
+            "sequence": _next_sequence(manager),
         }
     )
 
 
 async def edit_message(manager, user, message_id, message, sender):
-    owner_id = await manager.resolve_message_owner(message_id)
+    owner_id = await to_thread.run_sync(_resolve_message_owner, manager, message_id)
     if owner_id is None:
         await sender.send_json(
             {
@@ -188,14 +203,13 @@ async def edit_message(manager, user, message_id, message, sender):
         )
         return
 
-    manager.sequence += 1
     event = {
         "messageId": message_id,
         **public_user_payload(user),
         "message": message,
         "editedAt": edited_at,
         "edited": True,
-        "sequence": manager.sequence,
+        "sequence": _next_sequence(manager),
     }
     await manager.broadcast({"type": "message_edited", **event})
     await manager.broadcast({"type": "message", **event})
@@ -203,7 +217,7 @@ async def edit_message(manager, user, message_id, message, sender):
 
 
 async def delete_message(manager, user, message_id, sender):
-    owner_id = await manager.resolve_message_owner(message_id)
+    owner_id = await to_thread.run_sync(_resolve_message_owner, manager, message_id)
     if owner_id is None:
         await sender.send_json(
             {
@@ -245,7 +259,6 @@ async def delete_message(manager, user, message_id, sender):
         return
 
     manager.forget_message_owner(message_id)
-    manager.sequence += 1
     await manager.broadcast(
         {
             "type": "message_deleted",
@@ -253,7 +266,7 @@ async def delete_message(manager, user, message_id, sender):
             "userId": user["id"],
             "deletedAt": deleted_at,
             "deleted": True,
-            "sequence": manager.sequence,
+            "sequence": _next_sequence(manager),
         }
     )
     await sender.send_json({"type": "delete_ack", "messageId": message_id})
