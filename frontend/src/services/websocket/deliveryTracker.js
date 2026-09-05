@@ -1,7 +1,7 @@
 import {
   DELIVERY_TIMEOUT_MS,
   MAX_PENDING_OUTGOING,
-} from "./constants";
+} from "./constants.js";
 
 export class DeliveryTracker {
   constructor({ onFailed, timeoutMs = DELIVERY_TIMEOUT_MS } = {}) {
