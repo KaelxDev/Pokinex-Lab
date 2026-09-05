@@ -1,7 +1,9 @@
 import { WS_URL } from "../config/runtime";
 import { notifyDirectMessage } from "../notifications";
 
-const RECONNECT_INTERVAL = 10000;
+const RECONNECT_BASE_DELAY_MS = 1000;
+const RECONNECT_MAX_DELAY_MS = 30000;
+const RECONNECT_JITTER_MS = 500;
 const AUTH_CLOSE_CODE = 1008;
 const AUTH_CLOSE_REASON = "authentication required";
 const MODERATION_LOCK_STORAGE_KEY = "pokinex.moderationLock";
@@ -132,14 +134,12 @@ export function createWebSocket(
     });
 
     const moderatorUsername = String(data?.moderator || "staff").trim() || "staff";
-    const normalizedUsername = moderatorUsername.toLowerCase();
-    const role = normalizedUsername === "kael1nk" ? "owner" : "moderator";
     onMessage?.({
       type: "message",
       messageId: commandId,
       username: moderatorUsername,
       displayName: moderatorUsername,
-      role,
+      role: data?.moderatorRole || "moderator",
       message: "!clear all",
       timestamp: data?.timestamp || Date.now(),
       deliveryStatus: "sent",
@@ -213,6 +213,7 @@ export function createWebSocket(
         onClose?.();
         return;
       }
+      onClose?.();
       scheduleReconnect();
     };
   }
@@ -220,11 +221,17 @@ export function createWebSocket(
   function scheduleReconnect() {
     if (manuallyClosed || reconnectTimer) return;
     reconnectAttempt += 1;
-    onReconnecting?.(RECONNECT_INTERVAL, reconnectAttempt);
+    const exponentialDelay = Math.min(
+      RECONNECT_BASE_DELAY_MS * 2 ** (reconnectAttempt - 1),
+      RECONNECT_MAX_DELAY_MS,
+    );
+    const jitter = Math.floor(Math.random() * (RECONNECT_JITTER_MS + 1));
+    const delay = Math.min(exponentialDelay + jitter, RECONNECT_MAX_DELAY_MS);
+    onReconnecting?.(delay, reconnectAttempt);
     reconnectTimer = setTimeout(() => {
       reconnectTimer = null;
       connect();
-    }, RECONNECT_INTERVAL);
+    }, delay);
   }
 
   function send(payload) {
