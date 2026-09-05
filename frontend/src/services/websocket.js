@@ -4,6 +4,7 @@ import { notifyDirectMessage } from "../notifications";
 const RECONNECT_BASE_DELAY_MS = 1000;
 const RECONNECT_MAX_DELAY_MS = 30000;
 const RECONNECT_JITTER_MS = 500;
+const DELIVERY_TIMEOUT_MS = 10000;
 const AUTH_CLOSE_CODE = 1008;
 const AUTH_CLOSE_REASON = "authentication required";
 const MODERATION_LOCK_STORAGE_KEY = "pokinex.moderationLock";
@@ -65,20 +66,71 @@ export function createWebSocket(
   let reconnectAttempt = 0;
   let manuallyClosed = false;
   const pendingMessageIds = [];
+  const pendingMessagePayloads = new Map();
+  const deliveryTimers = new Map();
 
-  function rememberOutgoingMessage(messageId) {
-    if (!messageId) return;
-    pendingMessageIds.push(messageId);
-    if (pendingMessageIds.length > 100) pendingMessageIds.shift();
+  function clearDeliveryTimer(messageId) {
+    const timer = deliveryTimers.get(messageId);
+    if (timer) clearTimeout(timer);
+    deliveryTimers.delete(messageId);
   }
 
   function forgetOutgoingMessage(messageId) {
+    const id = String(messageId || "");
     const index = pendingMessageIds.indexOf(messageId);
     if (index >= 0) pendingMessageIds.splice(index, 1);
+    clearDeliveryTimer(id);
+    pendingMessagePayloads.delete(id);
+  }
+
+  function rememberOutgoingMessage(payload) {
+    const messageId = payload?.messageId;
+    if (!messageId) return;
+    const id = String(messageId);
+
+    pendingMessageIds.push(messageId);
+    pendingMessagePayloads.set(id, { ...payload });
+    clearDeliveryTimer(id);
+
+    const timer = setTimeout(() => {
+      if (!pendingMessagePayloads.has(id)) return;
+      const pending = pendingMessagePayloads.get(id);
+      forgetOutgoingMessage(messageId);
+      onMessage?.({
+        type: "delivery_failed",
+        messageId,
+        message: pending?.message || "",
+        replyTo: pending?.replyTo || null,
+      });
+    }, DELIVERY_TIMEOUT_MS);
+    deliveryTimers.set(id, timer);
+
+    if (pendingMessageIds.length > 100) {
+      const oldest = pendingMessageIds.shift();
+      if (oldest) {
+        const oldestId = String(oldest);
+        clearDeliveryTimer(oldestId);
+        pendingMessagePayloads.delete(oldestId);
+      }
+    }
   }
 
   function rejectOldestOutgoingMessage() {
-    return pendingMessageIds.shift() || null;
+    const messageId = pendingMessageIds.shift() || null;
+    if (messageId) {
+      const id = String(messageId);
+      clearDeliveryTimer(id);
+      pendingMessagePayloads.delete(id);
+    }
+    return messageId;
+  }
+
+  function clearPendingOutgoingMessages() {
+    for (const messageId of pendingMessageIds) {
+      clearDeliveryTimer(String(messageId));
+    }
+    pendingMessageIds.length = 0;
+    pendingMessagePayloads.clear();
   }
 
   function readCachedMessageIds() {
@@ -124,7 +176,7 @@ export function createWebSocket(
       ? pendingMessageIds[pendingMessageIds.length - 1]
       : `moderation-command-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-    pendingMessageIds.length = 0;
+    clearPendingOutgoingMessages();
 
     const clearIds = [...new Set([...localIds, ...databaseIds, commandId])];
     onMessage?.({
@@ -206,10 +258,12 @@ export function createWebSocket(
           clearTimeout(reconnectTimer);
           reconnectTimer = null;
         }
+        clearPendingOutgoingMessages();
         onAuthenticationRequired?.();
         return;
       }
       if (manuallyClosed) {
+        clearPendingOutgoingMessages();
         onClose?.();
         return;
       }
@@ -236,7 +290,9 @@ export function createWebSocket(
 
   function send(payload) {
     if (!socket || socket.readyState !== WebSocket.OPEN) return false;
-    if (payload?.type === "message") rememberOutgoingMessage(payload.messageId);
+    if (payload?.type === "message" && payload.messageId) {
+      rememberOutgoingMessage(payload);
+    }
     socket.send(JSON.stringify(payload));
     return true;
   }
@@ -276,7 +332,7 @@ export function createWebSocket(
     },
     close() {
       manuallyClosed = true;
-      pendingMessageIds.length = 0;
+      clearPendingOutgoingMessages();
       if (reconnectTimer) {
         clearTimeout(reconnectTimer);
         reconnectTimer = null;
