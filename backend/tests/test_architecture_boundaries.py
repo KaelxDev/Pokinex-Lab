@@ -67,6 +67,29 @@ def test_websocket_endpoint_remains_transport_only():
     assert "handle_public_message" not in endpoint
 
 
+def test_connection_manager_does_not_own_public_message_operations():
+    chat_source = (BACKEND_APP / "websocket" / "chat.py").read_text(encoding="utf-8")
+
+    assert "app.services.public_messages" not in chat_source
+    assert "async def send_message" not in chat_source
+    assert "async def edit_message" not in chat_source
+    assert "async def delete_message" not in chat_source
+    assert "async def toggle_reaction" not in chat_source
+    assert "resolve_message_owner" not in chat_source
+
+
+def test_public_message_service_owns_message_operations():
+    service = (BACKEND_APP / "services" / "public_messages.py").read_text(encoding="utf-8")
+
+    for function_name in (
+        "async def send_message",
+        "async def edit_message",
+        "async def delete_message",
+        "async def toggle_reaction",
+    ):
+        assert function_name in service
+
+
 def test_frontend_has_one_canonical_application_shell():
     main_source = (FRONTEND_SRC / "main.jsx").read_text(encoding="utf-8")
 
@@ -86,3 +109,4 @@ def test_runtime_moderation_compatibility_layer_is_gone():
 
 def test_legacy_direct_message_module_is_removed():
     assert not (BACKEND_APP / "direct_messages.py").exists()
+    assert not (BACKEND_APP / "websocket" / "direct_messages.py").exists()
