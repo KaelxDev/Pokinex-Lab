@@ -21,6 +21,11 @@ export interface UserRecord {
 
 export interface ReplyTarget {
   messageId: MessageId;
+  userId?: string | number;
+  username?: string;
+  displayName?: string;
+  message?: string;
+  deleted?: boolean;
 }
 
 export interface ContextMenuState {
