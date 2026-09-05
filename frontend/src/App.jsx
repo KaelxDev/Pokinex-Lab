@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { logout as logoutRequest } from "./services/auth";
 import AuthScreen from "./components/AuthScreen";
 import ChatHeader from "./components/ChatHeader";
@@ -31,10 +31,6 @@ export default function App() {
 
   const [messageInput, setMessageInput] = useState("");
   const [replyingTo, setReplyingTo] = useState(null);
-  const connectionRef = useRef({ connected: false, socket: null });
-
-  const isConnected = useCallback(() => connectionRef.current.connected, []);
-  const getSocket = useCallback(() => connectionRef.current.socket, []);
 
   const {
     users,
@@ -75,8 +71,8 @@ export default function App() {
   } = useChatActions({
     user,
     userRef,
-    isConnected,
-    getSocket,
+    isConnected: () => false,
+    getSocket: () => null,
     messageInput,
     setMessageInput,
     replyingTo,
@@ -128,17 +124,31 @@ export default function App() {
     connectionStatus,
     reconnectAttempt,
     reconnectSeconds,
+    isConnected,
+    getSocket,
   } = useChatConnection(Boolean(authChecked && user), {
     onMessage: handleWebSocketMessage,
     onOpen: handleConnectionOpen,
     onAuthenticationRequired: logout,
   });
 
-  connectionRef.current = { connected, socket: socketRef.current };
+  const chatActions = useChatActions({
+    user,
+    userRef,
+    isConnected,
+    getSocket,
+    messageInput,
+    setMessageInput,
+    replyingTo,
+    setReplyingTo,
+    offlineQueue,
+    setOfflineQueue,
+    setMessages,
+  });
 
   useEffect(() => {
-    if (connected) flushQueue();
-  }, [connected, flushQueue]);
+    if (connected) chatActions.flushQueue();
+  }, [connected, chatActions.flushQueue]);
 
   async function handleLogout() {
     try {
@@ -200,42 +210,42 @@ export default function App() {
             historyLoading={historyLoading}
             messagesRef={messagesRef}
             onScroll={handleMessagesScroll}
-            editingId={editingId}
-            editingText={editingText}
-            editSaving={editSaving}
-            editError={editError}
-            onEditingTextChange={setEditingText}
-            onSaveEdit={saveEdit}
-            onCancelEdit={cancelEdit}
-            reactionPickerMessageId={reactionPickerMessageId}
-            onToggleReactionPicker={toggleReactionPicker}
-            onReaction={handleReaction}
-            onOpenContextMenu={openContextMenu}
-            onLongPressStart={startLongPress}
-            onLongPressEnd={endLongPress}
+            editingId={chatActions.editingId}
+            editingText={chatActions.editingText}
+            editSaving={chatActions.editSaving}
+            editError={chatActions.editError}
+            onEditingTextChange={chatActions.setEditingText}
+            onSaveEdit={chatActions.saveEdit}
+            onCancelEdit={chatActions.cancelEdit}
+            reactionPickerMessageId={chatActions.reactionPickerMessageId}
+            onToggleReactionPicker={chatActions.toggleReactionPicker}
+            onReaction={chatActions.handleReaction}
+            onOpenContextMenu={chatActions.openContextMenu}
+            onLongPressStart={chatActions.startLongPress}
+            onLongPressEnd={chatActions.endLongPress}
           />
 
           <MessageComposer
             connected={connected}
             offlineQueueLength={offlineQueue.length}
-            replyingTo={replyingTo}
+            replyingTo={chatActions.replyingTo || replyingTo}
             messageInput={messageInput}
             onChange={setMessageInput}
-            onSubmit={sendMessage}
+            onSubmit={chatActions.sendMessage}
             onCancelReply={() => setReplyingTo(null)}
           />
         </div>
 
         <MessageContextMenu
-          contextMenu={contextMenu}
+          contextMenu={chatActions.contextMenu}
           onReact={() => {
-            setReactionPickerMessageId(contextMenu?.message?.messageId || null);
+            setReactionPickerMessageId(chatActions.contextMenu?.message?.messageId || null);
             setContextMenu(null);
           }}
-          onReply={() => contextMenu && beginReply(contextMenu.message)}
-          onCopy={() => contextMenu && copyMessage(contextMenu.message)}
-          onEdit={() => contextMenu && beginEdit(contextMenu.message)}
-          onDelete={() => contextMenu && confirmDelete(contextMenu.message)}
+          onReply={() => chatActions.contextMenu && chatActions.beginReply(chatActions.contextMenu.message)}
+          onCopy={() => chatActions.contextMenu && chatActions.copyMessage(chatActions.contextMenu.message)}
+          onEdit={() => chatActions.contextMenu && chatActions.beginEdit(chatActions.contextMenu.message)}
+          onDelete={() => chatActions.contextMenu && chatActions.confirmDelete(chatActions.contextMenu.message)}
         />
 
         <ProfileModal
