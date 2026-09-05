@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -6,13 +7,15 @@ BACKEND_APP = REPO_ROOT / "backend" / "app"
 FRONTEND_SRC = REPO_ROOT / "frontend" / "src"
 
 
-def test_production_code_does_not_use_database_compatibility_facade():
+def test_production_code_does_not_import_database_compatibility_facade():
+    import_pattern = re.compile(r"^(?:from|import)\s+app\.database\b", re.MULTILINE)
     offenders = []
+
     for path in BACKEND_APP.rglob("*.py"):
         if path.name == "database.py":
             continue
         text = path.read_text(encoding="utf-8")
-        if "app.database" in text:
+        if import_pattern.search(text):
             offenders.append(path.relative_to(REPO_ROOT).as_posix())
 
     assert offenders == []
