@@ -31,12 +31,6 @@ export interface OfflineQueueItem extends ChatMessage {
   createdAt: number;
 }
 
-interface HistoryResponse {
-  messages?: unknown;
-  nextBefore?: string | null;
-  hasMore?: boolean;
-}
-
 function scopedStorageKey(baseKey: string, userKey: string | null): string | null {
   return userKey == null ? null : `${baseKey}:user:${userKey}`;
 }
