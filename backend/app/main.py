@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.database import close_db_pool, init_db_pool, initialize_database
+from app.infrastructure.database import close_db_pool, init_db_pool, initialize_database
 from app.routes.auth import router as auth_router
 from app.routes.messages import router as messages_router
 from app.security import ALLOWED_ORIGINS
