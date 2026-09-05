@@ -1,13 +1,13 @@
+import {
+  DELIVERY_TIMEOUT_MS,
+  MAX_PENDING_OUTGOING,
+} from "./constants.ts";
 import type {
   DeliveryFailedEvent,
   DeliveryTrackerOptions,
   MessageId,
   OutgoingMessagePayload,
 } from "../../types/websocket";
-import {
-  DELIVERY_TIMEOUT_MS,
-  MAX_PENDING_OUTGOING,
-} from "./constants.js";
 
 export class DeliveryTracker {
   private readonly pendingIds: MessageId[] = [];
@@ -30,8 +30,10 @@ export class DeliveryTracker {
 
   forget(messageId: MessageId | null | undefined): void {
     const id = String(messageId ?? "");
-    const index = this.pendingIds.indexOf(messageId as MessageId);
-    if (index >= 0) this.pendingIds.splice(index, 1);
+    if (messageId != null) {
+      const index = this.pendingIds.indexOf(messageId);
+      if (index >= 0) this.pendingIds.splice(index, 1);
+    }
     this.clearTimer(id);
     this.pendingPayloads.delete(id);
   }
