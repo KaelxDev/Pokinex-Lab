@@ -1,3 +1,10 @@
+import ChatHeader from "./ChatHeader";
+import ChatSidebar from "./ChatSidebar";
+import MessageComposer from "./MessageComposer";
+import MessageContextMenu from "./MessageContextMenu";
+import MessageList from "./MessageList";
+import ProfileModal from "./ProfileModal";
+
 export default function ChatWorkspace({
   user,
   profile,
@@ -7,9 +14,12 @@ export default function ChatWorkspace({
   connectionStatus,
   reconnectAttempt,
   reconnectSeconds,
+  onLogout,
   messages,
-  messagesRef,
+  profilesById,
+  connected,
   historyLoading,
+  messagesRef,
   onMessagesScroll,
   editingId,
   editingText,
@@ -24,7 +34,6 @@ export default function ChatWorkspace({
   onOpenContextMenu,
   onLongPressStart,
   onLongPressEnd,
-  connected,
   offlineQueueLength,
   replyingTo,
   messageInput,
@@ -44,14 +53,6 @@ export default function ChatWorkspace({
   onCloseProfile,
   onSubmitProfile,
   onChooseAvatar,
-  profilesById,
-  onLogout,
-  setReactionPickerMessageId,
-  setContextMenu,
-  beginReply,
-  copyMessage,
-  beginEdit,
-  confirmDelete,
 }) {
   return (
     <section className="chat">
