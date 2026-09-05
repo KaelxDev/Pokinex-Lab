@@ -58,14 +58,14 @@ export function useChatConnection(
         if (disposed || generation !== generationRef.current) return;
         setConnected(false);
         setConnectionStatus(activeRef.current ? "reconnecting" : "disconnected");
-        if (activeRef.current) setReconnectSeconds(10);
+        if (activeRef.current) setReconnectSeconds(0);
       },
-      onReconnecting(_delay, attempt) {
+      onReconnecting(delay, attempt) {
         if (disposed || generation !== generationRef.current || !activeRef.current) return;
         setConnected(false);
         setConnectionStatus("reconnecting");
         setReconnectAttempt(attempt);
-        setReconnectSeconds(10);
+        setReconnectSeconds(Math.max(1, Math.ceil(delay / 1000)));
       },
       onAuthenticationRequired() {
         if (disposed || generation !== generationRef.current) return;
@@ -90,7 +90,7 @@ export function useChatConnection(
   useEffect(() => {
     if (connectionStatus !== "reconnecting") return undefined;
     const id = window.setInterval(() => {
-      setReconnectSeconds((value) => (value > 1 ? value - 1 : 10));
+      setReconnectSeconds((value) => Math.max(0, value - 1));
     }, 1000);
     return () => window.clearInterval(id);
   }, [connectionStatus]);
