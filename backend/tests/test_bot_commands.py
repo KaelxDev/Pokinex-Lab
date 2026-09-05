@@ -1,8 +1,8 @@
 import pytest
 
 from app.moderation_bot import BOT_USER, moderation_bot
-from app.services.bot_commands import handle_public_bot_command, online_user_count
 from app.services import bot_commands
+from app.services.bot_commands import handle_public_bot_command, online_user_count
 
 
 class FakeWebSocket:
@@ -32,7 +32,9 @@ async def test_public_command_is_consumed_and_broadcast():
         assert consumed is True
         assert websocket.messages
         assert websocket.messages[-1]["type"] == "message"
-        assert websocket.messages[-1]["userId"] == BOT_USER["id"]
+        assert websocket.messages[-1]["id"] == BOT_USER["id"]
+        assert websocket.messages[-1]["username"] == BOT_USER["username"]
+        assert websocket.messages[-1]["role"] == "bot"
         assert websocket.messages[-1]["message"] == moderation_bot.PUBLIC_COMMANDS["!ping"]
     finally:
         bot_commands.manager.active_connections.clear()
