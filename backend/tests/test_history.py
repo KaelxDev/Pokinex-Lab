@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
 import app.infrastructure.database as database
+from app.services.history_cursor import decode_cursor
 from app.services.message_history import get_message_history
 
 
@@ -40,7 +41,12 @@ def test_message_history_returns_newest_page_in_display_order(tmp_path, monkeypa
 
     assert [item["messageId"] for item in page["messages"]] == ["message-3", "message-4"]
     assert page["hasMore"] is True
-    assert page["nextBefore"] == page["messages"][0]["timestamp"]
+
+    cursor = decode_cursor(page["nextBefore"])
+    assert cursor is not None
+    created_at, message_id = cursor
+    assert created_at == page["messages"][0]["timestamp"]
+    assert message_id == page["messages"][0]["messageId"]
 
 
 def test_message_history_before_cursor_loads_older_messages(tmp_path, monkeypatch):
