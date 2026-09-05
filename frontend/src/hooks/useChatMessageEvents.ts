@@ -116,7 +116,6 @@ export function useChatMessageEvents({
     if (type === "profile_updated") {
       const updatedUser = asUserRecord(data.user);
       if (!updatedUser) return;
-
       mergeUser(updatedUser);
       if (String(userRef.current?.id) === String(updatedUser.id)) {
         syncProfile({ ...userRef.current, ...updatedUser });
@@ -134,7 +133,6 @@ export function useChatMessageEvents({
     if (type === "chat_reset") {
       const command = asChatMessage(data.commandMessage);
       if (!command?.messageId) return;
-
       clearLocalHistory();
       setOfflineQueue([]);
       setMessages([{
@@ -158,56 +156,35 @@ export function useChatMessageEvents({
         Array.isArray(data.messageIds) ? data.messageIds.map((id) => String(id)) : [],
       );
       if (messageIds.size === 0) return;
-
-      setMessages((current) =>
-        current.filter((item) => !messageIds.has(String(item.messageId))),
-      );
-
-      if (contextMenu?.message?.messageId && messageIds.has(String(contextMenu.message.messageId))) {
-        setContextMenu(null);
-      }
+      setMessages((current) => current.filter((item) => !messageIds.has(String(item.messageId))));
+      if (contextMenu?.message?.messageId && messageIds.has(String(contextMenu.message.messageId))) setContextMenu(null);
       if (editingId != null && messageIds.has(String(editingId))) {
         setEditingId(null);
         setEditingText("");
         setEditSaving(false);
         setEditError("");
       }
-      if (replyingTo?.messageId != null && messageIds.has(String(replyingTo.messageId))) {
-        setReplyingTo(null);
-      }
-      if (reactionPickerMessageId != null && messageIds.has(String(reactionPickerMessageId))) {
-        setReactionPickerMessageId(null);
-      }
+      if (replyingTo?.messageId != null && messageIds.has(String(replyingTo.messageId))) setReplyingTo(null);
+      if (reactionPickerMessageId != null && messageIds.has(String(reactionPickerMessageId))) setReactionPickerMessageId(null);
       return;
     }
 
     if (type === "ack") {
       const ackId = asMessageId(data.messageId);
-      setOfflineQueue((current) =>
-        ackId == null
-          ? current
-          : current.filter((item) => String(item.id) !== String(ackId)),
-      );
-      setMessages((current) =>
-        ackId == null
-          ? current
-          : current.map((item) =>
-              String(item.messageId) === String(ackId)
-                ? { ...item, offline: false, deliveryStatus: "sent" }
-                : item,
-            ),
-      );
+      if (ackId == null) return;
+      setOfflineQueue((current) => current.filter((item) => String(item.id) !== String(ackId)));
+      setMessages((current) => current.map((item) =>
+        String(item.messageId) === String(ackId) ? { ...item, offline: false, deliveryStatus: "sent" } : item,
+      ));
       return;
     }
 
     if (type === "delivery_failed") {
       const failedId = asMessageId(data.messageId);
-      if (failedId == null) return;
+      if (failedId == null || typeof data.message !== "string" || !data.message) return;
 
       setMessages((current) => {
-        const existing = current.find(
-          (item) => String(item.messageId) === String(failedId),
-        );
+        const existing = current.find((item) => String(item.messageId) === String(failedId));
         if (!existing || existing.deliveryStatus === "sent") return current;
         return current.map((item) =>
           String(item.messageId) === String(failedId)
@@ -216,22 +193,17 @@ export function useChatMessageEvents({
         );
       });
 
-      if (typeof data.message === "string" && data.message) {
-        const replyTo = asMessageId(data.replyTo);
-        setOfflineQueue((queue) => {
-          if (queue.some((item) => String(item.id) === String(failedId))) return queue;
-          return [
-            ...queue,
-            {
-              id: String(failedId),
-              type: "message",
-              message: data.message,
-              createdAt: Date.now(),
-              ...(replyTo != null ? { replyTo: { messageId: replyTo } } : {}),
-            },
-          ];
-        });
-      }
+      const replyTo = asMessageId(data.replyTo);
+      setOfflineQueue((queue) => {
+        if (queue.some((item) => String(item.id) === String(failedId))) return queue;
+        return [...queue, {
+          id: String(failedId),
+          type: "message",
+          message: data.message as string,
+          createdAt: Date.now(),
+          ...(replyTo != null ? { replyTo: { messageId: replyTo } } : {}),
+        }];
+      });
       return;
     }
 
@@ -239,7 +211,6 @@ export function useChatMessageEvents({
       setEditSaving(false);
       return;
     }
-
     if (type === "delete_ack") return;
 
     if (type === "error" && data.action === "edit_message") {
@@ -247,12 +218,10 @@ export function useChatMessageEvents({
       setEditSaving(false);
       return;
     }
-
     if (type === "error" && data.action === "delete_message") {
       console.error("Não foi possível excluir:", data.message);
       return;
     }
-
     if (type === "error" && data.action === "reaction") {
       console.error("Não foi possível reagir:", data.message);
       return;
@@ -261,61 +230,37 @@ export function useChatMessageEvents({
     if (type === "message_edited") {
       const messageId = asMessageId(data.messageId);
       if (messageId == null) return;
-      setMessages((current) =>
-        current.map((item) =>
-          String(item.messageId) === String(messageId)
-            ? {
-                ...item,
-                ...data,
-                deliveryStatus: "sent",
-                offline: false,
-                editPending: false,
-                edited: true,
-              }
-            : item,
-        ),
-      );
+      setMessages((current) => current.map((item) =>
+        String(item.messageId) === String(messageId)
+          ? { ...item, ...data, deliveryStatus: "sent", offline: false, editPending: false, edited: true }
+          : item,
+      ));
       return;
     }
 
     if (type === "message_deleted") {
       const messageId = asMessageId(data.messageId);
       if (messageId == null) return;
-      setMessages((current) =>
-        current.map((item) =>
-          String(item.messageId) === String(messageId)
-            ? {
-                ...item,
-                ...data,
-                message: "Esta mensagem foi excluída",
-                deleted: true,
-                deliveryStatus: "sent",
-                offline: false,
-                editPending: false,
-              }
-            : item,
-        ),
-      );
+      setMessages((current) => current.map((item) =>
+        String(item.messageId) === String(messageId)
+          ? { ...item, ...data, message: "Esta mensagem foi excluída", deleted: true, deliveryStatus: "sent", offline: false, editPending: false }
+          : item,
+      ));
       return;
     }
 
     if (type === "message_reaction") {
       const messageId = asMessageId(data.messageId);
       if (messageId == null) return;
-      setMessages((current) =>
-        current.map((item) =>
-          String(item.messageId) === String(messageId)
-            ? { ...item, reactions: data.reactions || {} }
-            : item,
-        ),
-      );
+      setMessages((current) => current.map((item) =>
+        String(item.messageId) === String(messageId) ? { ...item, reactions: data.reactions || {} } : item,
+      ));
       return;
     }
 
     if (type === "message") {
       const messageId = asMessageId(data.messageId);
       if (messageId == null) return;
-
       mergeUser({
         id: data.userId,
         username: typeof data.username === "string" ? data.username : undefined,
@@ -327,12 +272,7 @@ export function useChatMessageEvents({
       });
       setMessages((current) => {
         const index = current.findIndex((item) => String(item.messageId) === String(messageId));
-        const incoming: ChatMessage = {
-          ...data,
-          deliveryStatus: "sent",
-          offline: false,
-          reactions: data.reactions || {},
-        };
+        const incoming: ChatMessage = { ...data, messageId, deliveryStatus: "sent", offline: false, reactions: data.reactions || {} };
         if (index >= 0) {
           const next = [...current];
           next[index] = { ...next[index], ...incoming };
@@ -344,10 +284,7 @@ export function useChatMessageEvents({
     }
 
     if (type === "system") {
-      setMessages((current) => [
-        ...current,
-        { ...data, timestamp: data.timestamp || Date.now() },
-      ]);
+      setMessages((current) => [...current, { ...data, timestamp: data.timestamp || Date.now() }]);
     }
   }, [
     clearLocalHistory,
