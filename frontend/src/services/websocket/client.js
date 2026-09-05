@@ -13,14 +13,13 @@ import {
   emitModerationEvent,
 } from "./moderation";
 import {
-  deleteMessagePayload,
-  deleteMessagePayload as buildDeleteMessagePayload,
   directMessageDeletePayload,
   directMessageEditPayload,
   directMessagePayload,
   directMessageReactionPayload,
   editMessagePayload,
   messagePayload,
+  deleteMessagePayload,
   reactionPayload,
 } from "./protocol";
 
@@ -157,7 +156,7 @@ export function createWebSocket(
       return send(editMessagePayload(messageId, message));
     },
     sendDeleteMessage(messageId) {
-      return send(buildDeleteMessagePayload(messageId));
+      return send(deleteMessagePayload(messageId));
     },
     sendReplyMessage(message, messageId = null, replyTo = null) {
       return send(messagePayload(message, messageId, replyTo));
