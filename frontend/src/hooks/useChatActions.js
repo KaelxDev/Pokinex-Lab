@@ -32,6 +32,16 @@ export function useChatActions({
     const role = String(sender?.role || "").toLowerCase();
     const isStaff = ["owner", "admin", "moderator", "staff"].includes(role);
     const isClearAllCommand = connected && isStaff && /^(?:!clear|!purge)\s+all$/i.test(text);
+    const replyTo = replyingTo
+      ? {
+          messageId: replyingTo.messageId,
+          userId: replyingTo.userId,
+          username: replyingTo.username,
+          displayName: replyingTo.displayName,
+          message: replyingTo.message,
+          deleted: replyingTo.deleted,
+        }
+      : null;
 
     const optimistic = {
       type: "message",
@@ -48,39 +58,30 @@ export function useChatActions({
       deliveryStatus: connected ? "sending" : "pending",
       reactions: {},
       ...(isClearAllCommand ? { ephemeral: true, moderationCommand: true } : {}),
-      ...(replyingTo
-        ? {
-            replyTo: {
-              messageId: replyingTo.messageId,
-              userId: replyingTo.userId,
-              username: replyingTo.username,
-              displayName: replyingTo.displayName,
-              message: replyingTo.message,
-              deleted: replyingTo.deleted,
-            },
-          }
-        : {}),
+      ...(replyTo ? { replyTo } : {}),
     };
 
     setMessages((current) => [...current, optimistic]);
 
-    const sent = connected &&
-      (replyingTo
-        ? socket?.sendReplyMessage(text, id, replyingTo.messageId)
-        : socket?.sendMessage(text, id));
+    const sent = connected && (
+      replyTo
+        ? socket?.sendReplyMessage(text, id, replyTo.messageId)
+        : socket?.sendMessage(text, id)
+    );
 
     if (!sent) {
       setOfflineQueue((current) => [
         ...current,
         {
           id,
+          type: "message",
           message: text,
           createdAt: Date.now(),
           userId: sender?.id,
           username: sender?.username,
           displayName: sender?.displayName,
           avatar: sender?.avatar || "",
-          ...(replyingTo ? { replyTo: { messageId: replyingTo.messageId } } : {}),
+          ...(replyTo ? { replyTo } : {}),
         },
       ]);
     }
@@ -139,12 +140,7 @@ export function useChatActions({
     setMessages((current) =>
       current.map((item) =>
         item.messageId === message.messageId
-          ? {
-              ...item,
-              message: "Esta mensagem foi excluída",
-              deleted: true,
-              deletePending: true,
-            }
+          ? { ...item, message: "Esta mensagem foi excluída", deleted: true, deletePending: true }
           : item,
       ),
     );
@@ -181,11 +177,9 @@ export function useChatActions({
     event.stopPropagation();
     setReactionPickerMessageId(null);
     const currentUser = userRef.current || user;
-    const isMine =
-      message.userId != null
-        ? String(message.userId) === String(currentUser?.id)
-        : String(message.username || "") === String(currentUser?.username || "");
-
+    const isMine = message.userId != null
+      ? String(message.userId) === String(currentUser?.id)
+      : String(message.username || "") === String(currentUser?.username || "");
     setContextMenu({
       x: Math.max(8, Math.min(event.clientX, window.innerWidth - 190)),
       y: Math.max(8, Math.min(event.clientY, window.innerHeight - 210)),
@@ -199,22 +193,12 @@ export function useChatActions({
     clearTimeout(longPressRef.current);
     longPressRef.current = setTimeout(() => {
       const touch = event.touches[0];
-      openContextMenu(
-        {
-          preventDefault() {},
-          stopPropagation() {},
-          clientX: touch.clientX,
-          clientY: touch.clientY,
-        },
-        message,
-      );
+      openContextMenu({ preventDefault() {}, stopPropagation() {}, clientX: touch.clientX, clientY: touch.clientY }, message);
       navigator.vibrate?.(20);
     }, 550);
   }, [openContextMenu]);
 
-  const endLongPress = useCallback(() => {
-    clearTimeout(longPressRef.current);
-  }, []);
+  const endLongPress = useCallback(() => clearTimeout(longPressRef.current), []);
 
   const copyMessage = useCallback(async (message) => {
     if (message.deleted) return;
@@ -238,41 +222,22 @@ export function useChatActions({
             : message,
         ),
       );
-      socket.sendMessage(item.message, item.id);
+      if (item.type === "message" && item.replyTo?.messageId) {
+        socket.sendReplyMessage(item.message, item.id, item.replyTo.messageId);
+      } else {
+        socket.sendMessage(item.message, item.id);
+      }
     }
   }, [getSocket, offlineQueue, setMessages]);
 
   useEffect(() => () => clearTimeout(longPressRef.current), []);
 
   return {
-    messageInput,
-    setMessageInput,
-    replyingTo,
-    setReplyingTo,
-    contextMenu,
-    setContextMenu,
-    editingId,
-    setEditingId,
-    editingText,
-    setEditingText,
-    editSaving,
-    setEditSaving,
-    editError,
-    setEditError,
-    reactionPickerMessageId,
-    setReactionPickerMessageId,
-    sendMessage,
-    beginEdit,
-    cancelEdit,
-    saveEdit,
-    confirmDelete,
-    beginReply,
-    handleReaction,
-    toggleReactionPicker,
-    openContextMenu,
-    startLongPress,
-    endLongPress,
-    copyMessage,
-    flushQueue,
+    messageInput, setMessageInput, replyingTo, setReplyingTo, contextMenu, setContextMenu,
+    editingId, setEditingId, editingText, setEditingText, editSaving, setEditSaving,
+    editError, setEditError, reactionPickerMessageId, setReactionPickerMessageId,
+    sendMessage, beginEdit, cancelEdit, saveEdit, confirmDelete, beginReply,
+    handleReaction, toggleReactionPicker, openContextMenu, startLongPress, endLongPress,
+    copyMessage, flushQueue,
   };
 }
