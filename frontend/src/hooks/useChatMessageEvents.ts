@@ -6,32 +6,13 @@ import type {
 } from "react";
 import type { DeliveryFailedEvent, MessageId } from "../types/websocket";
 import type { ServerEvent } from "../services/websocket/client.ts";
-import type { ChatMessage, OfflineQueueItem } from "./useChatHistory.ts";
-
-export interface UserRecord {
-  id?: string | number;
-  username?: string;
-  displayName?: string;
-  avatar?: string;
-  status?: string;
-  online?: boolean;
-  role?: string;
-  [key: string]: unknown;
-}
-
-export interface ReplyTarget {
-  messageId: MessageId;
-  userId?: string | number;
-  username?: string;
-  displayName?: string;
-  message?: string;
-  deleted?: boolean;
-}
-
-export interface ContextMenuState {
-  message?: ChatMessage;
-  [key: string]: unknown;
-}
+import type {
+  ChatMessage,
+  ContextMenuState,
+  OfflineQueueItem,
+  ReplyTarget,
+  UserRecord,
+} from "../types/chat";
 
 export interface ChatMessageEvent extends Record<string, unknown> {
   type?: string;
