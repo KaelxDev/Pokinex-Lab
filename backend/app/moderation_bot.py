@@ -78,6 +78,9 @@ class ModerationBot:
     FLOOD_MAX_MESSAGES = 6
     DUPLICATE_WINDOW_SECONDS = 20.0
     DUPLICATE_MIN_LENGTH = 4
+    MAX_NORMALIZED_MESSAGE_LENGTH = 1000
+    MAX_LINKS_PER_MESSAGE = 3
+    MAX_MENTIONS_PER_MESSAGE = 4
     CAPS_MIN_ALPHA = 10
     CAPS_RATIO_LIMIT = 0.82
     REPEATED_CHARACTER_LIMIT = 8
@@ -118,18 +121,6 @@ class ModerationBot:
     def __init__(self, state: ModerationState | None = None):
         self.state = state or ModerationState()
         self._rng = random.Random()
-
-    @property
-    def FLOOD_WINDOW_SECONDS(self):
-        return self.state.__class__.__dict__.get("FLOOD_WINDOW_SECONDS", 8.0)
-
-    @property
-    def VIOLATION_WINDOW_SECONDS(self):
-        return self.state.VIOLATION_WINDOW_SECONDS
-
-    @property
-    def BOT_REPLY_COOLDOWN_SECONDS(self):
-        return self.state.BOT_REPLY_COOLDOWN_SECONDS
 
     def command_name(self, message: str) -> str:
         return message.strip().split()[0].lower() if message.strip() else ""
