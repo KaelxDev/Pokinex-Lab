@@ -1,7 +1,6 @@
 import { useCallback } from "react";
 
 export function useMessageMutations({
-  user,
   userRef,
   messageInput,
   setMessageInput,
@@ -89,7 +88,7 @@ export function useMessageMutations({
 
     setMessageInput("");
     setReplyingTo(null);
-  }, [getSocket, isConnected, messageInput, replyingTo, setMessageInput, setMessageInput, setOfflineQueue, setMessages, setReplyingTo, userRef]);
+  }, [getSocket, isConnected, messageInput, replyingTo, setMessageInput, setOfflineQueue, setMessages, setReplyingTo, userRef]);
 
   const beginEdit = useCallback((message) => {
     setContextMenu(null);
@@ -174,6 +173,5 @@ export function useMessageMutations({
     confirmDelete,
     beginReply,
     handleReaction,
-    user,
   };
 }
