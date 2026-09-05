@@ -4,10 +4,10 @@ from anyio import to_thread
 
 from app.database import get_message_owner
 from app.services import message_runtime
+from app.services.public_identity import public_user_payload
 from app.services.public_messages import (
     delete_message as delete_message_operation,
     edit_message as edit_message_operation,
-    public_user_payload,
     send_message as send_message_operation,
     toggle_reaction as toggle_reaction_operation,
 )
