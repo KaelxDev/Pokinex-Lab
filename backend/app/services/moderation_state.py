@@ -76,26 +76,36 @@ class ModerationState:
         turns = self._conversation_memory.get(str(user_id), ())
         return [text for role, text in turns if role == "user"][-limit:]
 
-    def record_message_time(self, user_id: int, now: float) -> int:
+    def record_message_time(self, user_id: int, now: float, window_seconds: float | None = None) -> int:
+        window = self.FLOOD_WINDOW_SECONDS if window_seconds is None else window_seconds
         timestamps = self._message_times[str(user_id)]
-        while timestamps and now - timestamps[0] > self.FLOOD_WINDOW_SECONDS:
+        while timestamps and now - timestamps[0] > window:
             timestamps.popleft()
         timestamps.append(now)
         return len(timestamps)
 
-    def duplicate_count(self, user_id: int, normalized: str, message_id: str | None, now: float) -> tuple[int, tuple[str, ...]]:
+    def duplicate_count(
+        self,
+        user_id: int,
+        normalized: str,
+        message_id: str | None,
+        now: float,
+        threshold: int,
+        window_seconds: float | None = None,
+    ) -> tuple[int, tuple[str, ...]]:
+        window = self.DUPLICATE_WINDOW_SECONDS if window_seconds is None else window_seconds
         key = str(user_id)
         history = self._duplicate_history[key]
         history[:] = [
             entry
             for entry in history
-            if now - entry[0] <= self.DUPLICATE_WINDOW_SECONDS
+            if now - entry[0] <= window
             and entry[1] == normalized
         ]
 
         count = len(history) + 1
-        if count >= 5:
-            cleanup_ids = tuple(entry[2] for entry in history[-4:] if entry[2])
+        if count >= threshold:
+            cleanup_ids = tuple(entry[2] for entry in history[-(threshold - 1):] if entry[2])
             history.clear()
             return count, cleanup_ids
 
