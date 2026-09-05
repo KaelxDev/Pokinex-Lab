@@ -7,6 +7,7 @@ from fastapi import WebSocket
 from pydantic import BaseModel, ValidationError
 
 from app.services.moderation import handle_public_message
+from app.services.public_messages import delete_message, edit_message, toggle_reaction
 from app.websocket.chat import manager
 from app.websocket.direct_message_features import (
     delete_direct,
@@ -125,7 +126,7 @@ async def handle_edit_message(
             }
         )
         return
-    await manager.edit_message(user, event.messageId, message, websocket)
+    await edit_message(manager, user, event.messageId, message, websocket)
 
 
 async def handle_delete_message(
@@ -133,7 +134,7 @@ async def handle_delete_message(
     event: DeleteMessageEvent,
     user: Any,
 ) -> None:
-    await manager.delete_message(user, event.messageId, websocket)
+    await delete_message(manager, user, event.messageId, websocket)
 
 
 async def handle_reaction(
@@ -141,7 +142,7 @@ async def handle_reaction(
     event: ReactionEvent,
     user: Any,
 ) -> None:
-    await manager.toggle_reaction(user, event.messageId, event.reaction, websocket)
+    await toggle_reaction(manager, user, event.messageId, event.reaction, websocket)
 
 
 _HANDLERS: dict[str, tuple[type[BaseModel], EventHandler]] = {
