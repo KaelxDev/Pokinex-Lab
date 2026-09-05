@@ -64,6 +64,17 @@ class ModerationEngine:
     def _mention_count(message: str) -> int:
         return len(re.findall(r"@[A-Za-z0-9_.-]{2,32}", message))
 
+    @staticmethod
+    def _link_count(message: str) -> int:
+        return len(re.findall(r"https?://\S+|www\.\S+", message, re.IGNORECASE))
+
+    @staticmethod
+    def _caps_ratio(message: str) -> float:
+        letters = [char for char in message if char.isalpha()]
+        if not letters:
+            return 0.0
+        return sum(char.isupper() for char in letters) / len(letters)
+
     def _record_block(
         self,
         category: str,
@@ -208,7 +219,7 @@ class ModerationEngine:
                     )
                 )
 
-        if self.bot._link_count(normalized) > self.bot.MAX_LINKS_PER_MESSAGE:
+        if self._link_count(normalized) > self.bot.MAX_LINKS_PER_MESSAGE:
             return ModerationDecision(
                 self._record_block(
                     "link_spam",
@@ -230,7 +241,7 @@ class ModerationEngine:
             )
 
         if (
-            self.bot._caps_ratio(normalized) >= self.bot.CAPS_RATIO_LIMIT
+            self._caps_ratio(normalized) >= self.bot.CAPS_RATIO_LIMIT
             and len(normalized) >= 14
         ):
             return ModerationDecision(
