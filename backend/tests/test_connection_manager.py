@@ -19,6 +19,11 @@ class FakeWebSocket:
         self.messages.append(data)
 
 
+class FailingWebSocket(FakeWebSocket):
+    async def send_json(self, data):
+        raise ConnectionError("socket closed")
+
+
 @pytest.fixture
 def user():
     return {
@@ -58,6 +63,40 @@ async def test_same_user_on_two_connections_is_not_duplicated_in_presence(user):
 
     assert manager.disconnect(first) is None
     assert manager.disconnect(second) == user
+
+
+@pytest.mark.asyncio
+async def test_failed_broadcast_removes_socket_and_refreshes_presence(user):
+    manager = ConnectionManager()
+    healthy = FakeWebSocket()
+    dead = FailingWebSocket()
+    second_user = {
+        "id": 2,
+        "username": "maria",
+        "displayName": "Maria",
+        "avatar": "",
+        "status": "online",
+    }
+    manager.active_connections[healthy] = user
+    manager.active_connections[dead] = second_user
+
+    await manager.broadcast({"type": "message", "messageId": "m-1", "message": "Olá"})
+
+    assert manager.get_user(dead) is None
+    users_events = [event for event in healthy.messages if event.get("type") == "users"]
+    assert users_events
+    assert [item["id"] for item in users_events[-1]["users"]] == [1]
+
+
+@pytest.mark.asyncio
+async def test_users_broadcast_does_not_recurse_when_socket_is_already_dead(user):
+    manager = ConnectionManager()
+    dead = FailingWebSocket()
+    manager.active_connections[dead] = user
+
+    await manager.send_users()
+
+    assert manager.active_connections == {}
 
 
 def test_processed_message_cache_is_bounded():

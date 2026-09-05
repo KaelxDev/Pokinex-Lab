@@ -107,12 +107,20 @@ class ConnectionManager:
     def get_user(self, websocket):
         return self.active_connections.get(websocket)
 
-    async def broadcast(self, data):
+    async def _broadcast(self, data):
+        failed = False
         for websocket in list(self.active_connections):
             try:
                 await websocket.send_json(data)
             except Exception:
                 self.active_connections.pop(websocket, None)
+                failed = True
+        return failed
+
+    async def broadcast(self, data):
+        failed = await self._broadcast(data)
+        if failed and data.get("type") != "users":
+            await self.send_users()
 
     async def send_users(self):
         users = []
@@ -130,7 +138,7 @@ class ConnectionManager:
             seen.add(user["id"])
             users.append(public_user_payload(user, online=True))
 
-        await self.broadcast(
+        await self._broadcast(
             {
                 "type": "users",
                 "users": users,
