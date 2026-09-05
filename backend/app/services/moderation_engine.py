@@ -1,6 +1,5 @@
 """Deterministic moderation policy used by the public chat service."""
 
-from collections import defaultdict, deque
 from dataclasses import dataclass
 import re
 import time
@@ -51,8 +50,6 @@ class ModerationEngine:
     def __init__(self, bot: ModerationBot | None = None):
         self.bot = bot or moderation_bot
         self.state = self.bot.state
-        self._message_times: dict[str, deque[float]] = defaultdict(deque)
-        self._duplicate_history: dict[str, list[tuple[float, str, str | None]]] = defaultdict(list)
 
     @staticmethod
     def normalize(message: str) -> str:
@@ -111,22 +108,10 @@ class ModerationEngine:
         message_id: str | None,
         now: float,
     ) -> ModerationDecision | None:
-        key = str(user_id)
-        history = self._duplicate_history[key]
-        history[:] = [
-            entry
-            for entry in history
-            if now - entry[0] <= self.bot.DUPLICATE_WINDOW_SECONDS
-            and entry[1] == normalized
-        ]
-
-        count = len(history) + 1
+        count, cleanup_ids = self.state.duplicate_count(user_id, normalized, message_id, now)
         if count < self.DUPLICATE_THRESHOLD:
-            history.append((now, normalized, message_id))
             return None
 
-        cleanup_ids = tuple(entry[2] for entry in history[-4:] if entry[2])
-        history.clear()
         result = self._record_block(
             "duplicate_burst",
             "A mesma mensagem foi enviada 5 vezes seguidas.",
@@ -137,11 +122,8 @@ class ModerationEngine:
         return ModerationDecision(result, cleanup_ids)
 
     def _check_flood(self, user_id: int, now: float) -> ModerationResult | None:
-        timestamps = self._message_times[str(user_id)]
-        while timestamps and now - timestamps[0] > self.bot.FLOOD_WINDOW_SECONDS:
-            timestamps.popleft()
-        timestamps.append(now)
-        if len(timestamps) <= self.bot.FLOOD_MAX_MESSAGES:
+        message_count = self.state.record_message_time(user_id, now)
+        if message_count <= self.bot.FLOOD_MAX_MESSAGES:
             return None
         return self._record_block(
             "flood",
@@ -280,7 +262,7 @@ class ModerationEngine:
 
             flood = self._check_flood(user_id, now)
             if flood is not None:
-                self._duplicate_history[str(user_id)].clear()
+                self.state.clear_duplicate_history(user_id)
                 return ModerationDecision(flood)
 
         return ModerationDecision(ModerationResult(True))
