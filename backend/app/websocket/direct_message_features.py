@@ -1,7 +1,8 @@
 from anyio import to_thread
 
 from app.auth import get_user_by_id
-from app.database import _persistent_avatar_reference, get_connection, using_postgres
+from app.infrastructure.database import get_connection, using_postgres
+from app.repositories.user_repository import persistent_avatar_reference
 
 MAX_HISTORY_LIMIT = 100
 REACTIONS = ("❤️", "😂", "😮", "😢", "😡", "👍")
@@ -67,8 +68,8 @@ def get_direct_message_history(user_id, other_user_id, limit=50, before=None):
         reactions = _reaction_map(connection, [row["message_id"] for row in rows])
         messages = []
         for row in reversed(rows):
-            sender_avatar = _persistent_avatar_reference(connection, row["sender_id"], row["sender_avatar"])
-            recipient_avatar = _persistent_avatar_reference(connection, row["recipient_id"], row["recipient_avatar"])
+            sender_avatar = persistent_avatar_reference(connection, row["sender_id"], row["sender_avatar"])
+            recipient_avatar = persistent_avatar_reference(connection, row["recipient_id"], row["recipient_avatar"])
             item = {
                 "type": "direct_message", "messageId": row["message_id"],
                 "senderId": row["sender_id"], "recipientId": row["recipient_id"], "userId": row["sender_id"],
@@ -82,7 +83,7 @@ def get_direct_message_history(user_id, other_user_id, limit=50, before=None):
             if row["reply_to_message_id"] and row["reply_username"]:
                 item["replyTo"] = {
                     "messageId": row["reply_to_message_id"], "userId": row["reply_user_id"], "username": row["reply_username"], "displayName": row["reply_display_name"],
-                    "avatar": _persistent_avatar_reference(connection, row["reply_user_id"], row["reply_avatar"]),
+                    "avatar": persistent_avatar_reference(connection, row["reply_user_id"], row["reply_avatar"]),
                     "message": "Esta mensagem foi excluída" if row["reply_deleted_at"] else row["reply_message"],
                     "deleted": bool(row["reply_deleted_at"]),
                 }
@@ -114,8 +115,8 @@ def _direct_message_payload(message_id):
             return None
         return {
             "messageId": row["message_id"], "senderId": row["sender_id"], "recipientId": row["recipient_id"], "userId": row["sender_id"],
-            "username": row["sender_username"], "displayName": row["sender_display_name"], "avatar": _persistent_avatar_reference(connection, row["sender_id"], row["sender_avatar"]),
-            "recipientUsername": row["recipient_username"], "recipientDisplayName": row["recipient_display_name"], "recipientAvatar": _persistent_avatar_reference(connection, row["recipient_id"], row["recipient_avatar"]),
+            "username": row["sender_username"], "displayName": row["sender_display_name"], "avatar": persistent_avatar_reference(connection, row["sender_id"], row["sender_avatar"]),
+            "recipientUsername": row["recipient_username"], "recipientDisplayName": row["recipient_display_name"], "recipientAvatar": persistent_avatar_reference(connection, row["recipient_id"], row["recipient_avatar"]),
             "message": "Esta mensagem foi excluída" if row["deleted_at"] else row["message"], "timestamp": row["created_at"],
             "edited": bool(row["edited_at"]), "editedAt": row["edited_at"], "deleted": bool(row["deleted_at"]), "deletedAt": row["deleted_at"],
             "reactions": _reaction_map(connection, [row["message_id"]]).get(row["message_id"], {}), "deliveryStatus": "sent", "offline": False,
