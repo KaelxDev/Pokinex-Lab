@@ -1,5 +1,5 @@
-export { createWebSocket } from "./websocket/client";
+export { createWebSocket } from "./websocket/client.ts";
 export {
   clearModerationLock,
   getModerationLock,
-} from "./websocket/moderation";
+} from "./websocket/moderation.ts";
