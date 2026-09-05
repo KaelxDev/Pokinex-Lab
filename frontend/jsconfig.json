@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "allowJs": true,
-    "checkJs": true,
+    "checkJs": false,
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "module": "ESNext",
@@ -12,9 +12,7 @@
     "skipLibCheck": true
   },
   "include": [
-    "src/services/websocket/protocol.ts",
-    "src/services/websocket/deliveryTracker.ts",
-    "src/types/**/*.d.ts"
+    "src/**/*.ts"
   ],
   "exclude": ["node_modules", "dist"]
 }
