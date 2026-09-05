@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createWebSocket } from "../services/websocket";
 
 export function useChatConnection(
@@ -6,6 +6,7 @@ export function useChatConnection(
   { onMessage, onOpen, onAuthenticationRequired } = {},
 ) {
   const socketRef = useRef(null);
+  const connectedRef = useRef(false);
   const callbackRef = useRef({ onMessage, onOpen, onAuthenticationRequired });
   const generationRef = useRef(0);
   const activeRef = useRef(Boolean(enabled));
@@ -13,6 +14,14 @@ export function useChatConnection(
   const [connectionStatus, setConnectionStatus] = useState(enabled ? "connecting" : "disconnected");
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
   const [reconnectSeconds, setReconnectSeconds] = useState(0);
+
+  const updateConnected = useCallback((value) => {
+    connectedRef.current = value;
+    setConnected(value);
+  }, []);
+
+  const isConnected = useCallback(() => connectedRef.current, []);
+  const getSocket = useCallback(() => socketRef.current, []);
 
   useEffect(() => {
     callbackRef.current = { onMessage, onOpen, onAuthenticationRequired };
@@ -26,7 +35,7 @@ export function useChatConnection(
     if (!enabled) {
       socketRef.current?.close();
       socketRef.current = null;
-      setConnected(false);
+      updateConnected(false);
       setConnectionStatus("disconnected");
       setReconnectAttempt(0);
       setReconnectSeconds(0);
@@ -36,7 +45,7 @@ export function useChatConnection(
     const generation = ++generationRef.current;
     let disposed = false;
     socketRef.current?.close();
-    setConnected(false);
+    updateConnected(false);
     setConnectionStatus("connecting");
     setReconnectAttempt(0);
     setReconnectSeconds(0);
@@ -44,7 +53,7 @@ export function useChatConnection(
     const socket = createWebSocket("", {
       onOpen(info) {
         if (disposed || generation !== generationRef.current) return;
-        setConnected(true);
+        updateConnected(true);
         setConnectionStatus("connected");
         setReconnectAttempt(0);
         setReconnectSeconds(0);
@@ -56,20 +65,20 @@ export function useChatConnection(
       },
       onClose() {
         if (disposed || generation !== generationRef.current) return;
-        setConnected(false);
+        updateConnected(false);
         setConnectionStatus(activeRef.current ? "reconnecting" : "disconnected");
         if (activeRef.current) setReconnectSeconds(0);
       },
       onReconnecting(delay, attempt) {
         if (disposed || generation !== generationRef.current || !activeRef.current) return;
-        setConnected(false);
+        updateConnected(false);
         setConnectionStatus("reconnecting");
         setReconnectAttempt(attempt);
         setReconnectSeconds(Math.max(1, Math.ceil(delay / 1000)));
       },
       onAuthenticationRequired() {
         if (disposed || generation !== generationRef.current) return;
-        setConnected(false);
+        updateConnected(false);
         setConnectionStatus("disconnected");
         setReconnectAttempt(0);
         setReconnectSeconds(0);
@@ -85,7 +94,7 @@ export function useChatConnection(
       ++generationRef.current;
       socket.close();
     };
-  }, [enabled]);
+  }, [enabled, updateConnected]);
 
   useEffect(() => {
     if (connectionStatus !== "reconnecting") return undefined;
@@ -101,5 +110,7 @@ export function useChatConnection(
     connectionStatus,
     reconnectAttempt,
     reconnectSeconds,
+    isConnected,
+    getSocket,
   };
 }
