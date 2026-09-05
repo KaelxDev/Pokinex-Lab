@@ -1,4 +1,4 @@
-from app.database import get_connection, using_postgres
+from app.infrastructure.database import get_connection, using_postgres
 
 DELETE_BATCH_SIZE = 500
 CLEAR_ALL_MARKER = "__pokinex_clear_all__::"
