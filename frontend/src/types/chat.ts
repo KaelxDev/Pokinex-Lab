@@ -22,7 +22,7 @@ export interface ReplyTarget {
 
 export interface ChatMessage {
   type?: string;
-  messageId?: MessageId;
+  messageId?: MessageId | null;
   userId?: string | number;
   username?: string;
   displayName?: string;
