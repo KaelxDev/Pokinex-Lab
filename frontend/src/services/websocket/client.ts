@@ -64,7 +64,15 @@ export type ServerEvent = Record<string, unknown> & {
   messageId?: MessageId | null;
 };
 
-type OutgoingEvent = MessagePayload | DirectMessagePayload;
+type OutgoingEvent =
+  | MessagePayload
+  | DirectMessagePayload
+  | ReturnType<typeof directMessageEditPayload>
+  | ReturnType<typeof directMessageDeletePayload>
+  | ReturnType<typeof directMessageReactionPayload>
+  | ReturnType<typeof editMessagePayload>
+  | ReturnType<typeof deleteMessagePayload>
+  | ReturnType<typeof reactionPayload>;
 
 function isMessageId(value: unknown): value is MessageId {
   return typeof value === "string" || typeof value === "number";
