@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.services.moderation import command_args, parse_clear_limit
+from app.services.moderation_commands import command_args, parse_clear_limit
 
 
 def test_parse_clear_limit_accepts_default_and_all():
