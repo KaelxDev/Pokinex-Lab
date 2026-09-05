@@ -1,23 +1,37 @@
+/** @typedef {import("../../types/websocket").DeliveryTrackerOptions} DeliveryTrackerOptions */
+/** @typedef {import("../../types/websocket").DeliveryFailedEvent} DeliveryFailedEvent */
+/** @typedef {import("../../types/websocket").OutgoingMessagePayload} OutgoingMessagePayload */
+/** @typedef {import("../../types/websocket").MessageId} MessageId */
+
 import {
   DELIVERY_TIMEOUT_MS,
   MAX_PENDING_OUTGOING,
 } from "./constants.js";
 
 export class DeliveryTracker {
+  /**
+   * @param {DeliveryTrackerOptions} [options]
+   */
   constructor({ onFailed, timeoutMs = DELIVERY_TIMEOUT_MS } = {}) {
+    /** @type {MessageId[]} */
     this.pendingIds = [];
+    /** @type {Map<string, OutgoingMessagePayload>} */
     this.pendingPayloads = new Map();
+    /** @type {Map<string, ReturnType<typeof setTimeout>>} */
     this.timers = new Map();
+    /** @type {((event: DeliveryFailedEvent) => void) | undefined} */
     this.onFailed = onFailed;
     this.timeoutMs = timeoutMs;
   }
 
+  /** @param {MessageId} messageId */
   clearTimer(messageId) {
     const timer = this.timers.get(String(messageId));
     if (timer) clearTimeout(timer);
     this.timers.delete(String(messageId));
   }
 
+  /** @param {MessageId | null | undefined} messageId */
   forget(messageId) {
     const id = String(messageId || "");
     const index = this.pendingIds.indexOf(messageId);
@@ -26,6 +40,7 @@ export class DeliveryTracker {
     this.pendingPayloads.delete(id);
   }
 
+  /** @param {OutgoingMessagePayload} payload */
   remember(payload) {
     const messageId = payload?.messageId;
     if (!messageId) return;
