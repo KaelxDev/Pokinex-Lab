@@ -90,6 +90,20 @@ def test_public_message_service_owns_message_operations():
         assert function_name in service
 
 
+def test_public_bot_commands_have_a_dedicated_service():
+    bot_service = BACKEND_APP / "services" / "bot_commands.py"
+    moderation_service = BACKEND_APP / "services" / "moderation_commands.py"
+
+    assert bot_service.exists()
+    bot_source = bot_service.read_text(encoding="utf-8")
+    moderation_source = moderation_service.read_text(encoding="utf-8")
+
+    assert "async def send_bot_message" in bot_source
+    assert "async def handle_public_bot_command" in bot_source
+    assert "async def send_bot_message" not in moderation_source
+    assert "def online_user_count" not in moderation_source
+
+
 def test_frontend_has_one_canonical_application_shell():
     main_source = (FRONTEND_SRC / "main.jsx").read_text(encoding="utf-8")
 
