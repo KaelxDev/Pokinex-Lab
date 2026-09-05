@@ -37,11 +37,23 @@ def test_state_owns_duplicate_and_flood_history():
     state = ModerationState()
 
     for index in range(4):
-        count, cleanup = state.duplicate_count(3, "mesma mensagem", f"m-{index}", 100.0 + index)
+        count, cleanup = state.duplicate_count(
+            3,
+            "mesma mensagem",
+            f"m-{index}",
+            100.0 + index,
+            threshold=5,
+        )
         assert count == index + 1
         assert cleanup == ()
 
-    count, cleanup = state.duplicate_count(3, "mesma mensagem", "m-4", 104.0)
+    count, cleanup = state.duplicate_count(
+        3,
+        "mesma mensagem",
+        "m-4",
+        104.0,
+        threshold=5,
+    )
 
     assert count == 5
     assert cleanup == ("m-0", "m-1", "m-2", "m-3")
