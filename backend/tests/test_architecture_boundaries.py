@@ -21,12 +21,14 @@ def _imports_database_facade(path: Path) -> bool:
 def test_production_code_does_not_import_database_compatibility_facade():
     offenders = []
     for path in BACKEND_APP.rglob("*.py"):
-        if path.name == "database.py":
-            continue
         if _imports_database_facade(path):
             offenders.append(path.relative_to(REPO_ROOT).as_posix())
 
     assert offenders == []
+
+
+def test_legacy_database_compatibility_facade_is_removed():
+    assert not (BACKEND_APP / "database.py").exists()
 
 
 def test_websocket_endpoint_remains_transport_only():
