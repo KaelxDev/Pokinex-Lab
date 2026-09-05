@@ -5,7 +5,6 @@ from anyio import to_thread
 from app.database import (
     delete_message as delete_message_record,
     get_message,
-    get_message_owner,
     save_message,
     toggle_reaction as toggle_reaction_record,
     update_message as update_message_record,
