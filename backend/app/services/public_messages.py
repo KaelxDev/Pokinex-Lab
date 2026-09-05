@@ -2,7 +2,7 @@
 
 from anyio import to_thread
 
-from app.database import (
+from app.repositories.message_repository import (
     delete_message as delete_message_record,
     get_message,
     save_message,
