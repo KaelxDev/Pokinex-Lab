@@ -2,7 +2,6 @@ from collections import deque
 from datetime import datetime, timezone
 
 from app.services.public_messages import (
-    REACTIONS,
     delete_message as delete_message_operation,
     edit_message as edit_message_operation,
     public_user_payload,
