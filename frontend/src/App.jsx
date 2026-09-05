@@ -26,10 +26,7 @@ export default function App() {
 
   const [messageInput, setMessageInput] = useState("");
   const [replyingTo, setReplyingTo] = useState(null);
-  const connectionRef = useRef({ connected: false, socket: null });
-
-  const isConnected = useCallback(() => connectionRef.current.connected, []);
-  const getSocket = useCallback(() => connectionRef.current.socket, []);
+  const messageHandlerRef = useRef(() => {});
 
   const {
     users,
@@ -41,6 +38,10 @@ export default function App() {
 
   const profile = users.find((item) => String(item.id) === String(user?.id)) || user;
 
+  const handleWebSocketMessageProxy = useCallback((data) => {
+    messageHandlerRef.current(data);
+  }, []);
+
   const handleConnectionOpen = useCallback(({ reconnected } = {}) => {
     if (reconnected) void loadMessageHistory();
   }, [loadMessageHistory]);
@@ -51,13 +52,13 @@ export default function App() {
     connectionStatus,
     reconnectAttempt,
     reconnectSeconds,
+    isConnected,
+    getSocket,
   } = useChatConnection(Boolean(authChecked && user), {
-    onMessage: () => {},
+    onMessage: handleWebSocketMessageProxy,
     onOpen: handleConnectionOpen,
     onAuthenticationRequired: logout,
   });
-
-  connectionRef.current = { connected, socket: socketRef.current };
 
   const {
     contextMenu,
@@ -132,38 +133,15 @@ export default function App() {
   } = useProfileEditor({ user, profile, syncProfile });
 
   useEffect(() => {
-    if (socketRef.current) {
-      // `useChatConnection` stores transport callbacks internally, so this
-      // ref remains available for the action hook without mutating the socket.
-    }
-  }, [socketRef]);
+    messageHandlerRef.current = handleWebSocketMessage;
+    return () => {
+      messageHandlerRef.current = () => {};
+    };
+  }, [handleWebSocketMessage]);
 
   useEffect(() => {
     if (connected) flushQueue();
   }, [connected, flushQueue]);
-
-  useEffect(() => {
-    connectionRef.current = { connected, socket: socketRef.current };
-  }, [connected, socketRef]);
-
-  useEffect(() => {
-    const socket = socketRef.current;
-    if (!socket) return undefined;
-    return undefined;
-  }, [socketRef]);
-
-  // The connection hook uses callback refs, so the handler is installed by
-  // recreating the hook callback on render. Keeping this assignment here is
-  // intentionally side-effect free for the current socket implementation.
-  useEffect(() => {
-    if (!socketRef.current) return;
-    socketRef.current.__pokinexMessageHandler = handleWebSocketMessage;
-    return () => {
-      if (socketRef.current?.__pokinexMessageHandler === handleWebSocketMessage) {
-        delete socketRef.current.__pokinexMessageHandler;
-      }
-    };
-  }, [handleWebSocketMessage, socketRef]);
 
   async function handleLogout() {
     try {
