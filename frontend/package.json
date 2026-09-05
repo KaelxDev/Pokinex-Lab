@@ -8,7 +8,6 @@
     "build": "vite build",
     "lint": "oxlint",
     "test": "node --test test",
-    "lint": "oxlint",
     "preview": "vite preview"
   },
   "dependencies": {
