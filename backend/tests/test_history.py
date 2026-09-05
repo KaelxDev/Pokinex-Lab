@@ -1,13 +1,12 @@
 from datetime import datetime, timedelta, timezone
 
-import app.database as database
-import app.infrastructure.database as database_infra
+import app.infrastructure.database as database
 from app.services.message_history import get_message_history
 
 
 def _prepare_database(tmp_path, monkeypatch):
     db_path = tmp_path / "history.db"
-    monkeypatch.setattr(database_infra, "SQLITE_DB_PATH", db_path)
+    monkeypatch.setattr(database, "SQLITE_DB_PATH", db_path)
     database.initialize_database()
     return db_path
 
