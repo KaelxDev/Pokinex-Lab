@@ -13,7 +13,7 @@ from contextvars import ContextVar
 from fastapi import WebSocket
 
 from app.auth import get_user_from_token
-from app.moderation_bot import ModerationBot, ModerationResult
+from app.moderation_bot import ModerationBot, ModerationResult, moderation_bot
 from app.roles import get_user_role, is_owner
 from app.websocket.chat import manager
 from app.websocket.schemas import ChatMessageEvent
