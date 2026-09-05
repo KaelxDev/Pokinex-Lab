@@ -25,6 +25,7 @@ import {
 } from "./protocol.ts";
 import type {
   DeliveryFailedEvent,
+  DirectMessagePayload,
   MessageId,
   MessagePayload,
   OutgoingMessagePayload,
@@ -63,17 +64,10 @@ export type ServerEvent = Record<string, unknown> & {
   messageId?: MessageId | null;
 };
 
-type OutgoingEvent = Record<string, unknown> & {
-  type: string;
-  messageId?: MessageId | null;
-};
+type OutgoingEvent = MessagePayload | DirectMessagePayload;
 
 function isMessageId(value: unknown): value is MessageId {
   return typeof value === "string" || typeof value === "number";
-}
-
-function isOutgoingMessagePayload(payload: OutgoingEvent): payload is MessagePayload {
-  return payload.type === "message";
 }
 
 export function createWebSocket(
@@ -191,7 +185,7 @@ export function createWebSocket(
   function send(payload: OutgoingEvent): boolean {
     if (!socket || socket.readyState !== WebSocket.OPEN) return false;
 
-    if (isOutgoingMessagePayload(payload) && isMessageId(payload.messageId)) {
+    if (payload.type === "message" && isMessageId(payload.messageId)) {
       deliveryTracker.remember(payload as OutgoingMessagePayload);
     }
 
