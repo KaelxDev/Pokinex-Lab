@@ -3,11 +3,7 @@ from datetime import datetime, timezone
 from anyio import to_thread
 
 from app.database import get_message_owner
-from app.services.message_runtime import (
-    MAX_MESSAGE_OWNERS,
-    MAX_PROCESSED_MESSAGE_IDS,
-    MessageRuntimeState,
-)
+from app.services import message_runtime
 from app.services.public_messages import (
     delete_message as delete_message_operation,
     edit_message as edit_message_operation,
@@ -15,6 +11,10 @@ from app.services.public_messages import (
     send_message as send_message_operation,
     toggle_reaction as toggle_reaction_operation,
 )
+
+MessageRuntimeState = message_runtime.MessageRuntimeState
+MAX_PROCESSED_MESSAGE_IDS = message_runtime.MAX_PROCESSED_MESSAGE_IDS
+MAX_MESSAGE_OWNERS = message_runtime.MAX_MESSAGE_OWNERS
 
 
 class ConnectionManager:
