@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Header, HTTPException, Query, Request
 
 from app.auth import get_user_by_id
+from app.repositories.direct_message_repository import get_direct_message_history
 from app.routes.auth import require_user
 from app.services.message_history import get_message_history
-from app.websocket.direct_message_features import get_direct_message_history
 
 router = APIRouter(prefix="/api/messages", tags=["messages"])
 
@@ -29,7 +29,10 @@ def direct_messages(
 ):
     _, current_user = require_user(request, authorization)
     if int(current_user["id"]) == int(user_id):
-        raise HTTPException(status_code=400, detail="Não é possível abrir uma conversa privada consigo mesmo.")
+        raise HTTPException(
+            status_code=400,
+            detail="Não é possível abrir uma conversa privada consigo mesmo.",
+        )
     target = get_user_by_id(user_id)
     if not target:
         raise HTTPException(status_code=404, detail="Usuário não encontrado.")
