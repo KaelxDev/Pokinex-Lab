@@ -1,7 +1,9 @@
 import time
+from io import BytesIO
 
 from anyio import to_thread
 from fastapi import APIRouter, File, Header, HTTPException, Request, Response, UploadFile, status
+from PIL import Image, UnidentifiedImageError
 from pydantic import BaseModel, Field
 
 from app.auth import authenticate, create_session, create_user, delete_session, get_user_by_id, update_profile
@@ -12,7 +14,9 @@ from app.websocket.chat import manager
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 MAX_AVATAR_SIZE = 2 * 1024 * 1024
+MAX_AVATAR_DIMENSION = 2048
 ALLOWED_IMAGE_TYPES = {"image/jpeg": ".jpg", "image/png": ".png", "image/gif": ".gif", "image/webp": ".webp"}
+ALLOWED_IMAGE_FORMATS = {"image/jpeg": "JPEG", "image/png": "PNG", "image/gif": "GIF", "image/webp": "WEBP"}
 
 
 class Credentials(BaseModel):
@@ -30,6 +34,20 @@ class ProfileUpdate(BaseModel):
 def _rate_limit_or_429(request: Request, scope: str, limit: int, window_seconds: int) -> None:
     if not allow_request(f"{scope}:{client_key(request)}", limit, window_seconds):
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Muitas tentativas. Tente novamente mais tarde.")
+
+
+def _validate_image(content: bytes, content_type: str) -> None:
+    try:
+        with Image.open(BytesIO(content)) as image:
+            if image.format != ALLOWED_IMAGE_FORMATS[content_type]:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="O conteúdo da imagem não corresponde ao formato declarado.")
+            if image.width > MAX_AVATAR_DIMENSION or image.height > MAX_AVATAR_DIMENSION:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="A imagem excede a dimensão máxima permitida de 2048x2048.")
+            image.verify()
+    except HTTPException:
+        raise
+    except (UnidentifiedImageError, OSError, ValueError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Imagem inválida ou corrompida.") from exc
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
@@ -92,6 +110,7 @@ async def upload_avatar(request: Request, file: UploadFile = File(...), authoriz
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="A imagem deve ter no máximo 2 MB.")
     if not content:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="A imagem está vazia.")
+    await to_thread.run_sync(_validate_image, content, content_type)
     avatar_path = await to_thread.run_sync(store_avatar, user["id"], content, content_type)
     version = int(time.time() * 1000)
     return {"avatar": f"{avatar_path}?v={version}"}
