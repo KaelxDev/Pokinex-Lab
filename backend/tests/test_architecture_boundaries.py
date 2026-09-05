@@ -18,6 +18,17 @@ def _imports_database_facade(path: Path) -> bool:
     return False
 
 
+def _imports_websocket_package(path: Path) -> bool:
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            if any(alias.name.startswith("app.websocket") for alias in node.names):
+                return True
+        if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("app.websocket"):
+            return True
+    return False
+
+
 def test_production_code_does_not_import_database_compatibility_facade():
     offenders = []
     for path in BACKEND_APP.rglob("*.py"):
@@ -29,6 +40,21 @@ def test_production_code_does_not_import_database_compatibility_facade():
 
 def test_legacy_database_compatibility_facade_is_removed():
     assert not (BACKEND_APP / "database.py").exists()
+
+
+def test_message_routes_do_not_depend_on_websocket_persistence():
+    routes_file = BACKEND_APP / "routes" / "messages.py"
+    assert not _imports_websocket_package(routes_file)
+
+
+def test_direct_message_persistence_has_a_repository_boundary():
+    repository = BACKEND_APP / "repositories" / "direct_message_repository.py"
+    feature = BACKEND_APP / "websocket" / "direct_message_features.py"
+
+    assert repository.exists()
+    assert "from app.infrastructure.database" in repository.read_text(encoding="utf-8")
+    assert "get_connection" not in feature.read_text(encoding="utf-8")
+    assert "using_postgres" not in feature.read_text(encoding="utf-8")
 
 
 def test_websocket_endpoint_remains_transport_only():
