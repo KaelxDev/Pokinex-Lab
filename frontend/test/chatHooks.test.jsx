@@ -1,5 +1,5 @@
-import { renderHook, act, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, renderHook, act, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 const connectionMocks = vi.hoisted(() => ({
   callbacks: null,
@@ -29,6 +29,12 @@ vi.mock("../src/services/auth.ts", () => ({
 import { useChatConnection } from "../src/hooks/useChatConnection";
 import { useChatHistory } from "../src/hooks/useChatHistory";
 import { useMessageMutations } from "../src/hooks/chat/useMessageMutations";
+
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+  connectionMocks.callbacks = null;
+});
 
 describe("useChatConnection", () => {
   it("tracks open and reconnecting states from the WebSocket client", () => {
