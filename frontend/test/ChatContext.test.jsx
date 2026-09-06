@@ -108,11 +108,11 @@ describe("ChatProvider", () => {
       </ChatProvider>,
     );
 
-    expect(screen.getByTestId("user")).toHaveTextContent("kael");
-    expect(screen.getByTestId("message-count")).toHaveTextContent("1");
+    expect(screen.getByTestId("user").textContent).toBe("kael");
+    expect(screen.getByTestId("message-count").textContent).toBe("1");
   });
 
-  it("keeps context mutations connected to the underlying hooks", async () => {
+  it("keeps context mutations connected to the underlying hooks", () => {
     const user = { id: "1", username: "kael", role: "owner" };
 
     render(
