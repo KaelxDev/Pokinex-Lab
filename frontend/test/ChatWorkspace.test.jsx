@@ -1,6 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   onLogout: vi.fn(),
@@ -102,6 +102,11 @@ vi.mock("../src/components/ProfileModal", () => ({
 }));
 
 import ChatWorkspace from "../src/components/ChatWorkspace";
+
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 
 describe("ChatWorkspace", () => {
   it("composes the major chat regions from ChatContext state", () => {
