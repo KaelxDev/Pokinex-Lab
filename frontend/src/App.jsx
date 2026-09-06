@@ -1,4 +1,4 @@
-import { logout as logoutRequest } from "./services/auth";
+import { logout as logoutRequest } from "./services/auth.ts";
 import AuthScreen from "./components/AuthScreen";
 import ChatWorkspace from "./components/ChatWorkspace.jsx";
 import { ChatProvider } from "./context/ChatContext";
