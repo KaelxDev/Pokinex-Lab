@@ -53,3 +53,24 @@ test("auth service formats API validation errors", async () => {
     /A senha deve conter no mínimo 8 caracteres\./,
   );
 });
+
+test("auth service preserves the opaque history cursor contract", async () => {
+  const calls = [];
+  globalThis.fetch = async (input, init) => {
+    calls.push({ input: String(input), init });
+    return createResponse({
+      messages: [{ messageId: "m1", message: "hello" }],
+      nextBefore: "opaque-cursor",
+      hasMore: true,
+    });
+  };
+
+  const auth = await import("../src/services/auth.ts");
+  const history = await auth.getMessageHistory(25, "previous-cursor");
+
+  assert.equal(history.nextBefore, "opaque-cursor");
+  assert.equal(history.hasMore, true);
+  assert.equal(history.messages?.[0]?.messageId, "m1");
+  assert.match(calls[0].input, /limit=25/);
+  assert.match(calls[0].input, /before=previous-cursor/);
+});
