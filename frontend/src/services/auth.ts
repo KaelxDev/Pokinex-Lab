@@ -30,10 +30,10 @@ export interface ProfilePayload {
 }
 
 function translateValidationMessage(item: unknown): string {
-  const value = typeof item === "string" ? item : (item as ValidationErrorItem | null)?.msg || (item as ValidationErrorItem | null)?.message || "";
-  const field = Array.isArray((item as ValidationErrorItem | null)?.loc)
-    ? (item as ValidationErrorItem).loc?.[item as ValidationErrorItem].length - 1
-    : "";
+  const error = item as ValidationErrorItem | null;
+  const value = typeof item === "string" ? item : error?.msg || error?.message || "";
+  const location = error?.loc;
+  const field = Array.isArray(location) ? location[location.length - 1] : "";
 
   if (/String should have at least 8 characters/i.test(value) && field === "password") {
     return "A senha deve conter no mínimo 8 caracteres.";
@@ -92,7 +92,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 
   const data = await readResponseData(response);
-  if (!response.ok) throw new Error(formatApiError((data as { detail?: unknown } | null)?.detail));
+  if (!response.ok) {
+    throw new Error(formatApiError((data as { detail?: unknown } | null)?.detail));
+  }
   return data as T;
 }
 
@@ -160,7 +162,10 @@ export async function getMessageHistory(
   const data = await readResponseData(response);
   if (!response.ok) {
     throw new Error(
-      formatApiError((data as { detail?: unknown } | null)?.detail, "Não foi possível carregar o histórico."),
+      formatApiError(
+        (data as { detail?: unknown } | null)?.detail,
+        "Não foi possível carregar o histórico.",
+      ),
     );
   }
 
