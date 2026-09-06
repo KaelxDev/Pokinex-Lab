@@ -142,7 +142,7 @@ def test_frontend_has_one_canonical_application_shell():
 
 
 def test_frontend_user_directory_has_replaced_legacy_profile_hook():
-    assert (FRONTEND_SRC / "hooks" / "useUserDirectory.js").exists()
+    assert (FRONTEND_SRC / "hooks" / "useUserDirectory.ts").exists()
     assert not (FRONTEND_SRC / "hooks" / "useUserProfiles.js").exists()
 
 

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { clearLegacyToken, me } from "../services/auth";
+import { clearLegacyToken, me } from "../services/auth.ts";
+import type { UserRecord } from "../types/chat";
 
-function normalizeUser(currentUser) {
+function normalizeUser(currentUser: UserRecord | null | undefined): UserRecord | null {
   if (!currentUser) return null;
   return {
     ...currentUser,
@@ -9,12 +10,20 @@ function normalizeUser(currentUser) {
   };
 }
 
-export function useAuthSession() {
-  const [authChecked, setAuthChecked] = useState(false);
-  const [user, setUser] = useState(null);
-  const userRef = useRef(null);
+export interface AuthSessionState {
+  authChecked: boolean;
+  user: UserRecord | null;
+  userRef: ReturnType<typeof useRef<UserRecord | null>>;
+  syncUser: (nextUser: UserRecord | null | undefined) => void;
+  logout: () => void;
+}
 
-  const syncUser = useCallback((nextUser) => {
+export function useAuthSession(): AuthSessionState {
+  const [authChecked, setAuthChecked] = useState(false);
+  const [user, setUser] = useState<UserRecord | null>(null);
+  const userRef = useRef<UserRecord | null>(null);
+
+  const syncUser = useCallback((nextUser: UserRecord | null | undefined) => {
     const normalizedUser = normalizeUser(nextUser);
     setUser(normalizedUser);
     userRef.current = normalizedUser;
@@ -23,7 +32,7 @@ export function useAuthSession() {
   useEffect(() => {
     let cancelled = false;
 
-    async function restore() {
+    async function restore(): Promise<void> {
       try {
         const currentUser = await me();
         if (cancelled) return;
@@ -44,10 +53,10 @@ export function useAuthSession() {
     };
   }, [syncUser]);
 
-  function logout() {
+  const logout = useCallback(() => {
     clearLegacyToken();
     syncUser(null);
-  }
+  }, [syncUser]);
 
   return { authChecked, user, userRef, syncUser, logout };
 }

@@ -1,11 +1,34 @@
 import { useEffect, useState } from "react";
-import { updateProfile, uploadAvatar } from "../services/auth";
+import type { ChangeEvent, FormEvent } from "react";
+import { updateProfile, uploadAvatar } from "../services/auth.ts";
+import type { UserRecord } from "../types/chat";
 
-export function useProfileEditor({ user, profile, syncProfile }) {
+export interface ProfileEditorOptions {
+  user: UserRecord | null;
+  profile: UserRecord | null;
+  syncProfile: (nextUser: UserRecord) => void;
+}
+
+export interface ProfileEditorState {
+  profileOpen: boolean;
+  profileError: string;
+  profileSaving: boolean;
+  avatarPreviewUrl: string;
+  openProfile: () => void;
+  saveProfile: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  chooseAvatar: (event: ChangeEvent<HTMLInputElement>) => void;
+  closeProfile: () => void;
+}
+
+export function useProfileEditor({
+  user,
+  profile,
+  syncProfile,
+}: ProfileEditorOptions): ProfileEditorState {
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileError, setProfileError] = useState("");
   const [profileSaving, setProfileSaving] = useState(false);
-  const [selectedAvatarFile, setSelectedAvatarFile] = useState(null);
+  const [selectedAvatarFile, setSelectedAvatarFile] = useState<File | null>(null);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState("");
 
   useEffect(() => {
@@ -14,12 +37,12 @@ export function useProfileEditor({ user, profile, syncProfile }) {
     };
   }, [avatarPreviewUrl]);
 
-  function openProfile() {
+  function openProfile(): void {
     setProfileError("");
     setProfileOpen(true);
   }
 
-  async function saveProfile(event) {
+  async function saveProfile(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setProfileError("");
     setProfileSaving(true);
@@ -34,8 +57,7 @@ export function useProfileEditor({ user, profile, syncProfile }) {
 
       const updated = await updateProfile({
         username: String(form.get("username") || oldUsername).trim(),
-        displayName:
-          String(form.get("displayName") || oldUsername).trim() || oldUsername,
+        displayName: String(form.get("displayName") || oldUsername).trim() || oldUsername,
         avatar: nextAvatar,
         status: String(form.get("status") || "").trim(),
       });
@@ -44,14 +66,16 @@ export function useProfileEditor({ user, profile, syncProfile }) {
       setAvatarPreviewUrl("");
       syncProfile(updated);
       setProfileOpen(false);
-    } catch (error) {
-      setProfileError(error.message || "Não foi possível atualizar o perfil.");
+    } catch (error: unknown) {
+      setProfileError(
+        error instanceof Error ? error.message : "Não foi possível atualizar o perfil.",
+      );
     } finally {
       setProfileSaving(false);
     }
   }
 
-  function chooseAvatar(event) {
+  function chooseAvatar(event: ChangeEvent<HTMLInputElement>): void {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -73,7 +97,8 @@ export function useProfileEditor({ user, profile, syncProfile }) {
     event.target.value = "";
   }
 
-  function closeProfile() {
+  function closeProfile(): void {
+    if (avatarPreviewUrl) URL.revokeObjectURL(avatarPreviewUrl);
     setSelectedAvatarFile(null);
     setAvatarPreviewUrl("");
     setProfileError("");
