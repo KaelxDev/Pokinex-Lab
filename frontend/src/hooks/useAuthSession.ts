@@ -10,6 +10,11 @@ function normalizeUser(currentUser: UserRecord | null | undefined): UserRecord |
   };
 }
 
+function emitAuthSession(user: UserRecord | null): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("pokinex:auth-user", { detail: user }));
+}
+
 export interface AuthSessionState {
   authChecked: boolean;
   user: UserRecord | null;
@@ -27,6 +32,7 @@ export function useAuthSession(): AuthSessionState {
     const normalizedUser = normalizeUser(nextUser);
     setUser(normalizedUser);
     userRef.current = normalizedUser;
+    emitAuthSession(normalizedUser);
   }, []);
 
   useEffect(() => {
