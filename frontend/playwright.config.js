@@ -7,7 +7,7 @@ export default defineConfig({
   testDir: "./e2e",
   fullyParallel: false,
   workers: 1,
-  retries: process.env.CI ? 2 : 0,
+  retries: 0,
   timeout: 90_000,
   expect: {
     timeout: 10_000,
@@ -30,6 +30,7 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       env: {
         ALLOWED_ORIGINS: frontendUrl,
+        POKINEX_E2E: "1",
       },
     },
     {
