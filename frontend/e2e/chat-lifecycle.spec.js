@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
-const API_URL = process.env.E2E_API_URL || "http://127.0.0.1:8000/api/auth";
+const BACKEND_URL = process.env.E2E_BACKEND_URL || "http://127.0.0.1:8000";
+const API_URL = process.env.E2E_API_URL || `${BACKEND_URL}/api/auth`;
 const TEST_PASSWORD = "Playwright#2026!";
 
 function uniqueUsername(prefix) {
@@ -76,18 +77,20 @@ test("login → chat → mensagem → editar/reagir → reconectar → DM", asyn
     await page.getByRole("button", { name: "Reagir com ❤️" }).click();
     await expect(editedNode.locator(".message-reaction").filter({ hasText: "❤️" })).toBeVisible();
 
-    await page.context().setOffline(true);
+    const disconnectResponse = await request.post(`${BACKEND_URL}/__e2e__/disconnect/${sender.id}`);
+    const disconnectBody = await disconnectResponse.json().catch(() => null);
+    expect(disconnectResponse.status(), JSON.stringify(disconnectBody)).toBe(200);
+    expect(disconnectBody.closed).toBeGreaterThan(0);
+
     await expect(page.locator(".connection-reconnecting")).toBeVisible({ timeout: 15_000 });
-    await page.context().setOffline(false);
     await expect(page.locator(".connection-online")).toBeVisible({ timeout: 30_000 });
     await expect(page.locator(".message.mine").filter({ hasText: editedMessage })).toBeVisible();
 
     await recipientTrigger.click();
 
-    const senderPublicName = await page.locator(".private-dm-overlay").getByText(`@${recipient.username}`).isVisible();
-    expect(senderPublicName).toBe(true);
     const dm = page.locator(".private-dm-overlay");
     await expect(dm).toBeVisible();
+    await expect(dm.getByText(`@${recipient.username}`)).toBeVisible();
     const dmInput = page.getByRole("textbox", { name: "Digite sua mensagem privada" });
     await expect(dmInput).toBeEnabled();
 
