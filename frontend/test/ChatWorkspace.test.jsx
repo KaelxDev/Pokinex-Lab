@@ -130,4 +130,13 @@ describe("ChatWorkspace", () => {
     expect(mocks.onLogout).toHaveBeenCalledTimes(1);
     expect(mocks.context.sendMessage).toHaveBeenCalledTimes(1);
   });
+
+  it("delegates profile opening to ChatContext", async () => {
+    const user = userEvent.setup();
+    render(<ChatWorkspace onLogout={mocks.onLogout} />);
+
+    await user.click(screen.getByRole("button", { name: "profile" }));
+
+    expect(mocks.context.openProfile).toHaveBeenCalledTimes(1);
+  });
 });
