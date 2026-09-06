@@ -92,6 +92,8 @@ test("login → chat → mensagem → editar/reagir → reconectar → DM", asyn
       `.private-dm-overlay[aria-label="Conversa privada com ${recipient.username}"]`,
     );
     await expect(dm).toBeVisible();
+    await expect(dm.locator(".private-dm-status")).toContainText("Privado", { timeout: 30_000 });
+
     const dmInput = page.getByRole("textbox", { name: "Digite sua mensagem privada" });
     await expect(dmInput).toBeEnabled();
 
