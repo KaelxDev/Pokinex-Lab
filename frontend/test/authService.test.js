@@ -11,16 +11,11 @@ function createResponse(body, { ok = true, status = 200 } = {}) {
   };
 }
 
-async function loadAuthService() {
-  globalThis.localStorage = {
-    removeItem() {},
-  };
-  globalThis.fetch = async () => createResponse({ user: { id: "1", username: "kael" } });
-  return import("../src/services/auth.ts");
-}
+globalThis.localStorage = { removeItem() {} };
 
 test("auth service exposes typed authentication operations", async () => {
-  const auth = await loadAuthService();
+  globalThis.fetch = async () => createResponse({ user: { id: "1", username: "kael" } });
+  const auth = await import("../src/services/auth.ts");
   const user = await auth.login("kael", "password123");
 
   assert.equal(user.id, "1");
@@ -28,9 +23,8 @@ test("auth service exposes typed authentication operations", async () => {
 });
 
 test("auth service rejects successful responses without a user payload", async () => {
-  globalThis.localStorage = { removeItem() {} };
   globalThis.fetch = async () => createResponse({});
-  const auth = await import("../src/services/auth.ts?missing-user");
+  const auth = await import("../src/services/auth.ts");
 
   await assert.rejects(
     () => auth.me(),
@@ -39,7 +33,6 @@ test("auth service rejects successful responses without a user payload", async (
 });
 
 test("auth service formats API validation errors", async () => {
-  globalThis.localStorage = { removeItem() {} };
   globalThis.fetch = async () =>
     createResponse(
       {
@@ -53,7 +46,7 @@ test("auth service formats API validation errors", async () => {
       { ok: false, status: 422 },
     );
 
-  const auth = await import("../src/services/auth.ts?validation-error");
+  const auth = await import("../src/services/auth.ts");
 
   await assert.rejects(
     () => auth.login("kael", "short"),
