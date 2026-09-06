@@ -64,6 +64,9 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: React component tests
+        run: npm run test:react
+
       - name: Type check
         run: npm run typecheck
 
