@@ -1,5 +1,5 @@
 import type { ChatMessage, UserRecord } from "../types/chat";
-import { API_URL, LEGACY_AUTH_TOKEN_KEY, messagesHistoryUrl } from "../config/runtime";
+import { API_URL, LEGACY_AUTH_TOKEN_KEY, messagesHistoryUrl } from "../config/runtime.ts";
 
 interface ValidationErrorItem {
   msg?: string;
