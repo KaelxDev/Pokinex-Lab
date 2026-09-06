@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
   const messages = [{ type: "message", messageId: "m-1", message: "Olá" }];
@@ -97,6 +97,11 @@ function Probe() {
     </>
   );
 }
+
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 
 describe("ChatProvider", () => {
   it("exposes authenticated user and aggregated chat state through context", () => {
