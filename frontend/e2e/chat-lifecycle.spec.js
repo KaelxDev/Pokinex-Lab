@@ -88,9 +88,10 @@ test("login → chat → mensagem → editar/reagir → reconectar → DM", asyn
 
     await recipientTrigger.click();
 
-    const dm = page.locator(".private-dm-overlay");
+    const dm = page.locator(
+      `.private-dm-overlay[aria-label="Conversa privada com ${recipient.username}"]`,
+    );
     await expect(dm).toBeVisible();
-    await expect(dm.getByText(`@${recipient.username}`)).toBeVisible();
     const dmInput = page.getByRole("textbox", { name: "Digite sua mensagem privada" });
     await expect(dmInput).toBeEnabled();
 
@@ -105,7 +106,9 @@ test("login → chat → mensagem → editar/reagir → reconectar → DM", asyn
     await expect(senderTriggerOnRecipient).toBeVisible({ timeout: 15_000 });
     await senderTriggerOnRecipient.click();
 
-    const recipientDm = recipientPage.locator(".private-dm-overlay");
+    const recipientDm = recipientPage.locator(
+      `.private-dm-overlay[aria-label="Conversa privada com ${sender.username}"]`,
+    );
     await expect(recipientDm).toBeVisible();
     await expect(recipientDm.locator(".private-dm-message").filter({ hasText: directMessage })).toBeVisible();
   } finally {
