@@ -1,10 +1,11 @@
 """Pokinex application entrypoint and HTTP configuration."""
 
 from contextlib import asynccontextmanager
+import os
 from pathlib import Path
 
 from anyio import to_thread
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -12,6 +13,7 @@ from app.infrastructure.database import close_db_pool, init_db_pool, initialize_
 from app.routes.auth import router as auth_router
 from app.routes.messages import router as messages_router
 from app.security import ALLOWED_ORIGINS
+from app.websocket.chat import manager
 from app.websocket.endpoint import websocket_endpoint
 
 APP_DIR = Path(__file__).resolve().parent
@@ -47,3 +49,16 @@ app.websocket("/ws")(websocket_endpoint)
 @app.get("/")
 async def root():
     return {"message": "Pokinex API", "status": "online"}
+
+
+@app.post("/__e2e__/disconnect/{user_id}", include_in_schema=False)
+async def e2e_disconnect(user_id: int):
+    if os.getenv("POKINEX_E2E") != "1":
+        raise HTTPException(status_code=404, detail="Not found")
+
+    closed = await manager.disconnect_user(
+        user_id,
+        code=1001,
+        reason="E2E reconnect test",
+    )
+    return {"closed": closed}
