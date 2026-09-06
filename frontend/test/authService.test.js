@@ -11,6 +11,11 @@ function createResponse(body, { ok = true, status = 200 } = {}) {
   };
 }
 
+globalThis.window = {
+  location: {
+    hostname: "localhost",
+  },
+};
 globalThis.localStorage = { removeItem() {} };
 
 test("auth service exposes typed authentication operations", async () => {
