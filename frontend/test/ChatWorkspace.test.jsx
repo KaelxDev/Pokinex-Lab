@@ -3,9 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  sendMessage: vi.fn(),
   onLogout: vi.fn(),
-  contextMenu: null,
   context: {
     user: { id: "1", username: "kael" },
     profile: { id: "1", username: "kael" },
@@ -109,12 +107,12 @@ describe("ChatWorkspace", () => {
   it("composes the major chat regions from ChatContext state", () => {
     render(<ChatWorkspace onLogout={mocks.onLogout} />);
 
-    expect(screen.getByTestId("chat-sidebar")).toBeInTheDocument();
-    expect(screen.getByTestId("chat-header")).toBeInTheDocument();
-    expect(screen.getByTestId("message-list")).toBeInTheDocument();
-    expect(screen.getByTestId("message-composer")).toBeInTheDocument();
-    expect(screen.getByTestId("message-context-menu")).toBeInTheDocument();
-    expect(screen.getByTestId("profile-modal")).toBeInTheDocument();
+    expect(screen.getByTestId("chat-sidebar")).toBeTruthy();
+    expect(screen.getByTestId("chat-header")).toBeTruthy();
+    expect(screen.getByTestId("message-list")).toBeTruthy();
+    expect(screen.getByTestId("message-composer")).toBeTruthy();
+    expect(screen.getByTestId("message-context-menu")).toBeTruthy();
+    expect(screen.getByTestId("profile-modal")).toBeTruthy();
   });
 
   it("forwards logout and composer actions without owning chat state", async () => {
